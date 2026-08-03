@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>What Fails Next — Gustavo Azevedo</title>
+<meta name="description" content="Eleven stages of an ingest client for a cursor-paginated API, each one built because the previous version broke against something specific — with the live numbers an adversarial mock server produced."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/what-fails-next.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/what-fails-next.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="What Fails Next"/>
+<meta property="og:description" content="Eleven stages of an ingest client for a cursor-paginated API, each one built because the previous version broke against something specific — with the live numbers an adversarial mock server produced."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-08-03T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-03T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Distributed Systems"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="What Fails Next"/>
+<meta name="twitter:description" content="Eleven stages of an ingest client for a cursor-paginated API, each one built because the previous version broke against something specific — with the live numbers an adversarial mock server produced."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"What Fails Next","description":"Eleven stages of an ingest client for a cursor-paginated API, each one built because the previous version broke against something specific — with the live numbers an adversarial mock server produced.","datePublished":"2026-08-03","dateModified":"2026-08-03","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/what-fails-next.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/what-fails-next.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"What Fails Next","item":"https://gpazevedo.github.io/blog/eng/what-fails-next.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+    <li><a href="../../index.html#blog-business">Business</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Distributed Systems</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Distributed Systems</span>
+    <span class="dot">·</span>
+    <time datetime="2026-08-03">August 2026</time>
+    <span class="dot">·</span>
+    <span>19 min read</span>
+  </div>
+
+  <h1>What Fails <em>Next</em></h1>
+  <p class="deck">Building an ingest client for 50 million records, one failure at a time.</p>
+
+  <div class="tldr">
+    <div class="tldr-label">TL;DR</div>
+    <p><strong>The problem.</strong> Read fifty million records out of a cursor-paginated HTTP API and land every one of them — over hours, at high throughput, against a server that rate-limits, stalls, serves malformed rows, and changes while you are reading it.</p>
+    <p><strong>What you get.</strong> A working consumer, built in eleven stages, each one added because the previous version broke against something specific at scale: streaming pagination that never buffers, a retry <em>policy</em> rather than a retry loop, validation split in two, checkpoints that survive <code>SIGKILL</code>, a worker pool whose watermark cannot skip a page, proactive rate limiting, sharding across parallel walkers, and detection for a dataset that mutates mid-walk.</p>
+    <p><strong>Why it is worth your time.</strong> The failure modes here return <strong>exit code 0</strong>. Every stage carries the live numbers that prove it, reconciled against a server that counts independently — so no claim in this post is the client grading its own homework.</p>
+    <p><strong>The code.</strong> <a href="https://github.com/gpazevedo/api-consumer">gpazevedo/api-consumer</a> — one merge commit per stage, each carrying its tests, its mutations and its live numbers.</p>
+    <p><strong>Part 1 of 2</strong> — this half is about getting the data <em>out</em>. <a href="the-sink-was-a-lie.html">Part 2</a> is about saving it.</p>
+  </div>
+
+  <p>The brief is ordinary: read every record from a cursor-paginated API and land it somewhere. Fifty million rows. Write it.</p>
+
+  <p>Almost every version of this ever written works on the first ten thousand records and is wrong about the rest.</p>
+
+  <blockquote><p>Not wrong in a way that raises — wrong in a way that returns exit code 0 and a number nobody checks.</p></blockquote>
+
+  <p>The code in <a href="https://github.com/gpazevedo/api-consumer"><code>api-consumer</code></a> was not designed and then written. It was built eleven times, and each version exists because the previous one broke against something specific. The git history is that sequence, one merge per stage, each carrying the tests that pass and the numbers a live run produced against an adversarial mock server that is trying to make the client look good.</p>
+
+  <div class="bt-stat-band">
+    <div class="bt-stat">
+      <div class="n">50M</div>
+      <div class="l">rows to walk</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n">11</div>
+      <div class="l">stages, one merge commit each</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n red">339</div>
+      <div class="l">records a passing client dropped silently</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">The method</div>
+    <p>Anyone can write a client that reports success. <a href="https://github.com/gpazevedo/api-consumer/blob/main/server/server.py"><code>server/server.py</code></a> keeps its own counters — rows served, malformed rows injected, retries by status, duplicate pages, distinct shards seen — and <strong>every claim the client makes has a counterpart there that it cannot fake.</strong></p>
+  </div>
+
+  <hr>
+
+  <h2>Part I — The walk itself</h2>
+
+  <h3>Stage 1 · Peak memory is one page, and that is a promise</h3>
+
+  <p>The first version returns a list. It is also the last version that fits in memory.</p>
+
+  <p><code>iter_pages</code> is an async generator, and that is an <strong>interface commitment, not an optimisation</strong>. The moment it accumulates and returns, the job is capped at RAM, and no cleverness downstream recovers it. A test pulls exactly one page from a three-page walk and asserts that exactly one request was issued. If the generator ever buffers, that test reads 3.</p>
+
+  <p>Four commitments are made here. Each one is a line or two of code, and each one is collected on later.</p>
+
+  <div class="layer-stack">
+    <div class="layer l1">
+      <div class="layer-meta">
+        <span class="layer-num">Invariant 1</span>
+        <span class="layer-name">Stream, never buffer</span>
+        <span class="layer-src">iter_pages — async generator</span>
+      </div>
+      <div class="chips">
+        <span class="chip">peak memory = one page</span>
+        <span class="chip">test asserts 1 request, not 3</span>
+      </div>
+    </div>
+    <div class="layer l2">
+      <div class="layer-meta">
+        <span class="layer-num">Invariant 2</span>
+        <span class="layer-name">Unpack before the emptiness check</span>
+        <span class="layer-src">only the cursor states the contract</span>
+      </div>
+      <div class="chips">
+        <span class="chip">empty page + live cursor</span>
+        <span class="chip">full page + null cursor</span>
+      </div>
+    </div>
+    <div class="layer l3">
+      <div class="layer-meta">
+        <span class="layer-num">Invariant 3</span>
+        <span class="layer-name">Yield the cursor that follows</span>
+        <span class="layer-src">collected at stage 4</span>
+      </div>
+      <div class="chips">
+        <span class="chip">persist progress after durability</span>
+      </div>
+    </div>
+    <div class="layer l4">
+      <div class="layer-meta">
+        <span class="layer-num">Invariant 4</span>
+        <span class="layer-name">The cursor is opaque</span>
+        <span class="layer-src">collected at stage 11</span>
+      </div>
+      <div class="chips">
+        <span class="chip">never decoded</span>
+        <span class="chip">never incremented</span>
+        <span class="chip">handed back verbatim</span>
+      </div>
+    </div>
+  </div>
+
+  <p>The unpack happens <em>before</em> the emptiness check. A last page can be empty with a non-null cursor, or full with a null one. Only the cursor states the contract — terminating on the payload is a guess about it.</p>
+
+  <p>Each page is yielded with the cursor that <em>follows</em> it. Three stages later, that is what lets progress be persisted after a page is durable rather than before.</p>
+
+  <p>And a rule that looks like pedantry for ten stages: <strong>the cursor is opaque.</strong> Never decoded, never incremented, only checked for truthiness or handed back verbatim. It costs nothing. We will collect on it at the very end.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Make the pager an <strong>async generator</strong> and treat the cursor as opaque — never decoded, never incremented. Peak memory stays at one page whatever the dataset size, and a later server-side switch to keyset pagination costs you one URL.</p>
+  </div>
+
+  <h3>Stage 2 · A hostile network is the normal case</h3>
+
+  <p>At fifty million rows, a 503 is not an exception. It is a Tuesday.</p>
+
+  <p>The retry loop goes in one place — <code>ApiClient.get_json</code> — so <code>iter_pages</code> never learns that retries exist. A page that 500s once is retried underneath it and yielded as though it had succeeded on the first try.</p>
+
+  <p>The interesting part is what is <em>not</em> retried.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Status</th><th>Reading</th><th>Policy</th><th>Why</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>429</td>
+          <td>rate limit</td>
+          <td><span class="pill pill-disable">retry</span></td>
+          <td>The server is asking. Back off and come back.</td>
+        </tr>
+        <tr>
+          <td>500 · 502 · 503</td>
+          <td>transient</td>
+          <td><span class="pill pill-disable">retry</span></td>
+          <td>The condition that caused it may not survive the wait.</td>
+        </tr>
+        <tr class="row-quality">
+          <td>501</td>
+          <td>terminal, despite 5xx</td>
+          <td><span class="pill pill-rollback">stop</span></td>
+          <td>Not Implemented is a permanent statement about an endpoint.</td>
+        </tr>
+        <tr>
+          <td>401 · 403</td>
+          <td>terminal</td>
+          <td><span class="pill pill-rollback">stop</span></td>
+          <td>Six attempts against a 401 burns quota on a bug retries cannot fix.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>That is the difference between a retry policy and a retry loop.</p>
+
+  <p>Backoff is full jitter — <code>random.uniform(0, ceiling)</code>, not a fixed exponential. The exponential bounds the worst case; the randomisation is what stops every concurrent retry waking on the same tick and re-triggering the limit that caused them.</p>
+
+<pre><code>delay = random.uniform(0, min(cap, base * 2 ** attempt))
+log.warning("retrying in %.2fs", delay)   # the number logged ...
+await asyncio.sleep(delay)                # ... is the number slept</code></pre>
+
+  <p>Two small properties are held structurally, because both are easy to break in ways that produce a <em>plausible-looking</em> log.</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-blue">◷</div>
+        <div class="tcard-title">The delay logged is the delay slept</div>
+      </div>
+      <p>One number, logged and slept by the same call. Sampling the distribution a second time to build the message produces a retry log that is fiction.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">↑</div>
+        <div class="tcard-title">Giving up raises the underlying fault</div>
+      </div>
+      <p>The caller sees httpx's own exception, not a wrapper. When it eventually fails at 3am, the traceback names the thing that actually happened.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Put retries in <strong>one funnel underneath the iterator</strong>, and make retryable-versus-terminal a policy rather than a status-code range. Full jitter, honour <code>Retry-After</code>, and log the delay you actually slept.</p>
+  </div>
+    </div>
+  </div>
+
+  <h3>Stage 3 · Bad data is not an error</h3>
+
+  <p>Somewhere in fifty million rows is a record with no <code>attributes</code>. If that stops the run, the run never finishes.</p>
+
+  <p>But if <em>everything</em> is tolerated, a client pointed at the wrong endpoint cheerfully reports "50,000,000 rejected" and exits 0.</p>
+
+  <p>So there are two levels, and keeping them apart <em>is</em> the stage.</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">⊗</div>
+        <div class="tcard-title">Protocol violation — stop</div>
+      </div>
+      <p><code>payload["data"]</code> missing or not a list. The API changed or the URL is wrong. There is nothing to walk.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">⊕</div>
+        <div class="tcard-title">Data quality event — keep walking</div>
+      </div>
+      <p>One row missing <code>attributes</code>. Log it with the row and the reason, and carry on to the next one.</p>
+    </div>
+  </div>
+
+  <p>Conflate them and one bad row looks like a broken API, while a broken API looks like one bad row.</p>
+
+  <div class="callout">
+    <div class="callout-label">Falsifiability</div>
+    <p>Every reject carries the row <strong>and</strong> the reason, because a count alone is not falsifiable. "9,957 rejected" reads equally plausible whether the validator works or whether it looks up <code>rec["atributes"]</code> and quietly rejects the entire dataset. Letting Python name the fault is what makes the number checkable — the typo reads back as <code>KeyError: 'atributes'</code> beside a record that plainly has its attributes.</p>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Split validation in two: a bad <strong>envelope</strong> stops the run, a bad <strong>row</strong> is logged and skipped. Every reject carries the row <em>and</em> the reason — a bare count is not falsifiable.</p>
+  </div>
+
+  <hr>
+
+  <h2>Part II — Surviving the environment</h2>
+
+  <h3>Stage 4 · The checkpoint that lies</h3>
+
+  <p>A job that runs for hours in an environment where things die every few minutes may never finish. So: persist the cursor, resume from it.</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">⚠</div>
+        <div class="tcard-title">A half-written checkpoint</div>
+      </div>
+      <p>Resumes from a cursor that was never valid, which is <strong>worse</strong> than having no checkpoint. So the write is atomic.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">⚠</div>
+        <div class="tcard-title">A checkpoint left behind</div>
+      </div>
+      <p>Resumes the next run from the end and ingests nothing, successfully. So it is discarded only on a clean finish.</p>
+    </div>
+  </div>
+
+  <p>But the real content of this stage is an ordering:</p>
+
+  <blockquote><p>Rejects durable, then the cursor advances.</p></blockquote>
+
+  <p>Resume is what makes an offset unrevisitable. Once a cursor past page N is on disk, a crash can never revisit page N — the next run starts <em>after</em> those records. A reject still in RAM at that moment is gone for good. A test spies on every checkpoint write and asserts that the page's rejects were already on disk.</p>
+
+  <p>That rule gets broken twice more, in two different disguises, and it is the same rule every time: <strong>the checkpoint must never advance past durability.</strong></p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Write the checkpoint <strong>atomically</strong> (temp file plus <code>os.replace</code>), discard it only on a clean finish, and never let it advance before the rejects it covers are on disk.</p>
+  </div>
+
+  <h3>Stage 5 · Stopping on purpose</h3>
+
+  <p>A hard crash is rare. A SIGTERM from a deploy is Tuesday again.</p>
+
+  <p>The handler cancels the walk, the exit flush runs in a <code>finally</code>, and the process exits <strong>non-zero</strong> — because an orchestrator that reads exit 0 as "the dataset is ingested" moves on without it.</p>
+
+  <p>The cancellation is absorbed and returned as a boolean rather than re-raised. "We were told to stop" and "we broke" both exit non-zero, but only one of them is a bug, and an exception cannot tell them apart.</p>
+
+  <div class="sampling-tiers">
+    <div class="tier tier-sampled">
+      <div class="tier-badge">0</div>
+      <div class="tier-text"><strong>The dataset is ingested.</strong> The only honest use of this code — and the one every silent failure mode in this post counterfeits.</div>
+    </div>
+    <div class="tier tier-threshold">
+      <div class="tier-badge">143</div>
+      <div class="tier-text"><strong>The OS killed us.</strong> Nothing was flushed on the way out.</div>
+    </div>
+    <div class="tier tier-always">
+      <div class="tier-badge">1</div>
+      <div class="tier-text"><strong>We left deliberately.</strong> Heard the signal, flushed 11 pages, wrote the cursor. The next run resumed from it and finished the other 19,000 records, with <code>duplicate_pages=0</code>.</div>
+    </div>
+  </div>
+
+  <div class="bt-callout">
+    The exit flush is wrapped in <code>asyncio.shield</code>, and the honest note in the source says it is <strong>correct but not yet exercised</strong> — the flush is synchronous, so there is no <code>await</code> inside for a second cancellation to land on. It starts mattering two stages later. Writing that down was cheaper than pretending.
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Catch the signal, cancel the walk, flush in a <code>finally</code>, and <strong>exit non-zero</strong>. Exit 0 tells an orchestrator the dataset is complete, and it will move on without it.</p>
+  </div>
+
+  <hr>
+
+  <h2>Part III — Widening the pipe</h2>
+
+  <h3>Stage 6 · Measure first, and mean it</h3>
+
+  <p>This stage adds no capability. It exists because the next three are unfalsifiable without it.</p>
+
+  <p>Every counter has a counterpart the server keeps independently. Neither tally is derived from the other, so a disagreement is a bug rather than a difference of opinion.</p>
+
+  <div class="eval-grid">
+    <div class="eval-card">
+      <div class="ec-label">Throughput</div>
+      <div class="ec-name">records</div>
+      <span class="ec-badge badge-ground">records_served</span>
+      <div class="ec-desc">What the client parsed, against what the server put on the wire.</div>
+    </div>
+    <div class="eval-card">
+      <div class="ec-label">Data quality</div>
+      <div class="ec-name">rejects</div>
+      <span class="ec-badge badge-llm">malformed_served</span>
+      <div class="ec-desc">What the client refused, against what the server deliberately corrupted.</div>
+    </div>
+    <div class="eval-card">
+      <div class="ec-label">Resilience</div>
+      <div class="ec-name">retries</div>
+      <span class="ec-badge badge-code">by_status</span>
+      <div class="ec-desc">What the client re-issued, against what the server saw arrive, per status code.</div>
+    </div>
+  </div>
+
+  <p>Then the numbers say something nobody planned. Against a rate-limited server the client reached page 17 of 30 and died on the seventh 429 — and its own retry count read <strong>six</strong> where the server counted <strong>seven</strong>.</p>
+
+  <div class="callout">
+    <div class="callout-label">Six or seven</div>
+    <p>Not a bug: the seventh 429 exhausted the retries and raised, and <strong>the attempt that gives up is not a retry.</strong> A design decision, confirmed against an independent tally, in production conditions.</p>
+  </div>
+
+  <p>That death is also the stage-9 motivation, measured rather than asserted.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Add counters <strong>before</strong> you tune anything, and give every one a counterpart the other side keeps independently. A disagreement is then a bug rather than a matter of opinion.</p>
+  </div>
+
+  <h3>Stage 7 · The sink is slow, and now the checkpoint lies again</h3>
+
+  <p>Fifty million single-row inserts outlast your patience regardless of fetch speed. So rows buffer and flush on size or age.</p>
+
+  <p>And immediately, <em>processed</em> stops meaning <em>durable</em>.</p>
+
+  <p>If the checkpoint advances when rows enter the buffer, it certifies records that are sitting in RAM. Crash, resume, and they are gone — the checkpoint is lying, which is worse than not having one. So marking progress moves into the flush path, and the flush becomes one ordered breath.</p>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">first</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Rejects to disk</div>
+        <div class="pipe-desc">The reject log for the batch lands before anything else is considered done.</div>
+        <div class="pipe-pass">✓ a crash here loses nothing that was counted</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">then</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Rows to the sink</div>
+        <div class="pipe-desc">The buffered batch is written and acknowledged.</div>
+        <div class="pipe-pass">✓ processed now means durable</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">last</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">The cursor advances</div>
+        <div class="pipe-desc">Only now is the checkpoint allowed to move past this batch.</div>
+        <div class="pipe-pass">✓ resume can never skip a record the checkpoint certified</div>
+        <div class="pipe-fail">✗ reverse any two of these lines and a test fails</div>
+      </div>
+    </div>
+  </div>
+
+  <p>Same invariant as before, broken a second way.</p>
+
+  <p>Two live runs make the cost concrete. Killed with an <em>exception</em>, the client unwinds through its <code>finally</code>, lands the partial batch, and resumes with <code>duplicate_pages=0</code> — nothing lost, nothing replayed. Killed with <strong>SIGKILL</strong>, which has no <code>finally</code>: the server had served 60 pages, the checkpoint covered 42, and the resume replayed exactly 18. That is the at-least-once trade, priced.</p>
+
+  <div class="bt-stat-band">
+    <div class="bt-stat">
+      <div class="n">60</div>
+      <div class="l">pages the server had served</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n">42</div>
+      <div class="l">pages the checkpoint covered</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n cyan">18</div>
+      <div class="l">pages replayed on resume — the price</div>
+    </div>
+  </div>
+
+  <p>The reject log across that pair: 1,586 lines, 1,585 <em>distinct</em> ids. Which is why the reconciliation key is distinct id and never line count.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Once rows buffer, <em>processed</em> stops meaning <em>durable</em>. Move progress into the flush path and keep it one ordered breath: <strong>rejects, then rows, then the cursor</strong>. Flush on size <em>or</em> age, so a trickling feed still records progress.</p>
+  </div>
+
+  <h3>Stage 8 · The fetch is slow, and pages stop arriving in order</h3>
+
+  <p>One producer, a bounded queue, a pool of workers. The producer is alone because fetching is <em>inherently</em> serial — page N+1's cursor does not exist until page N answers. That is the API's contract, not an implementation detail, and no amount of client concurrency removes it.</p>
+
+  <p>What the pool breaks is the checkpoint, for the third time. Workers finish out of order. Page 7 lands before page 5, and persisting "the newest cursor I have seen" resumes <em>past the gap</em> — losing page 5 silently and permanently.</p>
+
+  <p>So the checkpointer becomes a <strong>watermark</strong>: record each page's cursor at enqueue time, while fetch order is still real, and advance the persisted cursor only through the longest <em>contiguous</em> prefix of completed pages.</p>
+
+  <div class="bt-figure">
+    <svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Eight pages, with pages 1, 2, 3, 5 and 7 complete and pages 4, 6 and 8 still in flight. The watermark stops after page 3, the end of the contiguous prefix. The newest completed cursor sits after page 7 and would resume past the missing pages.">
+      <text x="45" y="30" font-family="DM Mono, monospace" font-size="11" letter-spacing="1.2" fill="var(--ink-muted)">WORKERS COMPLETE OUT OF ORDER</text>
+
+      <rect x="470" y="20" width="12" height="12" rx="2" fill="var(--teal-light)" stroke="var(--teal)" stroke-width="1.5"/>
+      <text x="488" y="30" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">COMPLETE</text>
+      <rect x="565" y="20" width="12" height="12" rx="2" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="3 2"/>
+      <text x="583" y="30" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">IN FLIGHT</text>
+
+      <rect x="45"  y="55" width="64" height="46" rx="6" fill="var(--teal-light)" stroke="var(--teal)" stroke-width="1.5"/>
+      <text x="77"  y="84" text-anchor="middle" font-family="DM Mono, monospace" font-size="13" fill="var(--ink)">1</text>
+      <rect x="123" y="55" width="64" height="46" rx="6" fill="var(--teal-light)" stroke="var(--teal)" stroke-width="1.5"/>
+      <text x="155" y="84" text-anchor="middle" font-family="DM Mono, monospace" font-size="13" fill="var(--ink)">2</text>
+      <rect x="201" y="55" width="64" height="46" rx="6" fill="var(--teal-light)" stroke="var(--teal)" stroke-width="1.5"/>
+      <text x="233" y="84" text-anchor="middle" font-family="DM Mono, monospace" font-size="13" fill="var(--ink)">3</text>
+      <rect x="279" y="55" width="64" height="46" rx="6" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="311" y="84" text-anchor="middle" font-family="DM Mono, monospace" font-size="13" fill="var(--ink-faint)">4</text>
+      <rect x="357" y="55" width="64" height="46" rx="6" fill="var(--teal-light)" stroke="var(--teal)" stroke-width="1.5"/>
+      <text x="389" y="84" text-anchor="middle" font-family="DM Mono, monospace" font-size="13" fill="var(--ink)">5</text>
+      <rect x="435" y="55" width="64" height="46" rx="6" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="467" y="84" text-anchor="middle" font-family="DM Mono, monospace" font-size="13" fill="var(--ink-faint)">6</text>
+      <rect x="513" y="55" width="64" height="46" rx="6" fill="var(--teal-light)" stroke="var(--teal)" stroke-width="1.5"/>
+      <text x="545" y="84" text-anchor="middle" font-family="DM Mono, monospace" font-size="13" fill="var(--ink)">7</text>
+      <rect x="591" y="55" width="64" height="46" rx="6" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="623" y="84" text-anchor="middle" font-family="DM Mono, monospace" font-size="13" fill="var(--ink-faint)">8</text>
+
+      <line x1="265" y1="50" x2="265" y2="140" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <circle cx="265" cy="142" r="3.5" fill="var(--amber)"/>
+      <text x="265" y="163" text-anchor="middle" font-family="DM Mono, monospace" font-size="11" fill="var(--amber)">WATERMARK — CONTIGUOUS PREFIX</text>
+      <text x="265" y="179" text-anchor="middle" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">THE PERSISTED CURSOR STOPS HERE</text>
+
+      <line x1="577" y1="50" x2="577" y2="196" stroke="var(--coral)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <circle cx="577" cy="198" r="3.5" fill="var(--coral)"/>
+      <text x="670" y="219" text-anchor="end" font-family="DM Mono, monospace" font-size="11" fill="var(--coral)">NEWEST COMPLETED — RESUMES PAST THE GAP</text>
+      <text x="670" y="235" text-anchor="end" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">PAGES 4 AND 6 LOST SILENTLY</text>
+    </svg>
+    <div class="bt-figcaption">The mutation: store the newest completed cursor instead of the contiguous prefix. <b>All 114 tests still passed.</b></div>
+  </div>
+
+  <p>Here is the part worth the whole section. I wrote a deliberate bug — store the newest completed cursor instead of the contiguous prefix — and <strong>all 114 tests still passed.</strong></p>
+
+  <p>Because a completion that does not advance the watermark never writes to disk. The corrupted cursor only reaches the file through the <em>unconditional exit flush</em> — which is precisely the path a crash takes. Every in-order test was green; only a crash with a hole open would have lost the page. The test that closes it completes page 2 with a hole at page 1 and then calls <code>flush()</code> directly. The mutation now fails.</p>
+
+  <blockquote><p>A test suite that cannot fail is a suite that is measuring nothing.</p></blockquote>
+
+  <p>This one had a real hole, and finding it took trying to break the code on purpose.</p>
+
+  <p>The other honest result from this stage: the pool made <strong>no difference to throughput.</strong></p>
+
+  <div class="bt-stat-band">
+    <div class="bt-stat">
+      <div class="n">27,816</div>
+      <div class="l">records/sec — serial</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n">29,109</div>
+      <div class="l">records/sec — worker pool</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n red">0</div>
+      <div class="l">difference that survives the noise</div>
+    </div>
+  </div>
+
+  <p>The roadmap warns you about this: give the workers real work or the layer is inert. The sink here is a stand-in whose write awaits nothing. So the pool was left in as <em>correctness</em> machinery, and the number was written down rather than massaged.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>When workers complete out of order, persist the longest <strong>contiguous prefix</strong>, never the newest cursor you have seen. Bound the queue — its <code>maxsize</code> is your backpressure — and match the sentinel count to the worker count.</p>
+  </div>
+
+  <h3>Stage 9 · Being a good citizen</h3>
+
+  <p>Concurrency turns one rate-limit breach into N simultaneous 429s, and stage 2's backoff is <em>reactive</em> — it handles the 429 you already caused.</p>
+
+  <p>A semaphore bounds in-flight requests; a token bucket throttles proactively. Bucket <strong>before</strong> semaphore, so a request waiting for a token does not also hold a concurrency slot hostage. And the semaphore wraps <strong>only</strong> the HTTP call: a request that keeps its slot while it backs off re-serialises the entire pool, silently, under load.</p>
+
+<pre><code>async with bucket:                  # 1. wait for a token — holds nothing
+    async with semaphore:           # 2. only now take a concurrency slot
+        return await self._get(url) # 3. slot released before any backoff</code></pre>
+
+  <p>Mutating that nesting does not merely fail the test — it deadlocks it, which is a fair picture of the production symptom.</p>
+
+  <p>Then the payoff, against the exact server that killed the stage-6 client:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Client</th><th>Server limit</th><th>Client budget</th><th>Reached</th><th>Outcome</th></tr>
+      </thead>
+      <tbody>
+        <tr class="row-quality">
+          <td>Stage 6</td>
+          <td>10 rps</td>
+          <td>none</td>
+          <td>page 17 of 30</td>
+          <td>died on 429s</td>
+        </tr>
+        <tr class="row-quality">
+          <td>Stage 9</td>
+          <td>10 rps</td>
+          <td>20 rps</td>
+          <td>page 29 of 30</td>
+          <td>died on 429s</td>
+        </tr>
+        <tr>
+          <td>Stage 9</td>
+          <td>above budget</td>
+          <td>20 rps</td>
+          <td>30 of 30</td>
+          <td><strong>zero</strong> 429s</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>Both died.</strong> A client-side bucket is a promise about <em>your</em> rate; it cannot keep you under a limit lower than the one you set yourself. The 429s went from unavoidable to merely misconfigured, and saying so is more useful than a green checkmark.</p>
+
+  <p>With the server's limit above the client's budget: 30 of 30 pages, <strong>zero</strong> 429s. Not "large, but recovered". Zero.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Throttle proactively with a token bucket <strong>before</strong> the semaphore, and hold the concurrency slot only across the HTTP call — never across a backoff. Draw both per <em>attempt</em>, retries included.</p>
+  </div>
+
+  <hr>
+
+  <h2>Part IV — The question underneath</h2>
+
+  <h3>Stage 10 · One walker has a ceiling</h3>
+
+  <p>Past the point where the measurements say one walker is saturated, there is nothing left to tune. The only way to go faster is more walkers over disjoint slices — and that is a distributed-systems move, not a bigger thread pool.</p>
+
+  <p>K walkers means K checkpoints, K reject logs, K watermarks, and a new class of mistake in what those files are called.</p>
+
+  <div class="callout">
+    <div class="callout-label">Naming is a correctness concern</div>
+    <p><code>shard_count</code> goes <strong>into the filename</strong>, because "shard 0 of 2" and "shard 0 of 5" cover incompatible partitions, and sharing a name lets a resumed run load a cursor that was only ever valid under the old boundary.</p>
+  </div>
+
+  <p>The <code>ApiClient</code> is shared across every shard. Stage 9's budget is a promise to the <em>server</em>; one client per shard would multiply it by K and silently undo the previous stage.</p>
+
+  <div class="bt-stat-band">
+    <div class="bt-stat">
+      <div class="n">2.1×</div>
+      <div class="l">from four walkers — 1.0s against 2.1s</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n green">0</div>
+      <div class="l">gaps or overlaps across shards</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n">32</div>
+      <div class="l">pages against 30 — one partial per shard</div>
+    </div>
+  </div>
+
+  <p>Four walkers finished in 1.0s what one did in 2.1s. Not 4× — 2.1× — because the shared limiter is doing its job. <code>shard_records_served</code> came back <code>{0: 7500, 1: 7500, 2: 7500, 3: 7500}</code>: contiguous, no gaps, no overlaps, union equals the unsharded walk. And 32 pages against 30, because each shard has its own trailing partial page. The cost of sharding, visible in the request count.</p>
+
+  <p>Killed mid-run, it left four independent watermarks — each an offset inside its own key range. The resume finished all four.</p>
+
+  <div class="score-bars">
+    <div class="sbar-row">
+      <div class="sbar-label">shard 0</div>
+      <div class="sbar-track"><div class="sbar-fill" style="width:4%"></div></div>
+      <div class="sbar-val">1300</div>
+      <div class="sbar-action">resumed → complete</div>
+    </div>
+    <div class="sbar-row">
+      <div class="sbar-label">shard 1</div>
+      <div class="sbar-track"><div class="sbar-fill" style="width:31%"></div></div>
+      <div class="sbar-val">9400</div>
+      <div class="sbar-action">resumed → complete</div>
+    </div>
+    <div class="sbar-row">
+      <div class="sbar-label">shard 2</div>
+      <div class="sbar-track"><div class="sbar-fill" style="width:56%"></div></div>
+      <div class="sbar-val">16900</div>
+      <div class="sbar-action">resumed → complete</div>
+    </div>
+    <div class="sbar-row">
+      <div class="sbar-label">shard 3</div>
+      <div class="sbar-track"><div class="sbar-fill" style="width:81%"></div></div>
+      <div class="sbar-val">24400</div>
+      <div class="sbar-action">resumed → complete</div>
+    </div>
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Put the shard <strong>count</strong> into every state filename, not just the index — "shard 0 of 2" and "shard 0 of 5" are incompatible partitions. Share one API client across all shards, or you multiply your rate budget by K.</p>
+  </div>
+
+  <h3>Stage 11 · The dataset changes while you read it</h3>
+
+  <p>A walk that takes hours runs against a table people are writing to.</p>
+
+  <p>An insert landing <em>ahead</em> of the cursor pulls it backward, and the server re-serves rows already read. That has two symptoms — a duplicate id, and a <code>seq</code> that fails to increase — and both are detectable.</p>
+
+  <p>A delete ahead of the cursor is the mirror image, and it leaves <strong>no trace</strong>. The cursor is pushed past rows that are never served. <code>seq</code> keeps climbing, no id repeats, nothing in the response looks wrong.</p>
+
+  <div class="bt-figure">
+    <svg viewBox="0 0 700 262" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two bands. An insert ahead of the cursor shifts rows right, so already-read rows are served again, producing a duplicate id and a stalled sequence. A delete ahead of the cursor shifts rows left, so rows are skipped with no duplicate and no sequence anomaly.">
+      <text x="30" y="24" font-family="DM Mono, monospace" font-size="11" letter-spacing="1" fill="var(--blue)">INSERT AHEAD OF THE CURSOR</text>
+      <text x="267" y="24" text-anchor="middle" font-family="DM Mono, monospace" font-size="9" letter-spacing="1" fill="var(--amber)">CURSOR</text>
+      <polygon points="267,40 260,30 274,30" fill="var(--amber)"/>
+
+      <rect x="30"  y="42" width="42" height="38" rx="5" fill="var(--bg)" stroke="var(--rule)" stroke-width="1.5"/>
+      <rect x="78"  y="42" width="42" height="38" rx="5" fill="var(--blue-light)" stroke="var(--blue)" stroke-width="1.5"/>
+      <text x="99"  y="66" text-anchor="middle" font-family="DM Mono, monospace" font-size="9" fill="var(--blue)">NEW</text>
+      <rect x="126" y="42" width="42" height="38" rx="5" fill="var(--bg)" stroke="var(--rule)" stroke-width="1.5"/>
+      <rect x="174" y="42" width="42" height="38" rx="5" fill="var(--bg)" stroke="var(--rule)" stroke-width="1.5"/>
+      <rect x="222" y="42" width="42" height="38" rx="5" fill="var(--bg)" stroke="var(--rule)" stroke-width="1.5"/>
+      <rect x="270" y="42" width="42" height="38" rx="5" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <rect x="318" y="42" width="42" height="38" rx="5" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <rect x="366" y="42" width="42" height="38" rx="5" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+      <line x1="100" y1="98" x2="244" y2="98" stroke="var(--blue)" stroke-width="1.5"/>
+      <polygon points="250,98 242,94 242,102" fill="var(--blue)"/>
+      <text x="30" y="118" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">ROWS SHIFT RIGHT — ALREADY-READ ROWS ARE SERVED AGAIN</text>
+
+      <rect x="440" y="38" width="240" height="50" rx="8" fill="var(--teal-light)" stroke="var(--teal)" stroke-width="1.5"/>
+      <text x="456" y="60" font-family="DM Mono, monospace" font-size="10" fill="var(--ink)">DUPLICATE ID · SEQ STALLS</text>
+      <text x="456" y="77" font-family="DM Mono, monospace" font-size="11" fill="var(--teal)">→ DETECTED, THE RUN STOPS</text>
+
+      <text x="30" y="152" font-family="DM Mono, monospace" font-size="11" letter-spacing="1" fill="var(--coral)">DELETE AHEAD OF THE CURSOR</text>
+      <text x="267" y="152" text-anchor="middle" font-family="DM Mono, monospace" font-size="9" letter-spacing="1" fill="var(--amber)">CURSOR</text>
+      <polygon points="267,168 260,158 274,158" fill="var(--amber)"/>
+
+      <rect x="30"  y="170" width="42" height="38" rx="5" fill="var(--bg)" stroke="var(--rule)" stroke-width="1.5"/>
+      <rect x="78"  y="170" width="42" height="38" rx="5" fill="var(--coral-light)" stroke="var(--coral)" stroke-width="1.5"/>
+      <text x="99"  y="194" text-anchor="middle" font-family="DM Mono, monospace" font-size="9" fill="var(--coral)">DEL</text>
+      <rect x="126" y="170" width="42" height="38" rx="5" fill="var(--bg)" stroke="var(--rule)" stroke-width="1.5"/>
+      <rect x="174" y="170" width="42" height="38" rx="5" fill="var(--bg)" stroke="var(--rule)" stroke-width="1.5"/>
+      <rect x="222" y="170" width="42" height="38" rx="5" fill="var(--bg)" stroke="var(--rule)" stroke-width="1.5"/>
+      <rect x="270" y="170" width="42" height="38" rx="5" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <rect x="318" y="170" width="42" height="38" rx="5" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <rect x="366" y="170" width="42" height="38" rx="5" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+      <line x1="250" y1="226" x2="106" y2="226" stroke="var(--coral)" stroke-width="1.5"/>
+      <polygon points="100,226 108,222 108,230" fill="var(--coral)"/>
+      <text x="30" y="246" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">ROWS SHIFT LEFT — SKIPPED ROWS ARE NEVER SERVED</text>
+
+      <rect x="440" y="166" width="240" height="50" rx="8" fill="var(--coral-light)" stroke="var(--coral)" stroke-width="1.5"/>
+      <text x="456" y="188" font-family="DM Mono, monospace" font-size="10" fill="var(--ink)">NO DUPLICATE · SEQ CLIMBS</text>
+      <text x="456" y="205" font-family="DM Mono, monospace" font-size="11" fill="var(--coral)">→ NOTHING TO DETECT</text>
+    </svg>
+    <div class="bt-figcaption">One direction is loud, the other leaves no evidence in the protocol. <b>That asymmetry is the whole stage.</b></div>
+  </div>
+
+  <p><strong>That asymmetry is the whole stage</strong>, and here is what it looks like measured. Three walks over the same mutating 5,000-row table:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Walk</th><th>What the client reported</th><th>What the server counted</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Offset, detector on</td>
+          <td>Stops on page 2: <code>duplicate id 'rec-000000935'</code></td>
+          <td>Silent corruption converted into a loud failure.</td>
+        </tr>
+        <tr class="row-quality">
+          <td>Offset, detector removed</td>
+          <td>Completes. 5 pages, 4,921 rows, <strong>zero errors</strong></td>
+          <td>260 duplicates served, and <strong>339 of 5,000 records never sent at all</strong></td>
+        </tr>
+        <tr>
+          <td>Keyset</td>
+          <td><code>keyset_duplicate_records = 0</code></td>
+          <td>210 rows deleted before the cursor reached them.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The middle row is the one to sit with. A client walked a table to completion, logged nothing, reported success, and dropped 339 real records. Nothing in the protocol reported it. The only reason we know is that the server was counting what it never sent.</p>
+
+  <div class="bt-stat-band">
+    <div class="bt-stat">
+      <div class="n red">339</div>
+      <div class="l">records never sent, while the client reported success</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n">260</div>
+      <div class="l">duplicates served and never noticed</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n green">0</div>
+      <div class="l">keyset duplicates — structural, not probabilistic</div>
+    </div>
+  </div>
+
+  <p>Detection does not fix that. The fix is server-side — and this is where the opacity rule from stage 1 pays.</p>
+
+  <div class="bt-callout">
+    <code>iter_pages_keyset</code> is <code>iter_pages</code>'s body, unchanged, pointed at a different URL. Eleven stages of accumulated machinery, and switching the server to keyset pagination costs the client <strong>one string</strong>. That is the whole return on never having decoded the cursor.
+  </div>
+
+  <p>Over keyset: <code>keyset_duplicate_records = 0</code>. Exactly zero, not "low" — a served <code>seq</code> can never satisfy <code>seq &gt; cursor</code> again, so it is structural rather than probabilistic. And the loss is finally <em>named</em>: 210 rows deleted before the cursor reached them. An explained absence instead of an unexplained shortfall.</p>
+
+  <p>What no pagination scheme fixes without snapshot isolation or CDC: a row deleted before the cursor arrives is never served. That is arriving one page late to a live table. It is not corruption, and pretending it is would be its own kind of lie.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Run the mutation detector <strong>in the producer</strong>, where fetch order is still real, and watch for both a duplicate id and a <code>seq</code> that fails to increase. Then write down that the mirror image — a silent skip — leaves no trace at all.</p>
+  </div>
+
+  <hr>
+
+  <h2>Part V — What the arc adds up to</h2>
+
+  <p>Three ideas survive all eleven stages.</p>
+
+  <div class="layer-stack">
+    <div class="layer l1">
+      <div class="layer-meta">
+        <span class="layer-num">Idea 1</span>
+        <span class="layer-name">The checkpoint must never advance past durability</span>
+        <span class="layer-src">stages 4, 7, 8</span>
+      </div>
+      <div class="chips">
+        <span class="chip">rejects before cursor</span>
+        <span class="chip">the sink's buffer is not the sink</span>
+        <span class="chip">contiguous prefix, not newest</span>
+      </div>
+    </div>
+    <div class="layer l2">
+      <div class="layer-meta">
+        <span class="layer-num">Idea 2</span>
+        <span class="layer-name">A library replaces the mechanism, never the guarantee</span>
+        <span class="layer-src">aiolimiter in, tenacity out</span>
+      </div>
+      <div class="chips">
+        <span class="chip">less code AND fewer concepts</span>
+        <span class="chip">the guard stays, by hand</span>
+      </div>
+    </div>
+    <div class="layer l3">
+      <div class="layer-meta">
+        <span class="layer-num">Idea 3</span>
+        <span class="layer-name">Say what you cannot do</span>
+        <span class="layer-src">in the source, not a follow-up ticket</span>
+      </div>
+      <div class="chips">
+        <span class="chip">five limitations, written down</span>
+      </div>
+    </div>
+  </div>
+
+  <p>The first appears at stage 4 as "rejects before cursor", at stage 7 as "the sink's buffer is not the sink", and at stage 8 as "a contiguous prefix, not the newest thing you have seen". Three different mechanisms, one invariant, and <strong>every violation of it produces a success message.</strong></p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">✓</div>
+        <div class="tcard-title">aiolimiter — adopted</div>
+      </div>
+      <p>It deleted a token-bucket class outright. It also silently accepts <code>max_rate=-1</code> and then blocks forever, where the hand-rolled version raised. So the guard stayed, by hand, in the constructor.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">✗</div>
+        <div class="tcard-title">tenacity — declined</div>
+      </div>
+      <p>The bar is that a library reduce both the code <em>and</em> the number of concepts a reader must hold. It deleted a loop and added a carrier exception, three callbacks and a translation layer.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">Credit where it is owed</div>
+    <p>Under <code>tenacity</code>, holding the semaphore across a backoff would be <strong>structurally impossible</strong>. That guarantee was traded for a test that fails loudly.</p>
+  </div>
+
+  <p>And the third idea, which is the one that costs something to keep. All five of these are written into the source, next to the code that has the limitation, rather than left in a follow-up ticket.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>What it cannot do</th><th>Why it is written down instead of fixed</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Detect silent deletes</td>
+          <td>Nothing in the protocol reports them. Only the server's own counters can name the shortfall.</td>
+        </tr>
+        <tr>
+          <td>Show a speedup from the worker pool</td>
+          <td>The sink is a stand-in whose write awaits nothing. The layer is correctness machinery, not throughput.</td>
+        </tr>
+        <tr>
+          <td>Guarantee exactly-once</td>
+          <td>Not purchasable across an HTTP API and a file. The trade is at-least-once, priced in replayed pages.</td>
+        </tr>
+        <tr>
+          <td>Detect cross-shard duplicates</td>
+          <td>Each shard's detector only ever sees its own slice.</td>
+        </tr>
+        <tr>
+          <td>Hold every id in memory</td>
+          <td>A 50M-id set is several gigabytes.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The client is about eleven hundred lines. Most of them are prose explaining why the thirty lines around them are the way they are — because the failure modes here are the kind that return exit code 0, and the only defence against those is writing down what you checked and how you would know if you were wrong.</p>
+
+  <div class="bt-callout">
+    The second row of that table is the one that bothered me. A sink that cannot fail cannot test the claims made about it — so the next post makes the destination real and follows whatever breaks: <strong><a href="the-sink-was-a-lie.html">The Sink Was a Lie</a></strong>.
+  </div>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="the-sink-was-a-lie.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">The Sink Was a Lie — what breaks when the destination stops being a stand-in</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; August 2026</p>
+    <p>Build: <a href="https://github.com/gpazevedo/api-consumer">gpazevedo/api-consumer</a> · <a href="https://github.com/gpazevedo/api-consumer/commits/main">one merge commit per stage</a>, each carrying its tests, its mutations and its live numbers</p>
+    <p>Stage-by-stage ledger: <a href="https://github.com/gpazevedo/api-consumer/blob/main/EVOLUTION.md">EVOLUTION.md</a> · Server scenarios: <a href="https://github.com/gpazevedo/api-consumer/blob/main/server/TESTING.md">server/TESTING.md</a></p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>
