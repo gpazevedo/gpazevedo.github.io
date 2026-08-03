@@ -1,0 +1,13 @@
+/* Personal-site additions on top of buyer-team-blog.css.
+   Keep buyer-team-blog.css byte-identical to the Buyer Team source so it can be
+   re-synced; anything site-specific belongs here. */
+
+.blog-nav-wm {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  color: var(--ink);
+  line-height: 1;
+}
+.blog-nav-wm span { color: var(--teal); font-weight: 400; }
