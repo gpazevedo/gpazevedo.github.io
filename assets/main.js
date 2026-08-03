@@ -51,6 +51,7 @@ document.querySelectorAll('.reveal').forEach(el => io.observe(el));
         <a href="${pathPrefix}${p.file}" class="blog-post">
           <div class="blog-post-tag">${p.tags[0]}</div>
           <div class="blog-post-title">${p.title}</div>
+          <div class="blog-post-desc">${p.description}</div>
           <div class="blog-post-meta">${p.readingTime} min read · ${fmtDate(p.date)}</div>
         </a>`)
       .join('');
