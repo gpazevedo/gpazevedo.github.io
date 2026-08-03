@@ -6,7 +6,7 @@
 <meta name="robots" content="index, follow"/>
 <meta name="author" content="Gustavo Peixoto de Azevedo"/>
 <title>Gustavo Peixoto de Azevedo — AI Solution Architect</title>
-<meta name="description" content="Hands-on AI Solution Architect. 25+ years architecting distributed systems — production-grade, event-driven agentic systems from business concept to production and evolution. Writing on engineering and procurement."/>
+<meta name="description" content="Hands-on AI Solution Architect. 25+ years architecting distributed systems — production-grade, event-driven agentic systems from business concept to production and evolution. Writing on engineering and business."/>
 <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
 <meta name="theme-color" content="#0F172A"/>
 
@@ -68,10 +68,10 @@
   <ul class="nav-links">
     <li><a href="#about">About</a></li>
     <li class="nav-dropdown">
-      <a href="#blog" class="nav-drop-trigger">Blog ▾</a>
-      <ul class="nav-submenu">
+      <a href="#blog" class="nav-drop-trigger" aria-haspopup="true" aria-expanded="false">Blog ▾</a>
+      <ul class="nav-submenu" id="nav-submenu">
         <li><a href="#blog-engineering">Engineering</a></li>
-        <li><a href="#blog-procurement">Procurement</a></li>
+        <li><a href="#blog-business">Business</a></li>
       </ul>
     </li>
     <li><a href="https://github.com/gpazevedo" target="_blank" rel="noopener noreferrer">GitHub</a></li>
@@ -99,13 +99,13 @@
         <h1 class="architect-name">Gustavo Peixoto de Azevedo</h1>
         <p class="architect-title">Hands-on AI Solution Architect — production-grade, event-driven agentic systems, from business concept to production and evolution.</p>
         <p class="architect-bio">
-          25+ years architecting distributed systems. I work across the whole stack of a real system: agent orchestration on Amazon Bedrock AgentCore and the Strands Agents SDK, multi-tenant runtimes, MCP integrations with enterprise platforms (SAP S/4HANA, Oracle Fusion, Coupa), and the observability, evaluations, security mapping, IaC, and GitOps that production multi-tenant operation actually requires.
+          25+ years building the distributed systems behind new business capabilities. As co-founder and CTO of Symprise for 16 years, I built platforms that streamlined logistics, export and import operations for Petrobras, Petroflex, Seara, GE and Saint-Gobain. At Grupo SBF/Nike Brasil, the streaming platform that made dynamic pricing possible on Black Friday; at Zwift, the core reactive services sustaining a live shared experience for 300K concurrent users. Now I build agentic AI systems. Agents are distributed systems with non-deterministic parts — the engineering that makes them trustworthy, and the business impact that follows, is what I write about here.
         </p>
         <p class="architect-bio">
-          Most recently I designed and built <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> end-to-end — an autonomous multi-agent procurement negotiation system — as a demonstration of what a single senior architect can ship from concept to deployed production-grade system.
+          Most recently I designed and built <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> — an autonomous multi-agent business negotiation system, and a demonstration of what one senior architect can take from concept to production.
         </p>
         <p class="architect-bio">
-          Previously: Staff Engineer on streaming data platforms at Grupo SBF, Platform Engineer at Zwift (300K concurrent users on real-time leaderboards), Founding Team engineer at Grepr. M.Sc. Computer &amp; Systems Engineering, UFRJ. Open-source contributor to <code>awslabs/fullstack-solution-template-for-agentcore</code>, <code>aws-samples/sample-strands-agent-with-agentcore</code>, <code>spring-ai-community/spring-ai-agentcore</code>, and <code>SYSTRAN/faster-whisper</code> among others.
+          Previously: Staff Engineer on streaming data platforms at Grupo SBF, Platform Engineer at Zwift, Founding Team engineer at Grepr. M.Sc. Computer &amp; Systems Engineering, UFRJ. Open-source contributor to <code>aws-samples/sample-strands-agent-with-agentcore</code>, <code>spring-ai-community/spring-ai-agentcore</code>, and <code>SYSTRAN/faster-whisper</code>, among others.
         </p>
         <div class="architect-links">
           <a href="https://www.linkedin.com/in/gpazevedo" target="_blank" rel="noopener noreferrer" class="architect-link">
@@ -127,7 +127,7 @@
   <div class="si">
     <p class="slabel reveal">Blog</p>
     <h2 class="stitle reveal">Thinking in public.</h2>
-    <p class="sdesc reveal">Technical deep-dives on building agentic systems that survive production, and perspectives on AI applied to procurement.</p>
+    <p class="sdesc reveal">Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</p>
     <div class="blog-layout">
 
       <div id="blog-engineering" class="reveal">
@@ -141,13 +141,13 @@
         <noscript><div class="blog-empty">Enable JavaScript to browse posts.</div></noscript>
       </div>
 
-      <div id="blog-procurement" class="reveal">
+      <div id="blog-business" class="reveal">
         <div class="blog-col-head">
-          <div class="blog-col-icon blog-col-icon-pro">PRO</div>
-          <span class="blog-col-title">Procurement</span>
+          <div class="blog-col-icon blog-col-icon-bus">BUS</div>
+          <span class="blog-col-title">Business</span>
         </div>
-        <div id="proc-posts" class="blog-posts">
-          <!-- populated by blog/procurement/posts.js -->
+        <div id="bus-posts" class="blog-posts">
+          <!-- populated by blog/business/posts.js -->
         </div>
         <noscript><div class="blog-empty">Enable JavaScript to browse posts.</div></noscript>
       </div>
@@ -185,7 +185,7 @@
 </footer>
 
 <script src="blog/eng/posts.js"></script>
-<script src="blog/procurement/posts.js"></script>
+<script src="blog/business/posts.js"></script>
 <script src="assets/main.js"></script>
 
 <!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->

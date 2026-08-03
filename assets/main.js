@@ -4,6 +4,25 @@ document.querySelector('.nav-hamburger')?.addEventListener('click', function () 
   this.closest('nav').classList.toggle('nav-open');
 });
 
+const blogDropTrigger = document.querySelector('.nav-drop-trigger');
+const blogDropdown = blogDropTrigger?.closest('.nav-dropdown');
+if (blogDropTrigger && blogDropdown) {
+  blogDropTrigger.addEventListener('click', function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    blogDropdown.classList.toggle('nav-dropdown-open');
+    const expanded = blogDropdown.classList.contains('nav-dropdown-open');
+    blogDropTrigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  });
+
+  document.addEventListener('click', function (event) {
+    if (!blogDropdown.contains(event.target) && blogDropdown.classList.contains('nav-dropdown-open')) {
+      blogDropdown.classList.remove('nav-dropdown-open');
+      blogDropTrigger.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
 const io = new IntersectionObserver(
   entries => entries.forEach(e => {
     if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
@@ -38,5 +57,5 @@ document.querySelectorAll('.reveal').forEach(el => io.observe(el));
   }
 
   renderPosts('eng-posts', window.engPosts, 'blog/eng/');
-  renderPosts('proc-posts', window.procurementPosts, 'blog/procurement/');
+  renderPosts('bus-posts', window.businessPosts, 'blog/business/');
 })();
