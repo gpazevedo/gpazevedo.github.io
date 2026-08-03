@@ -92,6 +92,7 @@ section{position:relative;z-index:1}
 .blog-post:hover{border-color:rgba(8,145,178,.4);background:rgba(8,145,178,.05)}
 .blog-post-tag{font-family:var(--ff-m);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--teal);margin-bottom:.4rem}
 .blog-post-title{font-size:.9rem;font-weight:500;color:var(--white);line-height:1.4;margin-bottom:.35rem}
+.blog-post-desc{font-size:.8rem;color:var(--muted);line-height:1.5;margin-bottom:.5rem}
 .blog-post-meta{font-size:.72rem;color:var(--muted)}
 .blog-empty{border:.5px dashed var(--border);border-radius:6px;padding:1.5rem 1.25rem;
   font-size:.85rem;color:var(--muted);text-align:center}
