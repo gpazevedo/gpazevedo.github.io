@@ -17,7 +17,7 @@ blog/
   blog.js               ← mobile nav for post pages
   _template.html        ← starting point for a new post
   eng/posts.js          ← engineering post index
-  procurement/posts.js  ← procurement post index
+  business/posts.js  ← business post index
 ```
 
 `/home/gpazevedo/blogs/` also holds a `medium/` folder for Medium-adapted versions of

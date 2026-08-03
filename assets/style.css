@@ -45,7 +45,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:1rem 2.5rem;
 .nav-submenu{display:none;position:absolute;top:calc(100% + 12px);left:50%;transform:translateX(-50%);
   background:rgba(15,23,42,.97);backdrop-filter:blur(12px);border:.5px solid var(--borderB);border-radius:6px;
   min-width:160px;list-style:none;overflow:hidden;z-index:200}
-.nav-dropdown:hover .nav-submenu{display:block}
+.nav-dropdown:hover .nav-submenu,
+.nav-dropdown.nav-dropdown-open .nav-submenu{display:block}
 .nav-submenu li a{display:block;padding:.7rem 1.25rem;font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;
   color:var(--slate);text-decoration:none;transition:background .15s,color .15s;white-space:nowrap}
 .nav-submenu li a:hover{background:rgba(8,145,178,.1);color:var(--teal)}
@@ -83,7 +84,7 @@ section{position:relative;z-index:1}
 .blog-col-head{display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:.5px solid var(--border)}
 .blog-col-icon{width:32px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--ff-m);font-size:.6rem;flex-shrink:0}
 .blog-col-icon-eng{background:rgba(8,145,178,.12);color:var(--teal)}
-.blog-col-icon-pro{background:rgba(212,160,23,.12);color:var(--gold)}
+.blog-col-icon-bus{background:rgba(212,160,23,.12);color:var(--gold)}
 .blog-col-title{font-family:var(--ff-d);font-size:1.1rem;font-weight:700}
 .blog-posts{display:flex;flex-direction:column;gap:.75rem}
 .blog-post{border:.5px solid var(--border);border-radius:6px;padding:1.1rem 1.25rem;background:rgba(15,23,42,.5);
