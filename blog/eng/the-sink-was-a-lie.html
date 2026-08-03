@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>The Sink Was a Lie — Gustavo Azevedo</title>
+<meta name="description" content="Five more stages of an ingest client, once the destination stopped being a counter: a real database, a dual write that cannot be ordered safely, CDC, an outbox that had to justify itself, and a benchmark that lied four times before it told the truth."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/the-sink-was-a-lie.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/the-sink-was-a-lie.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="The Sink Was a Lie"/>
+<meta property="og:description" content="Five more stages of an ingest client, once the destination stopped being a counter: a real database, a dual write that cannot be ordered safely, CDC, an outbox that had to justify itself, and a benchmark that lied four times before it told the truth."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-08-03T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-03T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Data Pipelines"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="The Sink Was a Lie"/>
+<meta name="twitter:description" content="Five more stages of an ingest client, once the destination stopped being a counter: a real database, a dual write that cannot be ordered safely, CDC, an outbox that had to justify itself, and a benchmark that lied four times before it told the truth."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"The Sink Was a Lie","description":"Five more stages of an ingest client, once the destination stopped being a counter: a real database, a dual write that cannot be ordered safely, CDC, an outbox that had to justify itself, and a benchmark that lied four times before it told the truth.","datePublished":"2026-08-03","dateModified":"2026-08-03","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/the-sink-was-a-lie.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/the-sink-was-a-lie.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"The Sink Was a Lie","item":"https://gpazevedo.github.io/blog/eng/the-sink-was-a-lie.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+    <li><a href="../../index.html#blog-business">Business</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Data Pipelines</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Data Pipelines</span>
+    <span class="dot">·</span>
+    <time datetime="2026-08-03">August 2026</time>
+    <span class="dot">·</span>
+    <span>16 min read</span>
+  </div>
+
+  <h1>The Sink Was a <em>Lie</em></h1>
+  <p class="deck">What breaks when the destination stops being a stand-in.</p>
+
+  <div class="tldr">
+    <div class="tldr-label">TL;DR</div>
+    <p><strong>The problem.</strong> You have read the records at high throughput. Now <em>save</em> them — durably and idempotently, into a real database, and keep a second system in sync without losing or duplicating rows when the process dies mid-flush.</p>
+    <p><strong>What you get.</strong> Five stages on the write side: a real Cassandra sink and what at-least-once actually costs; why no ordering makes a dual write safe; replacing that dual write with CDC off the write-ahead log; when an outbox earns its place and when it does not; and what object-backed storage does to a broker you have to replace.</p>
+    <p><strong>Why it is worth your time.</strong> Every claim is reconciled against a tally the client does not produce — a <code>SELECT COUNT(*)</code>, a topic's end offsets, a <code>count(*)</code> in Postgres — <strong>including the claims that came out negative</strong>. One of the five stages concludes you should not adopt the thing it just built.</p>
+    <p><strong>Part 2 of 2</strong> — <a href="what-fails-next.html">Part 1</a> is about reading the data. This half is about landing it.</p>
+  </div>
+
+  <p><a href="what-fails-next.html">The first post</a> ended with a list of things the client could not do. I wrote that list on purpose, because the failures in this kind of code return exit code 0, and the only defence is writing down what you did not check.</p>
+
+  <p>The second item on it was this:</p>
+
+  <blockquote><p>The sink is a stand-in. Its write awaits nothing real, which is why the worker pool shows no throughput gain here.</p></blockquote>
+
+  <p>That one line is the reason for everything below. <code>Sink.written += len(rows)</code> cannot fail, cannot be slow, and cannot be written to twice with the same row and notice. Which means three claims made earlier in the build were not conclusions. They were assumptions wearing a test.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>The claim</th><th>Made at</th><th>Why it was unfalsifiable</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>At-least-once is safe, because the write is idempotent on <code>id</code></td>
+          <td>Stage 4</td>
+          <td>You cannot make a counter non-idempotent.</td>
+        </tr>
+        <tr>
+          <td>Batching beats one write per row</td>
+          <td>Stage 7</td>
+          <td>There was no round trip to amortise.</td>
+        </tr>
+        <tr class="row-quality">
+          <td>The worker pool overlaps the write tail</td>
+          <td>Stage 8</td>
+          <td>Measured 4%, and called it noise.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>So I made the destination real, and then followed whatever broke. Five more stages.</p>
+
+  <div class="callout">
+    <div class="callout-label">The method, unchanged</div>
+    <p>The numbers below are all from live runs against an adversarial mock server, reconciled against tallies the client does not produce — a <code>SELECT COUNT(*)</code>, a topic's end offsets, a <code>count(*)</code> in Postgres. <strong>Every claim still has a counterpart it cannot fake.</strong></p>
+  </div>
+
+  <hr>
+
+  <h2>Part I — Three claims, finally falsifiable</h2>
+
+  <p>The first real destination is Cassandra, and picking it settles an argument rather than starting one. A Cassandra <code>INSERT</code> against a primary key is a blind write: no read, no compare, no lightweight transaction. That <em>is</em> "idempotent on <code>id</code>, last-write-wins". The bet the client made stages ago is now the storage engine's documented behaviour instead of a hopeful comment.</p>
+
+  <p>Two things surprised me.</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">⊗</div>
+        <div class="tcard-title">A multi-partition <code>BATCH</code> is not a bulk write</div>
+      </div>
+      <p>It is a coordinator-side <em>atomicity</em> tool, and using it for throughput makes throughput worse: 500 buffered rows across 500 partitions means one coordinator fans out to every replica, having thrown away the token-aware routing that would have sent each row straight to a node that owns it.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-blue">⇄</div>
+        <div class="tcard-title">The driver is threaded and this client is not</div>
+      </div>
+      <p><code>execute_async</code> returns a <code>ResponseFuture</code>, and the reply arrives on the driver's own IO thread. <code>add_callbacks</code> plus <code>loop.call_soon_threadsafe</code> onto a <code>loop.create_future()</code> is ten lines — and those ten lines are what two packaged async Cassandra clients are asking to be adopted over.</p>
+    </div>
+  </div>
+
+  <p>So 500 rows are 500 concurrent single-row upserts under a semaphore, and a test makes constructing a <code>BatchStatement</code> raise. The batching still pays — one flush, one checkpoint, one syscall for the rejects — just not in the CQL. And neither packaged client is worth a C++ dependency or a wrapper around ten lines.</p>
+
+  <p>Then the payoff. Twenty thousand records, <code>SIGKILL</code> two and a half seconds in:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Measured</th><th>Value</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Cursor left in <code>checkpoint.json</code></td><td>offset <strong>8,000</strong></td></tr>
+        <tr class="row-quality"><td>Rows already in Cassandra at that instant</td><td><strong>13,842</strong></td></tr>
+        <tr class="row-quality"><td>Records the server served across both runs</td><td><strong>27,000</strong></td></tr>
+        <tr><td>Cassandra row count at the end</td><td><strong>20,000</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Read the middle two lines together.</p>
+
+  <div class="bt-stat-band">
+    <div class="bt-stat">
+      <div class="n cyan">5,842</div>
+      <div class="l">rows durable ahead of the checkpoint covering them</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n">7,000</div>
+      <div class="l">records served beyond the number that exist</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n green">0</div>
+      <div class="l">movement in the final row count</div>
+    </div>
+  </div>
+
+  <p>5,842 rows were durable <em>ahead</em> of the checkpoint that covered them — which is the safe direction for that inequality to point, and exactly why the resumed run re-fetched them. The server served seven thousand records more than exist. The row count did not move.</p>
+
+  <p>That is the entire argument for at-least-once delivery, and until the sink was real there was no way to make it.</p>
+
+  <h3>The third claim did not survive, and that is a result too</h3>
+
+  <p>Same walk, fetch unthrottled so the write tail is what remains:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Workers</th><th>Median wall</th><th>CPU</th><th>Reading</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td>9.06s</td><td><strong>94% of one core</strong></td><td>baseline</td></tr>
+        <tr><td>2</td><td>8.75s</td><td><strong>95% of one core</strong></td><td>inside the spread</td></tr>
+        <tr><td>4</td><td>8.34s</td><td><strong>97% of one core</strong></td><td>inside the spread</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The wall-clock differences sit inside the run-to-run spread. The CPU number does not, and it is stable everywhere. The client is CPU-bound on one thread, so there is no idle time for a pool to overlap into: fifty thousand rows means fifty thousand tasks, semaphore acquisitions, futures, query plans and protocol CRCs, none of which are on the wire.</p>
+
+  <div class="bt-callout">
+    The old "4% is noise" verdict survives contact with a real database. But it survives <strong>with a reason attached instead of a shrug</strong>, and the reason changes what to do next. More coroutines cannot help. More <em>processes</em> can.
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>A <strong>blind upsert on a primary key</strong> is what makes at-least-once safe — no read, no compare, no lightweight transaction. Skip the multi-partition <code>BATCH</code>: prepared per-row statements keep token-aware routing, and the batching pays in your own buffer instead.</p>
+  </div>
+
+  <hr>
+
+  <h2>Part II — Two destinations, and no transaction between them</h2>
+
+  <p>The records are wanted in two places: a store to serve reads from, and a log other services can fan out from without asking this client for anything. So the flush grows a step.</p>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">first</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Rejects to disk</div>
+        <div class="pipe-desc">Unchanged since stage 4. Append-only, never discarded.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">then</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Rows to Cassandra</div>
+        <div class="pipe-desc">The buffered batch, as concurrent single-row upserts.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">then</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Events to the topic</div>
+        <div class="pipe-desc">The new step — and the one with nothing holding it to the step above.</div>
+        <div class="pipe-fail">✗ a crash lands here and no ordering prevents it</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">last</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">The cursor advances</div>
+        <div class="pipe-desc">Still last. Still the only ordering the client fully controls.</div>
+      </div>
+    </div>
+  </div>
+
+  <p><strong>And the extra step buys nothing.</strong> There is no transaction across Cassandra and Redpanda. A crash between the two writes is not prevented by deciding which one goes first. The ordering only decides which side loses.</p>
+
+  <p>I did not want to argue that in prose, so I measured it in both directions.</p>
+
+  <div class="bt-figure">
+    <svg viewBox="0 0 700 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two orderings of the same dual write, each interrupted by a SIGKILL. Writing rows first leaves 13,801 rows in Cassandra against 13,000 events on the topic, a surplus of 801 rows that no event announced. Writing events first leaves 15,000 events against 14,137 rows, a deficit of 863 events pointing at rows that do not exist. The sign of the divergence flips with the order and its magnitude never reaches zero.">
+      <text x="30" y="22" font-family="DM Mono, monospace" font-size="11" letter-spacing="1.1" fill="var(--ink-muted)">ONE FLUSH, TWO DESTINATIONS, NO TRANSACTION</text>
+
+      <text x="30" y="52" font-family="DM Mono, monospace" font-size="10" letter-spacing="1" fill="var(--amber)">ORDER A — ROWS FIRST</text>
+      <rect x="30" y="62" width="168" height="50" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="46" y="82" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">CASSANDRA</text>
+      <text x="46" y="100" font-family="DM Mono, monospace" font-size="13" fill="var(--ink)">13,801 rows</text>
+
+      <line x1="198" y1="87" x2="236" y2="87" stroke="var(--rule)" stroke-width="1.5"/>
+      <polygon points="264,72 250,90 259,90 253,104 268,86 259,86" fill="var(--coral)"/>
+      <text x="261" y="118" text-anchor="middle" font-family="DM Mono, monospace" font-size="9" fill="var(--coral)">SIGKILL</text>
+      <line x1="286" y1="87" x2="324" y2="87" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+      <rect x="324" y="62" width="168" height="50" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="340" y="82" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">REDPANDA</text>
+      <text x="340" y="100" font-family="DM Mono, monospace" font-size="13" fill="var(--ink)">13,000 events</text>
+
+      <rect x="518" y="62" width="152" height="50" rx="8" fill="var(--amber-light)" stroke="var(--amber)" stroke-width="1.5"/>
+      <text x="534" y="84" font-family="DM Serif Display, Georgia, serif" font-size="19" fill="var(--amber)">+801</text>
+      <text x="534" y="102" font-family="DM Mono, monospace" font-size="9" fill="var(--ink-muted)">ROWS NOBODY ANNOUNCED</text>
+
+      <text x="30" y="152" font-family="DM Mono, monospace" font-size="10" letter-spacing="1" fill="var(--blue)">ORDER B — EVENTS FIRST</text>
+      <rect x="30" y="162" width="168" height="50" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="46" y="182" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">REDPANDA</text>
+      <text x="46" y="200" font-family="DM Mono, monospace" font-size="13" fill="var(--ink)">15,000 events</text>
+
+      <line x1="198" y1="187" x2="236" y2="187" stroke="var(--rule)" stroke-width="1.5"/>
+      <polygon points="264,172 250,190 259,190 253,204 268,186 259,186" fill="var(--coral)"/>
+      <text x="261" y="218" text-anchor="middle" font-family="DM Mono, monospace" font-size="9" fill="var(--coral)">SIGKILL</text>
+      <line x1="286" y1="187" x2="324" y2="187" stroke="var(--rule)" stroke-width="1.5" stroke-dasharray="4 3"/>
+
+      <rect x="324" y="162" width="168" height="50" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="340" y="182" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">CASSANDRA</text>
+      <text x="340" y="200" font-family="DM Mono, monospace" font-size="13" fill="var(--ink)">14,137 rows</text>
+
+      <rect x="518" y="162" width="152" height="50" rx="8" fill="var(--blue-light)" stroke="var(--blue)" stroke-width="1.5"/>
+      <text x="534" y="184" font-family="DM Serif Display, Georgia, serif" font-size="19" fill="var(--blue)">−863</text>
+      <text x="534" y="202" font-family="DM Mono, monospace" font-size="9" fill="var(--ink-muted)">EVENTS WITH NO ROW</text>
+
+      <text x="30" y="240" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">A CLEAN RUN LANDS 20,000 AND 20,000 — WHICH IS WHAT MAKES THESE NUMBERS MEAN SOMETHING</text>
+    </svg>
+    <div class="bt-figcaption">The sign flips with the order. <b>The magnitude never reaches zero.</b></div>
+  </div>
+
+  <p>Same walk, same kill, twenty thousand records — six runs, three per direction:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Order</th><th>Rows</th><th>Events</th><th>Divergence</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>rows first</td><td>13,801</td><td>13,000</td><td><strong>+801</strong></td></tr>
+        <tr><td>rows first</td><td>13,520</td><td>13,000</td><td><strong>+520</strong></td></tr>
+        <tr><td>rows first</td><td>13,334</td><td>13,000</td><td><strong>+334</strong></td></tr>
+        <tr class="row-quality"><td>events first</td><td>14,137</td><td>15,000</td><td><strong>−863</strong></td></tr>
+        <tr class="row-quality"><td>events first</td><td>14,000</td><td>14,258</td><td><strong>−258</strong></td></tr>
+        <tr class="row-quality"><td>events first</td><td>11,064</td><td>12,000</td><td><strong>−936</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The sign flips with the order. The magnitude never reaches zero. A clean run lands 20,000 and 20,000, which is what makes the crashed numbers mean something instead of being noise about a broken build.</p>
+
+  <p>Retrying does not close it either — whichever write went first has already committed, so a retry that also fails leaves the same inconsistency one flush later.</p>
+
+  <h3>A second destination found a bug the first one structurally could not</h3>
+
+  <p>The buffer emptied itself before the write. With a sink that cannot fail, nothing ever noticed. With a destination that can refuse: the rows are gone from memory, the exception skips the checkpoint's completion — and then the unconditional exit flush finds an empty buffer, succeeds, and advances the cursor over records nothing ever wrote. A lost batch <em>and</em> a checkpoint certifying it.</p>
+
+  <p>The fix is one line moved. Empty the buffer only after the write returns.</p>
+
+  <blockquote><p>A buffer that empties before the write is a checkpoint that lies.</p></blockquote>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>There is <strong>no transaction across two systems</strong>, and no retry closes the gap. Ordering only picks which side loses. And whatever you write to, empty the buffer only <em>after</em> the write returns — otherwise the exit flush certifies a batch nobody stored.</p>
+  </div>
+
+  <hr>
+
+  <h2>Part III — One write, or none</h2>
+
+  <p>The dual write cannot be made reliable by ordering, so the next stage stops trying. The walk's only destination becomes Postgres: one transaction per flush, <code>INSERT ... ON CONFLICT (id) DO UPDATE</code>. Debezium tails the write-ahead log and publishes row images to the topic. A small projector consumes that topic and upserts into Cassandra — through the <em>same</em> sink object, unchanged, which is the moment the earlier stage pays for itself. Neither end of that sink knows the rows now arrive from a replication slot instead of an HTTP page.</p>
+
+  <blockquote><p>The dual write is not made reliable. It is made impossible.</p></blockquote>
+
+  <p>There is one thing to write. The log is derived from it by the database, out of a WAL the database was writing anyway, so there is no second write for a crash to land between. The fix is structural rather than probabilistic, and the numbers show it — the same kill that produced the table above:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Killed at</th><th>Postgres</th><th>Topic</th><th>Cassandra</th><th>Divergence</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1.8s</td><td>10,000</td><td>10,000</td><td>10,000</td><td><strong>0</strong></td></tr>
+        <tr><td>2.5s</td><td>14,000</td><td>14,000</td><td>14,000</td><td><strong>0</strong></td></tr>
+        <tr><td>3.0s</td><td>18,000</td><td>18,000</td><td>18,000</td><td><strong>0</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Exact, not small. Against +801 and −863 on the same walk one stage earlier.</p>
+
+  <h3>Now the honest part</h3>
+
+  <p>CDC does not remove the duplicate; it moves it. Two hundred thousand records, Debezium hard-killed three seconds into streaming and restarted:</p>
+
+  <div class="bt-stat-band">
+    <div class="bt-stat">
+      <div class="n">200,000</div>
+      <div class="l">rows in Postgres</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n red">212,288</div>
+      <div class="l">events on the topic</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n green">200,000</div>
+      <div class="l">rows in Cassandra</div>
+    </div>
+  </div>
+
+  <p>Twelve thousand duplicate events, republished because Debezium's offsets file was behind the WAL it had already sent. The projector does nothing clever about them and does not need to, because the write at the far end is still idempotent on <code>id</code>. The size of that duplicate is an offset-flush interval — <strong>a number in a properties file, not a guarantee</strong>.</p>
+
+  <div class="callout">
+    <div class="callout-label">The same invariant, a third mechanism</div>
+    <p>The projector holds the line every durable step in this client holds: <strong>a consumer group offset is a checkpoint by another name</strong>, so it commits <em>after</em> the write, never before. Committing first is stage 7's lying checkpoint at a third destination.</p>
+  </div>
+
+  <p>There is a cost, and it is worth stating. End to end — one <code>COMMIT</code> to a visible row in Cassandra — is roughly a second. Nothing in this build makes a reader wait for it, so a query answered from the read store can be behind the row committed in Postgres. That is what you buy with the structural fix.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p><strong>Derive the second system from the first</strong> instead of writing to both: one transaction, and CDC off the write-ahead log the database was writing anyway. A consumer group offset is a checkpoint by another name — commit it after the write, never before.</p>
+  </div>
+
+  <hr>
+
+  <h2>Part IV — What an outbox actually buys</h2>
+
+  <p>Nothing broke to get here. That is the point of this part.</p>
+
+  <p>If Debezium is tailing the WAL, the WAL already contains the record writes. An outbox table adds a second write of the same data inside the same transaction. So what does it buy? I built it to find out, and the answer was allowed to be "nothing".</p>
+
+  <p>It buys exactly two things.</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">✓</div>
+        <div class="tcard-title">The event is authored, not derived</div>
+      </div>
+      <p>Rename a column — <code>payload</code> to <code>body</code> — and push one row through each path. The table-image consumer reading <code>after.payload</code> raises <code>KeyError</code>. The outbox consumer is unchanged, because its payload was never a column layout; it is a document the producer wrote, carrying its own <code>version</code> field.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">✓</div>
+        <div class="tcard-title">Not every event is a row</div>
+      </div>
+      <p>This codebase already had the example and I had not noticed. A rejected record never becomes a row — it goes to <code>rejects.jsonl</code> and stops there — so no CDC configuration on the records table can ever emit <code>record.rejected</code>.</p>
+    </div>
+  </div>
+
+  <p>A table-image consumer is reading a schema, so a DBA's migration is its outage. One walk, twenty thousand records at a 5% malformed rate:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Counted in</th><th>Value</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Rows in <code>records</code></td><td>19,001</td></tr>
+        <tr><td>Events of type <code>record.ingested</code></td><td>19,001</td></tr>
+        <tr class="row-quality"><td>Events of type <code>record.rejected</code></td><td><strong>999</strong></td></tr>
+        <tr class="row-quality"><td>Lines in <code>rejects.jsonl</code></td><td>999</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Nine hundred and ninety-nine events that no amount of CDC on the row table could have produced.</p>
+
+  <p>And then the verdict, which the ledger allows to be negative:</p>
+
+  <blockquote><p>If your events are row images, do not adopt the outbox. It is a second write of the same bytes, an extra table to prune, and one more thing between a commit and a consumer. CDC on the tables was already giving you that.</p></blockquote>
+
+  <div class="bt-callout">
+    <strong>Adopt it when the event is not the row</strong> — when its shape is a contract you version, or when there are events with no row behind them at all. That is the same bar I apply to libraries, pointed at a pattern instead of a package.
+  </div>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Adopt the outbox only when <strong>the event is not the row</strong> — a payload you version rather than a schema a migration changes under you, or events with no row behind them at all. If your events are row images, CDC on the tables already gave you that.</p>
+  </div>
+
+  <hr>
+
+  <h2>Part V — The partition that cannot move</h2>
+
+  <p>One thing left that none of the stages above can see: a broker has to be replaced. A node dies, an instance is reclaimed, a cluster is rebalanced. On Kafka and on Redpanda, moving a partition means copying what is in it, and that takes as long as the bytes take.</p>
+
+  <p>AutoMQ's pitch is that it does not, because the bytes are in an object store already and only the metadata moves. That claim is on its own website and I could not find it quantified against anything. So I measured it.</p>
+
+  <div class="bt-callout">
+    <strong>The client diff is one function.</strong> Both speak the Kafka protocol, so the producer, the projector and Debezium's sink all change by one address. Fifteen stages ago I wrote down a rule that looked like pedantry — <em>the cursor is opaque, never decoded, only handed back</em> — and said it would be collected on at the end. This is the same discipline collecting a second time: nothing above the wire knew which broker it was talking to, so nothing above the wire had to be edited.
+  </div>
+
+  <p>The claim under test is the slope, not the seconds:</p>
+
+  <div class="bt-figure">
+    <svg viewBox="0 0 700 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Time to move one partition off a broker, plotted against partition size. Redpanda rises almost linearly from 2,413 milliseconds at 128 megabytes to 5,017 at 512 megabytes and 21,919 at 2,048 megabytes. AutoMQ stays flat on the baseline at 8, 17 and 12 milliseconds across the same three sizes, with the 2 gigabyte move faster than the 512 megabyte one.">
+      <text x="30" y="20" font-family="DM Mono, monospace" font-size="11" letter-spacing="1.1" fill="var(--ink-muted)">TIME TO MOVE ONE PARTITION OFF A BROKER</text>
+
+      <line x1="452" y1="16" x2="476" y2="16" stroke="var(--coral)" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="464" cy="16" r="4" fill="var(--coral)" stroke="var(--surface)" stroke-width="2"/>
+      <text x="484" y="20" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">REDPANDA</text>
+      <line x1="576" y1="16" x2="600" y2="16" stroke="var(--blue)" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="588" cy="16" r="4" fill="var(--blue)" stroke="var(--surface)" stroke-width="2"/>
+      <text x="608" y="20" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-muted)">AUTOMQ</text>
+
+      <line x1="68" y1="66"  x2="670" y2="66"  stroke="var(--rule)" stroke-width="1"/>
+      <line x1="68" y1="115" x2="670" y2="115" stroke="var(--rule)" stroke-width="1"/>
+      <line x1="68" y1="165" x2="670" y2="165" stroke="var(--rule)" stroke-width="1"/>
+      <line x1="68" y1="215" x2="670" y2="215" stroke="var(--rule)" stroke-width="1"/>
+      <line x1="68" y1="272" x2="670" y2="272" stroke="var(--rule)" stroke-width="1"/>
+
+      <text x="58" y="70"  text-anchor="end" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-faint)">20,000</text>
+      <text x="58" y="119" text-anchor="end" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-faint)">15,000</text>
+      <text x="58" y="169" text-anchor="end" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-faint)">10,000</text>
+      <text x="58" y="219" text-anchor="end" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-faint)">5,000</text>
+      <text x="58" y="268" text-anchor="end" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-faint)">0</text>
+      <text x="30" y="52" font-family="DM Mono, monospace" font-size="10" letter-spacing=".5" fill="var(--ink-muted)">MILLISECONDS</text>
+
+      <polyline points="106,240 219,214 670,47" fill="none" stroke="var(--coral)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="106" cy="240" r="4.5" fill="var(--coral)" stroke="var(--surface)" stroke-width="2"/>
+      <circle cx="219" cy="214" r="4.5" fill="var(--coral)" stroke="var(--surface)" stroke-width="2"/>
+      <circle cx="670" cy="47"  r="4.5" fill="var(--coral)" stroke="var(--surface)" stroke-width="2"/>
+
+      <polyline points="106,264 219,264 670,264" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="106" cy="264" r="4.5" fill="var(--blue)" stroke="var(--surface)" stroke-width="2"/>
+      <circle cx="219" cy="264" r="4.5" fill="var(--blue)" stroke="var(--surface)" stroke-width="2"/>
+      <circle cx="670" cy="264" r="4.5" fill="var(--blue)" stroke="var(--surface)" stroke-width="2"/>
+
+      <text x="664" y="38" text-anchor="end" font-family="DM Mono, monospace" font-size="12" fill="var(--ink)">21,919 ms</text>
+      <text x="112" y="254" font-family="DM Mono, monospace" font-size="11" fill="var(--ink-muted)">2,413 ms</text>
+      <text x="290" y="256" font-family="DM Mono, monospace" font-size="11" fill="var(--ink)">8 ms · 17 ms · 12 ms — no slope to fit</text>
+
+      <line x1="68" y1="272" x2="670" y2="272" stroke="var(--ink-faint)" stroke-width="1"/>
+      <text x="106" y="288" text-anchor="middle" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-faint)">128</text>
+      <text x="219" y="288" text-anchor="middle" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-faint)">512</text>
+      <text x="670" y="288" text-anchor="end" font-family="DM Mono, monospace" font-size="10" fill="var(--ink-faint)">2,048</text>
+      <text x="670" y="304" text-anchor="end" font-family="DM Mono, monospace" font-size="10" letter-spacing=".5" fill="var(--ink-muted)">PARTITION SIZE (MB)</text>
+    </svg>
+    <div class="bt-figcaption">Sixteen times the data is sixteen times the wait — on one of them. <b>The other has no slope to fit.</b></div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Partition</th><th>Redpanda</th><th>AutoMQ</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>128 MB</td><td>2,413 ms</td><td><strong>8 ms</strong></td></tr>
+        <tr><td>512 MB</td><td>5,017 ms</td><td><strong>17 ms</strong></td></tr>
+        <tr><td>2,048 MB</td><td>21,919 ms</td><td><strong>12 ms</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Redpanda is a straight line — about 1.1 seconds of fixed cost plus 10 ms per megabyte, so sixteen times the data is sixteen times the wait. AutoMQ has no slope to fit. The 2 GB move was faster than the 512 MB one, which is what "no relationship" looks like when you plot three points.</p>
+
+  <p>The mechanism is visible on disk, which matters more than the timings:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th></th><th>On the brokers</th><th>In the object store</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>AutoMQ, 2,048 MB partition</td><td><strong>5 MB each</strong></td><td>2.0 GiB</td></tr>
+        <tr class="row-quality"><td>Redpanda, 128 MB partition</td><td><strong>161 MB on the leader</strong></td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>There is nothing on an AutoMQ broker to move.</p>
+
+  <h3>What it cost on this rig was writes</h3>
+
+  <div class="bt-stat-band">
+    <div class="bt-stat">
+      <div class="n">174–186</div>
+      <div class="l">MB/s — Redpanda, same fill, same producer settings</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n red">2</div>
+      <div class="l">MB/s — AutoMQ, every durable write to the object store</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n">80×</div>
+      <div class="l">slower, and the opposite of the caveat I expected</div>
+    </div>
+  </div>
+
+  <p>Eighty times slower, because every durable write goes to the object store instead of a local disk. That is one machine's number, and a tuned AutoMQ against real S3 is a different measurement — but it is the <em>opposite</em> of the caveat I expected to be writing, so it goes in as measured.</p>
+
+  <p>The two caveats I did expect, printed rather than buried: a loopback copy between containers on one box flatters Redpanda against a real cross-AZ network, and a local object store flatters AutoMQ's read latency. Which is exactly why the finding is the shape of the curve.</p>
+
+  <blockquote><p>A single machine can honestly distinguish flat from linear. It cannot honestly quote seconds.</p></blockquote>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Keep every address behind one accessor and nothing above the wire needs to know which cluster it is talking to. When you compare two systems, <strong>measure the shape of the curve, not the seconds</strong> — one machine can tell flat from linear honestly, and cannot quote absolute numbers honestly.</p>
+  </div>
+
+  <hr>
+
+  <h2>Part VI — The benchmark lied four times before it told the truth</h2>
+
+  <p>This is the part I would keep if I had to throw the rest away.</p>
+
+  <p>Every one of these produced a plausible number instead of an error:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>What was wrong</th><th>What it looked like</th></tr>
+      </thead>
+      <tbody>
+        <tr class="row-quality">
+          <td>Dialled the port of a broker I had deleted</td>
+          <td>A producer retrying for fifteen minutes — indistinguishable from a slow fill</td>
+        </tr>
+        <tr class="row-quality">
+          <td>Polled for "successfully completed"; the tool prints "is completed"</td>
+          <td>Polling forever against a move that had already finished</td>
+        </tr>
+        <tr class="row-quality">
+          <td>Stopped timing when the controller's in-flight list emptied</td>
+          <td>A 128 MB partition timed at <strong>40 ms</strong>, still sitting on the broker it started on</td>
+        </tr>
+        <tr class="row-quality">
+          <td>Batched sixteen records into a request over the broker's size limit</td>
+          <td><strong>"35 MB/s"</strong>, into a partition holding zero records</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Look at the direction of those errors. Every single one biases the result <em>towards the thing I was hoping to find</em>. A move that did not happen is the fastest move there is. A partition that is empty moves instantly. I was not being dishonest; I was being ordinary, and ordinary is enough.</p>
+
+  <p>So the rig grew two assertions that have nothing to do with brokers.</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">✓</div>
+        <div class="tcard-title"><code>move.py</code> asserts the landing</div>
+      </div>
+      <p>The partition actually arrived on the broker it was sent to. Without it, a move that never happened is timed as the fastest move in the dataset.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">✓</div>
+        <div class="tcard-title"><code>fill.py</code> asks the broker</div>
+      </div>
+      <p>How many records it actually holds, rather than trusting its own loop counter — the same rule the client has followed since the beginning, pointed at the benchmark instead of the client.</p>
+    </div>
+  </div>
+
+  <p>That second check immediately caught a fifth one: 512 records sent, <strong>573 in the partition</strong>, because a leader re-election in the first seconds after startup made the producer retry and the retries were not idempotent. A partition 12% larger than the label it was about to be given.</p>
+
+  <p>There was a sixth, and it is the most instructive. The first version of the rig shelled out to each cluster's own CLI — <code>rpk</code> on one side, <code>kafka-reassign-partitions.sh</code> on the other. The JVM that second one starts costs about three seconds per poll.</p>
+
+  <div class="bt-stat-band">
+    <div class="bt-stat">
+      <div class="n">8 ms</div>
+      <div class="l">the effect being measured</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n red">3,000 ms</div>
+      <div class="l">the ruler's own noise floor, per poll</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n red">2</div>
+      <div class="l">different rulers, on the two things being compared</div>
+    </div>
+  </div>
+
+  <p>I was about to measure an eight-millisecond effect with a three-second ruler, using two different rulers on the two things being compared. Both clusters speak the Kafka protocol, so the fix was to write one program that talks to both and put no <code>docker exec</code> anywhere in the rig.</p>
+
+  <blockquote><p>A rig whose noise floor exceeds its effect can only confirm what it was built to confirm.</p></blockquote>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p><strong>Assert that the thing you are measuring actually happened</strong> — that the partition landed, that the records are really in it. Ask the system, never your own loop counter. Every bug in this rig produced a plausible number, and every one biased the answer toward what it was built to find.</p>
+  </div>
+
+  <hr>
+
+  <h2>What the arc adds up to</h2>
+
+  <div class="layer-stack">
+    <div class="layer l1">
+      <div class="layer-meta">
+        <span class="layer-num">Idea 1</span>
+        <span class="layer-name">The checkpoint must never advance past durability</span>
+        <span class="layer-src">now four mechanisms deep</span>
+      </div>
+      <div class="chips">
+        <span class="chip">rejects before cursor</span>
+        <span class="chip">contiguous prefix</span>
+        <span class="chip">the buffer empties after the write</span>
+        <span class="chip">offsets commit after the write</span>
+      </div>
+    </div>
+    <div class="layer l2">
+      <div class="layer-meta">
+        <span class="layer-num">Idea 2</span>
+        <span class="layer-name">Idempotence is what makes at-least-once affordable</span>
+        <span class="layer-src">a crash, a CDC restart, a broker retry</span>
+      </div>
+      <div class="chips">
+        <span class="chip">7,000 replayed records</span>
+        <span class="chip">12,288 duplicate events</span>
+        <span class="chip">no dedup logic anywhere</span>
+      </div>
+    </div>
+    <div class="layer l3">
+      <div class="layer-meta">
+        <span class="layer-num">Idea 3</span>
+        <span class="layer-name">Say what you cannot do</span>
+        <span class="layer-src">the list got longer, not shorter</span>
+      </div>
+      <div class="chips">
+        <span class="chip">CDC is at-least-once too</span>
+        <span class="chip">the read store lags</span>
+        <span class="chip">one machine's numbers</span>
+      </div>
+    </div>
+  </div>
+
+  <p><strong>The checkpoint must never advance past durability.</strong> It showed up again in two new places here: a buffer that empties before its write, and a consumer group offset committed before the projector's write. Same invariant, third and fourth mechanism, and every violation of it produces a success message.</p>
+
+  <p><strong>Idempotence is what makes at-least-once affordable.</strong> It absorbed a crash replay, then twelve thousand duplicate CDC events, then a broker's retry. Not one of those needed dedup logic, and each of them would have needed exactly-once otherwise — which is not purchasable at any of these boundaries.</p>
+
+  <p><strong>Say what you cannot do.</strong> The list got longer, not shorter:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>What it still cannot do</th><th>Why it is written down instead of fixed</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Deliver each event exactly once</td>
+          <td>CDC removes the dual write, not the duplicate. A Debezium restart republished 12,288 events, absorbed only because the far write is idempotent on <code>id</code>.</td>
+        </tr>
+        <tr>
+          <td>Serve a read that is current</td>
+          <td>The read store lags by roughly a second, and nothing here makes a reader wait for it.</td>
+        </tr>
+        <tr>
+          <td>Prune the outbox</td>
+          <td>Stage 15 writes it and never deletes from it. A real deployment removes rows once the WAL has carried them.</td>
+        </tr>
+        <tr>
+          <td>Tell you how many seconds a partition move takes</td>
+          <td>Two containers on one box copy bytes over loopback. Flat versus linear is honest at this scale; absolute numbers are not.</td>
+        </tr>
+        <tr class="row-quality">
+          <td>Survive losing the object store</td>
+          <td>Stage 16 moves the durability of every partition into it — a replication factor you no longer manage in exchange for a dependency you now do. This build never tests the failure it introduces.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The item I got to delete was the one this whole arc was about. The sink is not a stand-in any more, and every claim that depended on it is now either measured or withdrawn.</p>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="what-fails-next.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">What Fails Next — building an ingest client for 50 million records, one failure at a time</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; August 2026</p>
+    <p>Build: consumer/ · one merge commit per stage, each carrying its tests, its mutations and its live numbers</p>
+    <p>Stage-by-stage ledger: consumer/EVOLUTION.md · Server scenarios: consumer/server/TESTING.md</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>
