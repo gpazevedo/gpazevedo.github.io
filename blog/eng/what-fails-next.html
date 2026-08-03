@@ -83,6 +83,7 @@
     <p><strong>The problem.</strong> Read fifty million records out of a cursor-paginated HTTP API and land every one of them — over hours, at high throughput, against a server that rate-limits, stalls, serves malformed rows, and changes while you are reading it.</p>
     <p><strong>What you get.</strong> A working consumer, built in eleven stages, each one added because the previous version broke against something specific at scale: streaming pagination that never buffers, a retry <em>policy</em> rather than a retry loop, validation split in two, checkpoints that survive <code>SIGKILL</code>, a worker pool whose watermark cannot skip a page, proactive rate limiting, sharding across parallel walkers, and detection for a dataset that mutates mid-walk.</p>
     <p><strong>Why it is worth your time.</strong> The failure modes here return <strong>exit code 0</strong>. Every stage carries the live numbers that prove it, reconciled against a server that counts independently — so no claim in this post is the client grading its own homework.</p>
+    <p><strong>The code.</strong> <a href="https://github.com/gpazevedo/api-consumer">gpazevedo/api-consumer</a> — one merge commit per stage, each carrying its tests, its mutations and its live numbers.</p>
     <p><strong>Part 1 of 2</strong> — this half is about getting the data <em>out</em>. <a href="the-sink-was-a-lie.html">Part 2</a> is about saving it.</p>
   </div>
 
@@ -92,7 +93,7 @@
 
   <blockquote><p>Not wrong in a way that raises — wrong in a way that returns exit code 0 and a number nobody checks.</p></blockquote>
 
-  <p>The code in <code>consumer/</code> was not designed and then written. It was built eleven times, and each version exists because the previous one broke against something specific. The git history is that sequence, one merge per stage, each carrying the tests that pass and the numbers a live run produced against an adversarial mock server that is trying to make the client look good.</p>
+  <p>The code in <a href="https://github.com/gpazevedo/api-consumer"><code>api-consumer</code></a> was not designed and then written. It was built eleven times, and each version exists because the previous one broke against something specific. The git history is that sequence, one merge per stage, each carrying the tests that pass and the numbers a live run produced against an adversarial mock server that is trying to make the client look good.</p>
 
   <div class="bt-stat-band">
     <div class="bt-stat">
@@ -111,7 +112,7 @@
 
   <div class="callout">
     <div class="callout-label">The method</div>
-    <p>Anyone can write a client that reports success. <code>consumer/server/server.py</code> keeps its own counters — rows served, malformed rows injected, retries by status, duplicate pages, distinct shards seen — and <strong>every claim the client makes has a counterpart there that it cannot fake.</strong></p>
+    <p>Anyone can write a client that reports success. <a href="https://github.com/gpazevedo/api-consumer/blob/main/server/server.py"><code>server/server.py</code></a> keeps its own counters — rows served, malformed rows injected, retries by status, duplicate pages, distinct shards seen — and <strong>every claim the client makes has a counterpart there that it cannot fake.</strong></p>
   </div>
 
   <hr>
@@ -908,8 +909,8 @@ await asyncio.sleep(delay)                # ... is the number slept</code></pre>
 
   <div class="post-footer">
     <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; August 2026</p>
-    <p>Build: consumer/ · one merge commit per stage, each carrying its tests, its mutations and its live numbers</p>
-    <p>Stage-by-stage ledger: consumer/EVOLUTION.md · Server scenarios: consumer/server/TESTING.md</p>
+    <p>Build: <a href="https://github.com/gpazevedo/api-consumer">gpazevedo/api-consumer</a> · <a href="https://github.com/gpazevedo/api-consumer/commits/main">one merge commit per stage</a>, each carrying its tests, its mutations and its live numbers</p>
+    <p>Stage-by-stage ledger: <a href="https://github.com/gpazevedo/api-consumer/blob/main/EVOLUTION.md">EVOLUTION.md</a> · Server scenarios: <a href="https://github.com/gpazevedo/api-consumer/blob/main/server/TESTING.md">server/TESTING.md</a></p>
   </div>
 
 </article>

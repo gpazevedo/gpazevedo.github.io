@@ -83,6 +83,7 @@
     <p><strong>The problem.</strong> You have read the records at high throughput. Now <em>save</em> them — durably and idempotently, into a real database, and keep a second system in sync without losing or duplicating rows when the process dies mid-flush.</p>
     <p><strong>What you get.</strong> Five stages on the write side: a real Cassandra sink and what at-least-once actually costs; why no ordering makes a dual write safe; replacing that dual write with CDC off the write-ahead log; when an outbox earns its place and when it does not; and what object-backed storage does to a broker you have to replace.</p>
     <p><strong>Why it is worth your time.</strong> Every claim is reconciled against a tally the client does not produce — a <code>SELECT COUNT(*)</code>, a topic's end offsets, a <code>count(*)</code> in Postgres — <strong>including the claims that came out negative</strong>. One of the five stages concludes you should not adopt the thing it just built.</p>
+    <p><strong>The code.</strong> <a href="https://github.com/gpazevedo/api-consumer">gpazevedo/api-consumer</a> — the sink work is <a href="https://github.com/gpazevedo/api-consumer/blob/main/client/sinks.py">client/sinks.py</a> and <a href="https://github.com/gpazevedo/api-consumer/blob/main/client/projector.py">client/projector.py</a>, one merge commit per stage.</p>
     <p><strong>Part 2 of 2</strong> — <a href="what-fails-next.html">Part 1</a> is about reading the data. This half is about landing it.</p>
   </div>
 
@@ -757,8 +758,8 @@
 
   <div class="post-footer">
     <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; August 2026</p>
-    <p>Build: consumer/ · one merge commit per stage, each carrying its tests, its mutations and its live numbers</p>
-    <p>Stage-by-stage ledger: consumer/EVOLUTION.md · Server scenarios: consumer/server/TESTING.md</p>
+    <p>Build: <a href="https://github.com/gpazevedo/api-consumer">gpazevedo/api-consumer</a> · <a href="https://github.com/gpazevedo/api-consumer/commits/main">one merge commit per stage</a>, each carrying its tests, its mutations and its live numbers</p>
+    <p>Stage-by-stage ledger: <a href="https://github.com/gpazevedo/api-consumer/blob/main/EVOLUTION.md">EVOLUTION.md</a> · Server scenarios: <a href="https://github.com/gpazevedo/api-consumer/blob/main/server/TESTING.md">server/TESTING.md</a></p>
   </div>
 
 </article>
