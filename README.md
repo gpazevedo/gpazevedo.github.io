@@ -66,6 +66,53 @@ these posts. Only this repo is published.
 
 7. Commit and push. GitHub Pages deploys from the default branch.
 
+## Analytics
+
+[GoatCounter](https://www.goatcounter.com/), hosted dashboard at
+**https://gpazevedo.goatcounter.com** — private, login required, only you can read it.
+
+`count.js` is **pinned and served from this repo** (`assets/count.js`) rather than loaded
+from `gc.zgo.at`, so no third-party JavaScript runs on any page. Only the counting
+beacon leaves the browser, and that endpoint returns no executable code. GoatCounter
+supports this and guarantees `/count` stays backward-compatible; the cost is that the
+pinned script does not receive upstream updates.
+
+```
+assets/count.js   sha256 792b7abd26c1fb6ae62906833e09a301251e2641816e69e4f95aba518f3fe3f0
+```
+
+To refresh it, re-download and re-record the hash:
+
+```bash
+curl -sS -o assets/count.js https://gc.zgo.at/count.js && sha256sum assets/count.js
+```
+
+The snippet sits before `</body>` in `index.html` and `blog/_template.html`, so every
+post created from the template is counted automatically. Nothing else to wire up.
+
+### What it records
+
+Path, hour-level timestamp, country (from IP, country granularity only), referrer,
+browser, OS, screen width, and a random session ID. **No IP addresses, no full
+User-Agent, no tracker ID, no cookies** — so no cookie banner is required.
+
+### Exact per-read timestamps
+
+The dashboard aggregates to the hour. For second-level timestamps, enable
+**Settings → Data collection → Individual pageviews** (off by default), then pull the
+CSV export — those rows feed the export, not the dashboard.
+
+### Reading the numbers honestly
+
+Ad blockers block the beacon, and this audience runs them heavily. Counts are a
+**floor and a trend line, not a census**. Local previews are not counted: `count.js`
+skips `localhost` and `127.*` unless `allow_local` is set.
+
+### Reverting to the CDN version
+
+Replace the `src` in both files with `//gc.zgo.at/count.js` and delete
+`assets/count.js`. Data and dashboard are unaffected.
+
 ## Keeping CSS in sync
 
 `blog/buyer-team-blog.css` is a verbatim copy of the Buyer Team blog stylesheet. Keep
