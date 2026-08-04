@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>How we decided to build Buyer Team — Gustavo Azevedo</title>
+<meta name="description" content="Everyone asks why we chose the Strands Agents SDK. The SDK was the third decision, not the first. The real question was how to implement Buyer Team at all: build the agent layer from scratch or adopt an SDK, Python or another language, and only then — which SDK. Here is the full decision tree, and why the architecture made each choice smaller than the one before it.">
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="How we decided to build Buyer Team — the decision tree behind the SDK choice"/>
+<meta property="og:description" content="Everyone asks why we chose the Strands Agents SDK. The SDK was the third decision, not the first. Here is the full decision tree, and why the architecture made each choice smaller than the one before it."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-06-09T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-06-10T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Agentic Frameworks"/>
+<meta property="article:tag" content="Architecture Decision"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="How we decided to build Buyer Team — the decision tree behind the SDK choice"/>
+<meta name="twitter:description" content="Everyone asks why we chose Strands. The SDK was the third decision, not the first — here's the full decision tree."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"How we decided to build Buyer Team — the decision tree behind the SDK choice","description":"Everyone asks why we chose the Strands Agents SDK. The SDK was the third decision, not the first. Here is the full decision tree, and why the architecture made each choice smaller than the one before it.","datePublished":"2026-06-09","dateModified":"2026-06-10","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"How we decided to build Buyer Team","item":"https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+  /* Post-local styles — verdict pills, scorecard accents, decision-tree figure */
+  .verdict{display:inline-block;font-family:"DM Mono",monospace;font-size:.72rem;letter-spacing:.04em;padding:.18em .6em;border-radius:999px;white-space:nowrap}
+  .v-chosen{background:var(--teal-light);color:var(--teal);border:1px solid var(--teal)}
+  .v-build{background:var(--amber-light);color:var(--amber);border:1px solid var(--amber)}
+  .v-risk{background:var(--amber-light);color:var(--amber);border:1px solid var(--amber)}
+  .v-na{background:var(--surface);color:var(--ink-muted);border:1px solid var(--rule)}
+  table.decision td:last-child{white-space:nowrap}
+
+  .decision-tree{margin:2.2rem 0;display:flex;flex-direction:column;gap:0;align-items:stretch}
+  .dt-level{border:1px solid var(--rule);background:var(--surface);border-radius:10px;padding:1rem 1.25rem;display:flex;gap:1rem;align-items:baseline;flex-wrap:wrap}
+  .dt-level + .dt-connector{align-self:center;font-family:"DM Mono",monospace;color:var(--teal);font-size:.85rem;padding:.35rem 0}
+  .dt-q{font-family:"DM Mono",monospace;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);flex-basis:100%}
+  .dt-options{color:var(--ink-muted);font-size:.92rem}
+  .dt-pick{font-family:"DM Mono",monospace;color:var(--teal);font-weight:600;margin-left:auto}
+  @media (max-width:560px){.dt-pick{margin-left:0}}
+
+  figure.diagram{margin:2.4rem 0;padding:0}
+  figure.diagram svg{width:100%;height:auto;display:block}
+  figure.diagram figcaption{font-family:"DM Mono",monospace;font-size:.74rem;letter-spacing:.04em;color:var(--ink-muted);margin-top:.65rem}
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+    <li><a href="../../index.html#blog-business">Business</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Architecture Decision</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Architecture Decision</span>
+    <span class="dot">·</span>
+    <time datetime="2026-06-09">June 2026</time>
+    <span class="dot">·</span>
+    <span>12 min read</span>
+  </div>
+
+  <h1>How we decided to <em>build</em> Buyer Team</h1>
+
+  <p class="deck">Everyone asks why we chose Strands. It's the wrong first question. The SDK was the <em>third</em> decision in a tree — after "build from scratch or adopt?" and "which language?" — and by the time we reached it, the architecture had deliberately made it the smallest, most reversible choice of the three.</p>
+
+  <p>Buyer Team runs seven specialized procurement-negotiation agents in production. They classify spend, run auctions, evaluate bids, draft counter-offers, and award purchase orders — under guardrails, with a full audit trail, across tenants whose data must never touch. When engineers see the stack, the question is almost always the same: <em>why the Strands Agents SDK and not LangGraph, CrewAI, or your own loop?</em></p>
+
+  <p>It's a fair question, but it skips the two decisions that came before it and that did most of the work. The real question we sat down to answer in the design phase was broader: <strong>what is the most effective and efficient way to implement this system at all?</strong> Hand-rolled or SDK-based? Python, TypeScript, Go, or the JVM? This post is the full decision record — and the pattern that emerges is the actual lesson: each architectural choice we'd already made shrank the next decision below it.</p>
+
+  <div class="decision-tree" role="img" aria-label="Three-level decision tree: build vs adopt resolved to adopt an SDK; language resolved to Python; SDK resolved to Strands.">
+    <div class="dt-level">
+      <span class="dt-q">Decision 1 — the agent layer</span>
+      <span class="dt-options">Build from scratch · Adopt an SDK</span>
+      <span class="dt-pick">→ adopt</span>
+    </div>
+    <div class="dt-connector">↓ narrows to</div>
+    <div class="dt-level">
+      <span class="dt-q">Decision 2 — the language</span>
+      <span class="dt-options">Python · TypeScript · Go / Rust · JVM</span>
+      <span class="dt-pick">→ Python</span>
+    </div>
+    <div class="dt-connector">↓ narrows to</div>
+    <div class="dt-level">
+      <span class="dt-q">Decision 3 — the SDK</span>
+      <span class="dt-options">CrewAI · AutoGen · LangGraph · roll-your-own · Strands</span>
+      <span class="dt-pick">→ Strands</span>
+    </div>
+  </div>
+
+  <h2>The question behind the question</h2>
+
+  <p>Before any of the three decisions, one principle was already fixed: <strong>orchestration before intelligence</strong>. A deterministic AWS Step Functions DAG owns the negotiation lifecycle — sequence, retries, audit, human-in-the-loop interrupts. LLM agents supply judgment at each decision point, then hand control back. Durable state lives in portable services: DynamoDB and Step Functions, not inside any agent process.</p>
+
+  <p>And the runtime question was already settled too — we covered that decision in <a href="why-we-chose-agentcore.html">why we chose Bedrock AgentCore</a>. AgentCore owns tenant isolation, burst concurrency, outbound OAuth, and evaluation coverage as managed infrastructure.</p>
+
+  <div class="callout">
+    <div class="callout-label">Why this matters for the implementation choice</div>
+    <p>Those two prior decisions removed the hardest problems from the agent code entirely. What was left to implement was the <em>inner agent loop</em>: the reasoning cycle, tool dispatch, and the behavioral guardrails inside a single negotiation turn. That is a thin layer by design — which means the build-vs-buy, language, and SDK decisions were all scoped to something deliberately small and replaceable. The architecture shrank the decision before we made it.</p>
+  </div>
+
+  <figure class="diagram" role="img" aria-label="Stacked layer diagram: Step Functions removes the orchestration question, AgentCore removes the runtime question, leaving only the thin inner agent loop to decide.">
+    <svg viewBox="0 0 720 312" xmlns="http://www.w3.org/2000/svg" font-family="Sora, sans-serif">
+      <!-- Layer: Step Functions -->
+      <rect x="36" y="28" width="416" height="72" rx="10" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="58" y="58" font-family="'DM Mono', monospace" font-size="14" fill="var(--ink)" font-weight="600">AWS Step Functions — deterministic DAG</text>
+      <text x="58" y="80" font-size="12" fill="var(--ink-muted)">sequence · retries · audit · HITL interrupts</text>
+      <line x1="452" y1="64" x2="492" y2="64" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="500" y="60" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--ink-muted)">removes the</text>
+      <text x="500" y="76" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--ink-muted)">orchestration question</text>
+
+      <!-- Layer: AgentCore -->
+      <rect x="36" y="112" width="416" height="72" rx="10" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="58" y="142" font-family="'DM Mono', monospace" font-size="14" fill="var(--ink)" font-weight="600">Bedrock AgentCore — managed runtime</text>
+      <text x="58" y="164" font-size="12" fill="var(--ink-muted)">isolation · burst · outbound OAuth · evaluations</text>
+      <line x1="452" y1="148" x2="492" y2="148" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="500" y="144" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--ink-muted)">removes the</text>
+      <text x="500" y="160" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--ink-muted)">runtime question</text>
+
+      <!-- Layer: inner loop (highlighted) -->
+      <rect x="36" y="196" width="416" height="56" rx="10" fill="var(--teal-light)" stroke="var(--teal)" stroke-width="2"/>
+      <text x="58" y="220" font-family="'DM Mono', monospace" font-size="14" fill="var(--teal)" font-weight="600">Inner agent loop</text>
+      <text x="58" y="240" font-size="12" fill="var(--teal)">reasoning · tool dispatch · behavioral guardrails</text>
+      <line x1="452" y1="224" x2="492" y2="224" stroke="var(--teal)" stroke-width="1.5"/>
+      <text x="500" y="214" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--amber)" font-weight="600">the only layer left</text>
+      <text x="500" y="230" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--amber)" font-weight="600">to decide</text>
+      <text x="500" y="246" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--ink-muted)">→ decisions 1–3</text>
+
+      <!-- State note -->
+      <line x1="36" y1="276" x2="452" y2="276" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 4"/>
+      <text x="36" y="298" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--ink-muted)">durable state lives outside every layer — DynamoDB + Step Functions</text>
+    </svg>
+    <figcaption>Fig. 1 — Two prior decisions removed the hard questions; the implementation choice was scoped to the thin layer that remained.</figcaption>
+  </figure>
+
+  <h2>Decision 1 — build from scratch, or adopt an SDK?</h2>
+
+  <p>The case for hand-rolling is real. An agent loop is conceptually simple: call the model, parse tool requests, execute, append results, repeat. A competent engineer has a v1 in days. No dependency churn, no abstractions fighting you, total control. For a team whose product <em>is</em> the agent infrastructure, that's often the right call.</p>
+
+  <p>But "the loop" is the cheap part. What we'd actually own, forever, is everything around it:</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">⊖</div>
+        <div class="tcard-title">What building from scratch really costs</div>
+      </div>
+      <p>Streaming and retry semantics across model round-trips. A2A server plumbing so six agents interoperate. OTEL span emission on every tool call. Prompt-cache management against a &lt;$0.10-per-negotiation cost target. And the security-critical piece: a guardrail chokepoint that <em>every</em> tool invocation must pass through. That last one is exactly the kind of code that's easy to get subtly wrong — and a chokepoint that fails open is worse than no chokepoint, because you trust it.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⊕</div>
+        <div class="tcard-title">What adopting really buys</div>
+      </div>
+      <p>Not convenience — <em>reviewed, exercised infrastructure for the parts where a subtle bug is a security incident.</em> An SDK-owned event loop means the guardrail hook sits below the model's reach by construction, hardened by every other production user. Our engineering goes into negotiation logic and guardrail <em>policy</em> — the things only we can write — instead of re-deriving dispatch plumbing.</p>
+    </div>
+  </div>
+
+  <figure class="diagram" role="img" aria-label="Waterline diagram: the agent loop is visible above the line; below it sit six subsystems you own forever, including the security-critical guardrail chokepoint.">
+    <svg viewBox="0 0 720 330" xmlns="http://www.w3.org/2000/svg" font-family="Sora, sans-serif">
+      <!-- Above the waterline -->
+      <rect x="240" y="20" width="240" height="52" rx="10" fill="var(--teal-light)" stroke="var(--teal)" stroke-width="2"/>
+      <text x="360" y="42" text-anchor="middle" font-family="'DM Mono', monospace" font-size="13.5" fill="var(--teal)" font-weight="600">the agent loop</text>
+      <text x="360" y="60" text-anchor="middle" font-size="11.5" fill="var(--teal)">a v1 in days</text>
+
+      <!-- Waterline -->
+      <line x1="28" y1="96" x2="692" y2="96" stroke="var(--ink)" stroke-width="1" stroke-dasharray="5 5"/>
+      <text x="28" y="88" font-family="'DM Mono', monospace" font-size="11" fill="var(--ink-muted)">what you demo</text>
+      <text x="692" y="114" text-anchor="end" font-family="'DM Mono', monospace" font-size="11" fill="var(--amber)" font-weight="600">what you own, forever</text>
+
+      <!-- Below: row 1 -->
+      <rect x="28" y="130" width="208" height="58" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="132" y="155" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--ink)">streaming + retry</text>
+      <text x="132" y="172" text-anchor="middle" font-size="11" fill="var(--ink-muted)">across model round-trips</text>
+
+      <rect x="256" y="130" width="208" height="58" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="360" y="155" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--ink)">A2A server plumbing</text>
+      <text x="360" y="172" text-anchor="middle" font-size="11" fill="var(--ink-muted)">six agents interoperating</text>
+
+      <rect x="484" y="130" width="208" height="58" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="588" y="155" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--ink)">OTEL span emission</text>
+      <text x="588" y="172" text-anchor="middle" font-size="11" fill="var(--ink-muted)">every tool call, every hook</text>
+
+      <!-- Below: row 2 -->
+      <rect x="28" y="204" width="208" height="58" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="132" y="229" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--ink)">prompt-cache mgmt</text>
+      <text x="132" y="246" text-anchor="middle" font-size="11" fill="var(--ink-muted)">the &lt;$0.10 KPI depends on it</text>
+
+      <rect x="256" y="204" width="208" height="58" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="360" y="229" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--ink)">eval integration</text>
+      <text x="360" y="246" text-anchor="middle" font-size="11" fill="var(--ink-muted)">the quality gate</text>
+
+      <rect x="484" y="204" width="208" height="58" rx="8" fill="var(--amber-light)" stroke="var(--amber)" stroke-width="2"/>
+      <text x="588" y="229" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--amber)" font-weight="600">guardrail chokepoint</text>
+      <text x="588" y="246" text-anchor="middle" font-size="11" fill="var(--amber)">security-critical · fails open silently</text>
+
+      <text x="360" y="306" text-anchor="middle" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--ink-muted)">"the loop" is the cheap part — the subsystems around it are the product you didn't mean to start</text>
+    </svg>
+    <figcaption>Fig. 2 — Decision 1: what building from scratch actually puts on the team's books.</figcaption>
+  </figure>
+
+  <p>We adopted — with one condition that runs through this whole series: <strong>the SDK must stay replaceable.</strong> Durable state lives outside the agents; orchestration belongs to Step Functions; the SDK is confined to the inner loop. If we ever rip it out, we rewrite a thin layer, not the system. That condition is what made Decision 1 safe to take quickly.</p>
+
+  <h2>Decision 2 — which language?</h2>
+
+  <p>This one generates the most heat and deserved the least. But first, a constraint worth ruling out explicitly: <strong>the runtime didn't force the choice.</strong> AgentCore's first-party tooling is Python-first, but the Runtime executes containers — it's language-agnostic by construction. And this wasn't theoretical for us: our architect had already built and run JVM agents (Spring AI, deployed as ARM64 containers with OTEL/ADOT tracing) fully adapted to AgentCore Runtime. We knew from experience that any language on this list could ship. The field was genuinely open, which means what follows is a real decision, not a rationalized constraint. Three observations decided it.</p>
+
+  <p><strong>First, the workload shape.</strong> A negotiation agent is I/O-bound: it waits on Bedrock, on supplier MCP servers, on DynamoDB. Raw compute throughput — the headline argument for Go or Rust — is solving a problem we don't have. And the concurrency story that <em>does</em> matter (one auction fanning out to 200 concurrent bids) is handled by AgentCore's microVM-per-session model, not by the language runtime. The platform absorbed the argument for a systems language before it could be made.</p>
+
+  <p><strong>Second, ecosystem gravity.</strong> The agentic ecosystem is overwhelmingly Python-first: SDKs (or frameworks, as most brand themselves), eval tooling, guardrail libraries, reference implementations, and the hiring pool that knows them. Going against that gravity is a permanent tax paid on every integration.</p>
+
+  <p><strong>Third — and decisively — what each language unlocked in the SDK shortlist.</strong> At decision time, the capability matrix was lopsided: the SDKs we were evaluating carried their full production surface — multi-agent graph patterns, SDK-owned hook systems, the OpenTelemetry stack — in Python. TypeScript coverage, where it existed at all, was preview-grade and missing exactly the capabilities Buyer Team depends on: graph-based human-in-the-loop interrupts and OTEL end-to-end. The language decision wasn't a taste decision. It was a capability matrix.</p>
+
+  <div class="callout">
+    <div class="callout-label">Why language before SDK, if they're coupled?</div>
+    <p>Honestly: decisions 2 and 3 were evaluated <em>jointly</em>. A language is only as good as the SDKs it gives you, and an SDK shortlist presupposes a language — you can't score one axis without peeking at the other. The tree is ordered not by evaluation chronology but by <strong>size and irreversibility of commitment</strong>. The language touches hiring, tooling, and every line of code we write; the SDK is confined to the inner loop and contractually replaceable (Decision 1's condition). Bigger, harder-to-reverse decisions sit higher in the tree — so when the joint evaluation resolved, we recorded the language verdict first.</p>
+  </div>
+
+  <table class="decision">
+    <thead>
+      <tr><th>Option</th><th>Agentic ecosystem</th><th>SDK capability (at decision time)</th><th>Workload fit</th><th>Verdict</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Python</td><td>Deepest by far</td><td>Production SDK, full surface</td><td>I/O-bound: fine</td><td><span class="verdict v-chosen">chosen</span></td></tr>
+      <tr><td>TypeScript</td><td>Growing fast</td><td>Preview — no Graph, no OTEL stack</td><td>I/O-bound: fine</td><td><span class="verdict v-risk">capability gap</span></td></tr>
+      <tr><td>Go / Rust</td><td>Thin</td><td>No first-party agent SDK</td><td>Solves a problem we don't have</td><td><span class="verdict v-na">wrong axis</span></td></tr>
+      <tr><td>JVM / Spring AI</td><td>Maturing</td><td>Proven on AgentCore (containers); separate SDK lineage</td><td>Credible, heavier</td><td><span class="verdict v-build">credible, declined</span></td></tr>
+    </tbody>
+  </table>
+
+  <p>The honest caveat: the TypeScript SDK has since reached 1.0, and the gap is closing. If we were deciding today, the language column would be a closer contest — though ecosystem gravity and our existing eval tooling would likely still tip it. Python's real costs — packaging friction, optional typing — we paid down deliberately with modern tooling: <code>uv</code> for environments, Pydantic models on every tool boundary, and strict type-checking in CI. The weaknesses are manageable; they're just not free.</p>
+
+  <h2>Decision 3 — which SDK?</h2>
+
+  <p>Only now does the familiar question arrive — and notice how much smaller it has become. We're not choosing an orchestrator (Step Functions owns that), not choosing a runtime (AgentCore owns that), not choosing where state lives (DynamoDB owns that). We're choosing a library for the inner loop, against one non-negotiable: <strong>guardrails the LLM cannot bypass.</strong> Buyer Team moves real money under real governance. Confidentiality and policy controls must be a property of the architecture, not of the prompt.</p>
+
+  <h3>CrewAI</h3>
+  <p>Excellent for role-based collaborative crews — but it wants to <em>be</em> the orchestrator. Its strengths duplicate the layer Step Functions already owns, and its guardrail story is prompt- and convention-level, not a structural chokepoint.</p>
+
+  <h3>AutoGen</h3>
+  <p>Built for conversational, emergent multi-agent reasoning. Powerful where emergent behavior is the goal; in a governed negotiation, emergence is precisely what the deterministic DAG exists to prevent.</p>
+
+  <h3>LangGraph</h3>
+  <p>The serious contender. But its core strength — graph-based orchestration with checkpointing — again duplicates Step Functions, and its guardrail guarantee is <em>topological</em>: a guard holds only if every path through the graph routes through the guard node. One stray edge added in a refactor and a guardrail silently disappears. That's a guarantee maintained by discipline, not by construction.</p>
+
+  <h3>Roll-your-own loop</h3>
+  <p>Already resolved by Decision 1 — but it re-enters here as the baseline every SDK must beat: if an SDK doesn't give us something we couldn't responsibly build, adopting it is pure dependency risk.</p>
+
+  <h3>Strands</h3>
+  <p>What won it is one structural property: the hook system is an <strong>SDK-owned chokepoint</strong>. Every tool invocation — every one — passes through <code>BeforeToolCallEvent</code>, where our steering hooks inspect, modify, or <code>cancel_tool</code> before any side effect occurs. The model cannot route around it, because the route doesn't exist; there is one door, and the guard is bolted to it. It fails closed. On top of that: A2A deployment as a first-class primitive, native Bedrock AgentCore alignment (OTEL spans, Evaluations as the quality gate, per-tenant model selection), and an agent loop that preserves prompt-cache prefix purity — which is what keeps us under the $0.10-per-negotiation cost KPI.</p>
+
+  <figure class="diagram" role="img" aria-label="Two-panel comparison: a topological guard can be bypassed by a stray graph edge; the SDK-owned hook is the only route to the tool and fails closed.">
+    <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" font-family="Sora, sans-serif">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--ink)"/>
+        </marker>
+        <marker id="arrAmber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--amber)"/>
+        </marker>
+        <marker id="arrTeal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--teal)"/>
+        </marker>
+      </defs>
+
+      <!-- Divider -->
+      <line x1="360" y1="20" x2="360" y2="262" stroke="var(--rule)" stroke-width="1" stroke-dasharray="3 4"/>
+
+      <!-- LEFT: topological guard -->
+      <text x="180" y="36" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12.5" fill="var(--amber)" font-weight="600">guard by discipline (topological)</text>
+
+      <rect x="40" y="110" width="84" height="44" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="82" y="136" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--ink)">model</text>
+
+      <rect x="158" y="110" width="84" height="44" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="200" y="136" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--ink)">guard</text>
+
+      <rect x="276" y="110" width="60" height="44" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="306" y="136" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--ink)">tool</text>
+
+      <line x1="124" y1="132" x2="152" y2="132" stroke="var(--ink)" stroke-width="1.5" marker-end="url(#arr)"/>
+      <line x1="242" y1="132" x2="270" y2="132" stroke="var(--ink)" stroke-width="1.5" marker-end="url(#arr)"/>
+
+      <!-- stray edge -->
+      <path d="M 82 110 C 110 62, 270 62, 304 104" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrAmber)"/>
+      <text x="193" y="50" text-anchor="middle" font-family="'DM Mono', monospace" font-size="11" fill="var(--amber)">stray edge — one refactor away</text>
+
+      <text x="180" y="196" text-anchor="middle" font-size="11.5" fill="var(--ink-muted)">the guarantee holds only while every path</text>
+      <text x="180" y="214" text-anchor="middle" font-size="11.5" fill="var(--ink-muted)">happens to route through the guard node</text>
+      <text x="180" y="246" text-anchor="middle" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--amber)" font-weight="600">maintained by review</text>
+
+      <!-- RIGHT: SDK-owned hook -->
+      <text x="540" y="36" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12.5" fill="var(--teal)" font-weight="600">guard by construction (SDK hook)</text>
+
+      <rect x="396" y="110" width="84" height="44" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="438" y="136" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--ink)">model</text>
+
+      <rect x="510" y="94" width="118" height="78" rx="8" fill="var(--teal-light)" stroke="var(--teal)" stroke-width="2"/>
+      <text x="569" y="118" text-anchor="middle" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--teal)" font-weight="600">BeforeToolCall</text>
+      <text x="569" y="134" text-anchor="middle" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--teal)" font-weight="600">Event</text>
+      <text x="569" y="152" text-anchor="middle" font-size="10.5" fill="var(--teal)">inspect · modify</text>
+      <text x="569" y="166" text-anchor="middle" font-family="'DM Mono', monospace" font-size="10.5" fill="var(--teal)">cancel_tool</text>
+
+      <rect x="650" y="110" width="50" height="44" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
+      <text x="675" y="136" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--ink)">tool</text>
+
+      <line x1="480" y1="132" x2="504" y2="132" stroke="var(--teal)" stroke-width="1.5" marker-end="url(#arrTeal)"/>
+      <line x1="628" y1="132" x2="644" y2="132" stroke="var(--teal)" stroke-width="1.5" marker-end="url(#arrTeal)"/>
+
+      <text x="540" y="196" text-anchor="middle" font-size="11.5" fill="var(--ink-muted)">there is one door, and the guard is bolted to it —</text>
+      <text x="540" y="214" text-anchor="middle" font-size="11.5" fill="var(--ink-muted)">the route around it does not exist</text>
+      <text x="540" y="246" text-anchor="middle" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--teal)" font-weight="600">fails closed, by construction</text>
+    </svg>
+    <figcaption>Fig. 3 — Decision 3's non-negotiable: a guardrail guarantee maintained by review vs. one that holds by construction.</figcaption>
+  </figure>
+
+  <table class="decision">
+    <thead>
+      <tr><th>Option</th><th>Guardrail chokepoint</th><th>Orchestration posture</th><th>AgentCore / A2A fit</th><th>Verdict</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>CrewAI</td><td>Prompt-level</td><td>Wants to own it</td><td>Partial</td><td><span class="verdict v-risk">layer overlap</span></td></tr>
+      <tr><td>AutoGen</td><td>Convention</td><td>Emergent by design</td><td>Partial</td><td><span class="verdict v-risk">wrong shape</span></td></tr>
+      <tr><td>LangGraph</td><td>Topological — edge-dependent</td><td>Duplicates Step Functions</td><td>Portable, generic</td><td><span class="verdict v-build">discipline-bound</span></td></tr>
+      <tr><td>Roll-your-own</td><td>Ours to get right, forever</td><td>Neutral</td><td>Build everything</td><td><span class="verdict v-build">resolved in D1</span></td></tr>
+      <tr><td>Strands</td><td>SDK-owned, fails closed</td><td>Library, not orchestrator</td><td>Native</td><td><span class="verdict v-chosen">chosen</span></td></tr>
+    </tbody>
+  </table>
+
+  <h2>What "effective and efficient" actually meant</h2>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">◎</div>
+        <div class="tcard-title">Effective — the guarantees</div>
+      </div>
+      <p>Guardrails that survive a misbehaving model, by construction. A complete OTEL audit trail on every negotiation. Hard tenant isolation below the agent layer. And replaceability: every layer of the tree — SDK, even language — can be swapped without touching durable state or orchestration.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⚡</div>
+        <div class="tcard-title">Efficient — the economics</div>
+      </div>
+      <p>A small team shipping six production agents in weeks, not quarters, because we built only the layer that differentiates us. Engineering hours spent on negotiation logic and guardrail policy. AI cost held under $0.10 per negotiation through prompt-cache purity the SDK preserves rather than fights.</p>
+    </div>
+  </div>
+
+  <h2>The honest verdict</h2>
+
+  <p>Not "Strands is best," and not even "Python is best." Rather: <strong>for a small team building governed, multi-tenant negotiation agents, the effective and efficient implementation was the one that made every decision as small as possible before making it.</strong> Orchestration before intelligence took the workflow off the table. AgentCore took the runtime off the table. What remained — adopt over build, Python over the field, Strands over its peers — was a sequence of progressively smaller bets, each reversible in inverse order of its importance.</p>
+
+  <p>If your system needs the SDK to be the orchestrator, or you're building exploratory multi-agent reasoning where emergent behavior is the goal, the tree resolves differently — CrewAI, AutoGen, or LangGraph may well win, and TypeScript's gap has narrowed since we chose. SDKs are decisions you should be willing to revisit as the system and the ecosystem evolve. But decide them in order, and let the architecture shrink each one first. For this boundary, this constraint set, this team: adopt, Python, Strands.</p>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="why-we-chose-agentcore.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Why we chose Bedrock AgentCore — and what we turned down to get there</div>
+      </a>
+      <a href="dag-vs-llm-planner.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Why we chose a deterministic DAG over a pure LLM planner</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> — AI Solution Architect · June 2026</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> — an autonomous multi-agent procurement negotiation system.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>
