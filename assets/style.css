@@ -80,11 +80,10 @@ section{position:relative;z-index:1}
 .architect-link-icon{font-family:var(--ff-m);font-size:.78rem;color:var(--teal);font-weight:500}
 
 /* BLOG INDEX */
-.blog-layout{display:grid;grid-template-columns:1fr 1fr;gap:3rem;margin-top:3.5rem}
+.blog-layout{display:grid;grid-template-columns:1fr;gap:3rem;margin-top:3.5rem}
 .blog-col-head{display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:.5px solid var(--border)}
 .blog-col-icon{width:32px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-family:var(--ff-m);font-size:.6rem;flex-shrink:0}
 .blog-col-icon-eng{background:rgba(8,145,178,.12);color:var(--teal)}
-.blog-col-icon-bus{background:rgba(212,160,23,.12);color:var(--gold)}
 .blog-col-title{font-family:var(--ff-d);font-size:1.1rem;font-weight:700}
 .blog-posts{display:flex;flex-direction:column;gap:.75rem}
 .blog-post{border:.5px solid var(--border);border-radius:6px;padding:1.1rem 1.25rem;background:rgba(15,23,42,.5);
@@ -138,7 +137,6 @@ footer{position:relative;z-index:1;border-top:.5px solid var(--border);padding:2
 }
 
 @media(max-width:768px){
-  .blog-layout{grid-template-columns:1fr}
   .architect-card{grid-template-columns:1fr;padding:1.75rem;gap:1.5rem}
   .architect-photo{width:140px;height:140px;margin:0 auto}
   .architect-name{font-size:1.4rem;text-align:center}

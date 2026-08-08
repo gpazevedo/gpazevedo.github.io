@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Building ATLAS Counsel: grounding, escalation, and safety in a citation-first RAG agent — Gustavo Azevedo</title>
+<meta name="description" content="A LangGraph agent that cites every claim to a retrievable span, refuses when the corpus doesn't cover a question, and escalates to a human across a stateless HTTP/MCP boundary when it isn't sure."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/atlas-counsel.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<!-- Open Graph -->
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/atlas-counsel.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Building ATLAS Counsel: grounding, escalation, and safety in a citation-first RAG agent"/>
+<meta property="og:description" content="A LangGraph agent that cites every claim to a retrievable span, refuses when the corpus doesn't cover a question, and escalates to a human across a stateless HTTP/MCP boundary when it isn't sure."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/atlas-counsel-og.jpg"/>
+<meta property="og:image:width" content="1200"/>
+<meta property="og:image:height" content="630"/>
+<meta property="og:image:type" content="image/jpeg"/>
+<meta property="og:image:alt" content="ATLAS Counsel architecture overview — citation-grounded agentic RAG over a hybrid OpenSearch Serverless retriever with an optional FalkorDB graph channel, and a LangGraph agent"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-07-10T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-04T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="RAG"/>
+<meta property="article:tag" content="LangGraph"/>
+<meta property="article:tag" content="AI Procurement"/>
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:title" content="Building ATLAS Counsel: grounding, escalation, and safety in a citation-first RAG agent"/>
+<meta name="twitter:description" content="A LangGraph agent that cites every claim to a retrievable span, refuses when the corpus doesn't cover a question, and escalates to a human across a stateless HTTP/MCP boundary when it isn't sure."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/atlas-counsel-og.jpg"/>
+<meta name="twitter:image:alt" content="ATLAS Counsel architecture overview — citation-grounded agentic RAG over a hybrid OpenSearch Serverless retriever with an optional FalkorDB graph channel, and a LangGraph agent"/>
+
+<!-- Schema.org -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Building ATLAS Counsel: grounding, escalation, and safety in a citation-first RAG agent",
+  "description": "A LangGraph agent that cites every claim to a retrievable span, refuses when the corpus doesn't cover a question, and escalates to a human across a stateless HTTP/MCP boundary when it isn't sure.",
+  "datePublished": "2026-07-10",
+  "dateModified": "2026-08-04",
+  "author": {"@type": "Person", "name": "Gustavo Peixoto de Azevedo", "url": "https://gpazevedo.github.io/"},
+  "publisher": {"@type": "Person", "name": "Gustavo Peixoto de Azevedo", "url": "https://gpazevedo.github.io/"},
+  "url": "https://gpazevedo.github.io/blog/eng/atlas-counsel.html",
+  "mainEntityOfPage": "https://gpazevedo.github.io/blog/eng/atlas-counsel.html",
+  "image": {"@type": "ImageObject", "url": "https://gpazevedo.github.io/assets/atlas-counsel-og.jpg", "width": 1200, "height": 630}
+}
+</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Building ATLAS Counsel: grounding, escalation, and safety in a citation-first RAG agent","item":"https://gpazevedo.github.io/blog/eng/atlas-counsel.html"}]}</script>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+  figure.diagram { margin: 2rem 0; padding: 0; }
+  figure.diagram svg { display: block; width: 100%; height: auto; }
+  figure.diagram figcaption,
+  figure.hero figcaption {
+    margin-top: 0.75rem; font-size: 0.85rem; line-height: 1.5;
+    color: #64748B; text-align: center; font-style: italic;
+  }
+  figure.hero { margin: 1.75rem 0 0.5rem; padding: 0; }
+  figure.hero img {
+    display: block; width: 100%; height: auto;
+    border-radius: 12px; border: 1px solid #E2E8F0;
+  }
+  @media (prefers-color-scheme: dark) {
+    figure.diagram figcaption,
+    figure.hero figcaption { color: #94A3B8; }
+    figure.hero img { border-color: #1E293B; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Retrieval &amp; Agents</span>
+  </nav>
+
+  <!-- EYEBROW -->
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Retrieval &amp; Agents</span>
+    <span class="dot">·</span>
+    <time datetime="2026-07-10">July 2026</time>
+    <span class="dot">·</span>
+    <span>15 min read</span>
+  </div>
+
+  <!-- TITLE -->
+  <h1>Building <em>ATLAS Counsel:</em> grounding, escalation, and safety in a citation-first RAG agent</h1>
+
+  <!-- DECK -->
+  <p class="deck">
+    How Buyer Team built a LangGraph agent that cites every claim to a retrievable source span, refuses when the corpus doesn't cover a question, and escalates to a human across a stateless HTTP/MCP boundary when it isn't sure — with the decisions we actually made in production, and why.
+  </p>
+
+  <figure class="hero">
+    <img src="../../assets/atlas-counsel-architecture.jpg" width="2560" height="1696" loading="eager" decoding="async"
+      alt="ATLAS Counsel architecture overview. Left: an offline ingest lane where a deterministic synthetic corpus generator feeds a chunk-and-dual-embed step into an OpenSearch Serverless NextGen hybrid index that scales to zero when idle, with an optional FalkorDB graph store. Centre: an online query pipeline — user question, optional query decomposition, hybrid retrieve and merge (RRF, fused client-side on OpenSearch), optional rerank — wrapping a LangGraph agent that runs load_memory, plan, retrieve, validate, gap_analyze, synthesize, verify and human-gate, emitting a grounded answer with citations over FastAPI and MCP. Right: an eval harness that observes the pipeline with retrieval, LLM-judge, per-tag, regression and observability metrics. Bottom: a provider-abstraction layer with swappable embedding, retriever (in-memory, Qdrant, OpenSearch Serverless), reranker, graph-store, judge and LLM backends.">
+    <figcaption>ATLAS Counsel end to end — a deterministic corpus feeds a hybrid retriever; a LangGraph agent plans, retrieves, validates, synthesizes and verifies before it answers, escalating to a human when it isn't sure; an eval harness measures every stage.</figcaption>
+  </figure>
+
+  <hr>
+
+  <!-- INTRO -->
+  <p>
+    Most RAG systems treat citation as a courtesy: ask the model to name its sources in the prompt, and hope it complies. That's tolerable for a search assistant. It's not tolerable for a system that answers "who approves a $60,000 purchase?" and expects a procurement director to act on the answer. A wrong citation there isn't a UX blemish — it's an audit finding.
+  </p>
+
+  <p>
+    <strong>ATLAS Counsel</strong> is Buyer Team's citation-grounded agentic RAG system: it answers procurement-policy and contract questions, grounds every claim in a retrievable source span, refuses when the corpus doesn't cover the question, and pauses for a human when it isn't sure. It runs as a bounded subsystem with its own stack — a <strong>LangGraph</strong> <code>StateGraph</code> over a hybrid retriever (OpenSearch Serverless NextGen in production, Qdrant for local dev) with an optional FalkorDB graph-retrieval channel for relationships plain similarity can't see — exposed to the rest of the platform as MCP tools (<code>counsel_ask</code>, <code>counsel_resume</code>, <code>counsel_brief</code>). The Step Functions orchestrator and six A2A agents covered in <a href="https://buyer-team.com/blog/eng/multi-tenant-a2a-agentcore.html" target="_blank" rel="noopener noreferrer">an earlier post</a> call Counsel like any other tool; neither system knows the other's internals.
+  </p>
+
+  <p>
+    This post covers three problems that turned out to be harder than "add retrieval and prompt for citations": making grounding structurally unavoidable rather than a prompt request, giving the agent a bounded way to try harder before giving up, and making a human pause survive a protocol that has no concept of pausing. A fourth section covers what we defend against explicitly — indirect prompt injection and memory poisoning — because a doc-grounded agent exposed as a callable tool is exactly the shape that invites both.
+  </p>
+
+  <h2>Why citation-grounded RAG isn't the same problem as search</h2>
+
+  <p>
+    A search assistant that occasionally under-cites is annoying. A procurement agent that answers with unverifiable confidence, or guesses at a policy that doesn't exist, or blocks on a human indefinitely, produces a different class of failure — one with the same "no exception is thrown" invisibility as the multi-tenancy contamination described in that earlier post.
+  </p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">⚠</div>
+        <div class="tcard-title">A citation can be wrong and still look right</div>
+      </div>
+      <p>An LLM asked to cite its sources will cite <em>something</em>, whether or not that something actually supports the claim. Prompt-level citation requests degrade silently — there's no error, no log line, just a plausible-looking reference to a document that says something else.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">◎</div>
+        <div class="tcard-title">Refusal needs a real signal, not a score threshold</div>
+      </div>
+      <p>The obvious refusal heuristic — decline when the top retrieval score is low — assumes retrieval scores carry absolute meaning. Fused rank-based scores don't. Getting refusal right required a different signal entirely (see the callout below).</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-blue">↻</div>
+        <div class="tcard-title">Self-correction has to be bounded</div>
+      </div>
+      <p>An agent that re-checks its own answer against the evidence is more reliable than one that doesn't — but only if the re-check loop has a hard ceiling. An unbounded verify-and-retry loop is a production incident with a UUID.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⇄</div>
+        <div class="tcard-title">A pause has to survive the protocol</div>
+      </div>
+      <p>Escalating to a human is easy to draw on a whiteboard. It's a real integration problem when the agent is called over HTTP and MCP — both request/response — and the human might not respond for hours.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">A note on the corpus</div>
+    <p>The corpus behind Counsel is fully seeded and template-driven — no LLM calls, no network, byte-identical output for the same generator inputs. That determinism is what makes the eval numbers in this post comparable run over run, and it's what keeps the repository public-safe. It ships <strong>8 documents / 24 citable spans</strong> (procurement policies, vendor MSAs, a negotiation log) and <strong>8 golden Q/A items</strong> tagged <code>grounded</code>, <code>multi_hop</code>, or <code>unanswerable</code> — plus four planted hard cases designed to break a naive implementation.</p>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Trap</th>
+          <th>Where</th>
+          <th>What it tests</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Contradiction</td>
+          <td>AcmeCloud 99.9% vs. NorthLink 99.5% uptime</td>
+          <td>cross-document reasoning</td>
+        </tr>
+        <tr>
+          <td>Threshold precision</td>
+          <td>POL-001 ($50k) vs. near-duplicate POL-002 ($25k)</td>
+          <td>reranker precision</td>
+        </tr>
+        <tr>
+          <td>Unanswerable</td>
+          <td>supplier-gift question, planted with no supporting span</td>
+          <td>refuse-if-ungrounded</td>
+        </tr>
+        <tr>
+          <td>Anti-splitting</td>
+          <td>a $120k purchase phrased as smaller pieces</td>
+          <td>policy reasoning, not just lookup</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Layer one: grounding as a type contract</h2>
+
+  <p>
+    Every span in the corpus carries a stable, human-readable id — <code>POL-001#S1</code> is, and will always be, the $50,000 single-source-purchase threshold clause. That id survives chunking, survives embedding, and shows up in every retrieval result, so a chunk is always traceable back to a specific sentence in a specific document. Citation grounding builds on top of that stable identity at three independent checkpoints, each one catching what the previous one might have missed.
+  </p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 680 470" role="img" aria-labelledby="grd-title grd-desc" font-family="'Sora', system-ui, sans-serif">
+      <title id="grd-title">Three checkpoints enforce citation grounding</title>
+      <desc id="grd-desc">A stable span id assigned at corpus generation flows through a required Pydantic field on every claim, and is independently re-checked by a verify node against what was actually retrieved. Any claim that fails any checkpoint is retried or escalated, never shipped.</desc>
+      <style>
+        .grd-card { fill: #F8FAFC; stroke: #E2E8F0; stroke-width: 1; }
+        .grd-num  { font: 500 12px 'DM Mono', ui-monospace, monospace; letter-spacing: .04em; }
+        .grd-name { font: 500 16px 'Sora', sans-serif; }
+        .grd-src  { font: 400 13px 'DM Mono', ui-monospace, monospace; }
+        .grd-flow { font: 400 12px 'DM Mono', ui-monospace, monospace; fill: #64748B; }
+        .grd-edge { stroke: #94A3B8; stroke-width: 1.5; fill: none; }
+        .bar-teal { fill: #0D9488; } .acc-teal { fill: #0D9488; }
+        .bar-blue { fill: #2563EB; } .acc-blue { fill: #2563EB; }
+        .bar-amber { fill: #B45309; } .acc-amber { fill: #B45309; }
+        .t-name { fill: #0F172A; }
+        .t-src  { fill: #475569; }
+        @media (prefers-color-scheme: dark) {
+          .grd-card { fill: #111B2E; stroke: #1E293B; }
+          .grd-flow { fill: #94A3B8; }
+          .grd-edge { stroke: #475569; }
+          .t-name { fill: #F1F5F9; }
+          .t-src  { fill: #94A3B8; }
+          .bar-teal { fill: #2DD4BF; } .acc-teal { fill: #2DD4BF; }
+          .bar-blue { fill: #60A5FA; } .acc-blue { fill: #60A5FA; }
+          .bar-amber { fill: #FBBF24; } .acc-amber { fill: #FBBF24; }
+        }
+      </style>
+      <defs>
+        <marker id="grd-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <text class="grd-flow" x="60" y="32">Corpus generation</text>
+      <line class="grd-edge" x1="60" y1="42" x2="60" y2="72" marker-end="url(#grd-arrow)"/>
+      <rect class="grd-card" x="40" y="72" width="600" height="92" rx="12"/>
+      <rect class="bar-teal" x="40" y="72" width="5" height="92" rx="2.5"/>
+      <text class="grd-num acc-teal" x="64" y="98">CHECKPOINT 1</text>
+      <text class="grd-name t-name" x="64" y="120">Corpus — stable span_id per citable sentence</text>
+      <text class="grd-src t-src" x="64" y="142">24 spans across 8 documents, e.g. POL-001#S1</text>
+      <text class="grd-src t-src" x="64" y="158">Chunk carries its span_id through embed + index</text>
+      <line class="grd-edge" x1="340" y1="164" x2="340" y2="190" marker-end="url(#grd-arrow)"/>
+      <rect class="grd-card" x="40" y="190" width="600" height="92" rx="12"/>
+      <rect class="bar-blue" x="40" y="190" width="5" height="92" rx="2.5"/>
+      <text class="grd-num acc-blue" x="64" y="216">CHECKPOINT 2</text>
+      <text class="grd-name t-name" x="64" y="238">Synthesize — span_id is a required Claim field</text>
+      <text class="grd-src t-src" x="64" y="260">DraftAnswer.claims: list[Claim], Claim.span_id: str</text>
+      <text class="grd-src t-src" x="64" y="276">No citation is not a style gap — it's a validation error</text>
+      <line class="grd-edge" x1="340" y1="282" x2="340" y2="308" marker-end="url(#grd-arrow)"/>
+      <rect class="grd-card" x="40" y="308" width="600" height="92" rx="12"/>
+      <rect class="bar-amber" x="40" y="308" width="5" height="92" rx="2.5"/>
+      <text class="grd-num acc-amber" x="64" y="334">CHECKPOINT 3</text>
+      <text class="grd-name t-name" x="64" y="356">Verify — independently re-checks against retrieval</text>
+      <text class="grd-src t-src" x="64" y="378">Rejects a claim citing a span not actually retrieved</text>
+      <text class="grd-src t-src" x="64" y="394">or whose text drifted from the source — bounded retry</text>
+      <text class="grd-flow" x="340" y="432" text-anchor="middle">A claim that fails any checkpoint is retried or escalated — never shipped</text>
+    </svg>
+    <figcaption>Citation grounding enforced at three independent points: stable identity at generation, a required field at synthesis, and an independent re-check at verification.</figcaption>
+  </figure>
+
+  <pre><code># Citation is a required field, not a prompt request
+# synthesize() must emit a DraftAnswer or it fails validation
+
+class Claim(BaseModel):
+    text: str = Field(..., min_length=1)
+    span_id: str   # required — no citation, no claim
+
+class DraftAnswer(BaseModel):
+    claims: list[Claim]
+
+# verify() then independently checks each claim's span_id against
+# the spans that were *actually* retrieved for this question — a
+# claim citing an untouched span fails here even if synthesize()
+# asserted it was faithful.</code></pre>
+
+  <p>
+    We tested checkpoint three with a deliberately hallucinating stub LLM that always cites a span it never retrieved. The graph catches it every time, retries up to the cap, and escalates to the human gate rather than shipping a fabricated citation. Reliability here isn't a matter of prompt wording — it's the type system plus a control-flow guarantee that runs whether or not the model behaves.
+  </p>
+
+  <div class="callout">
+    <div class="callout-label">Why a retrieval score can't drive refusal</div>
+    <p>Our first refusal mechanism — decline when the top fused retrieval score is low — scored a flat <strong>0.0</strong> on refusal accuracy the moment the eval harness ran, because <strong>Reciprocal Rank Fusion scores are rank-based, not absolute.</strong> The top hit scores ≈ 1/(k+1) whether it's a perfect match or merely the least-bad candidate in the set. On the planted unanswerable question, retrieval scored <code>0.0325</code> against <code>0.0328</code> for questions with a clear answer — no threshold on a fused score can separate those. We rebuilt refusal around <em>lexical grounding overlap</em> — does the question's distinctive content actually appear in the retrieved spans — and refusal accuracy went to 1.0. That check became the <code>validate</code> node.</p>
+  </div>
+
+  <h2>Layer two: the agent graph</h2>
+
+  <p>
+    Counsel's control flow is cyclic by necessity: the agent re-checks its own draft against the evidence and retries when a claim isn't supported, and — when the first retrieval pass comes up short — it tries a second, narrower retrieval before giving up. A DAG or a chain models that awkwardly at best. LangGraph's <code>StateGraph</code> gives us first-class conditional edges and cycles, so the graph on the whiteboard and the graph in code are the same graph.
+  </p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 680 560" role="img" aria-labelledby="graph-title graph-desc" font-family="'Sora', system-ui, sans-serif">
+      <title id="graph-title">The ATLAS Counsel LangGraph StateGraph</title>
+      <desc id="graph-desc">A question flows through plan, retrieve, and validate. Grounded questions proceed to synthesize and verify; insufficiently grounded ones loop through a bounded gap-analysis retrieval before falling through to a human gate. Verify either finalizes, retries synthesize up to a cap, or escalates to the human gate, which can steer the answer or decline it. State is checkpointed throughout and the whole graph is exposed over REST and MCP behind one service.</desc>
+      <style>
+        .g-node-t { font: 500 14px 'Sora', sans-serif; }
+        .g-node-s { font: 400 11.5px 'DM Mono', ui-monospace, monospace; }
+        .g-flow   { font: 400 12px 'DM Mono', ui-monospace, monospace; fill: #64748B; }
+        .g-edge   { stroke: #94A3B8; stroke-width: 1.5; fill: none; }
+        .g-edge-loop { stroke: #94A3B8; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+        .g-shell  { fill: #F1F5F9; stroke: #CBD5E1; stroke-width: 1; }
+        .g-shell-t { font: 500 16px 'Sora', sans-serif; fill: #0F172A; }
+        .g-shell-s { font: 400 12px 'DM Mono', ui-monospace, monospace; fill: #475569; }
+        .n-gray { fill: #F8FAFC; stroke: #CBD5E1; }
+        .n-purple { fill: #F3EEFE; stroke: #C4B5FD; }
+        .n-amber { fill: #FCF3E3; stroke: #FCD9A0; }
+        .n-teal { fill: #E2F6F1; stroke: #99E2D2; }
+        .n-green { fill: #ECF6DE; stroke: #C2DD9A; }
+        .tt-gray { fill: #0F172A; } .ts-gray { fill: #475569; }
+        .tt-purple { fill: #4C1D95; } .ts-purple { fill: #6D28D9; }
+        .tt-amber { fill: #7C4A06; } .ts-amber { fill: #92600C; }
+        .tt-teal { fill: #0B5048; } .ts-teal { fill: #0F766E; }
+        .tt-green { fill: #2C4A0E; } .ts-green { fill: #3F6212; }
+        @media (prefers-color-scheme: dark) {
+          .g-flow { fill: #94A3B8; }
+          .g-edge, .g-edge-loop { stroke: #475569; }
+          .g-shell { fill: #0E1A2F; stroke: #1E3A5F; }
+          .g-shell-t { fill: #DBEAFE; }
+          .g-shell-s { fill: #93C5FD; }
+          .n-gray { fill: #1E293B; stroke: #334155; }
+          .n-purple { fill: #2B2150; stroke: #6D5CB8; }
+          .n-amber { fill: #422C0A; stroke: #B07D2A; }
+          .n-teal { fill: #103D38; stroke: #2A8579; }
+          .n-green { fill: #25380F; stroke: #5C8A2C; }
+          .tt-gray { fill: #F1F5F9; } .ts-gray { fill: #CBD5E1; }
+          .tt-purple { fill: #EDE9FE; } .ts-purple { fill: #C4B5FD; }
+          .tt-amber { fill: #FCEBCB; } .ts-amber { fill: #FBCF86; }
+          .tt-teal { fill: #D5F4EC; } .ts-teal { fill: #8DD9C8; }
+          .tt-green { fill: #E6F2D6; } .ts-green { fill: #B6D98C; }
+        }
+      </style>
+      <defs>
+        <marker id="g-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <text class="g-flow" x="60" y="32">Question (+ tenant_id)</text>
+      <line class="g-edge" x1="60" y1="42" x2="60" y2="70" marker-end="url(#g-arrow)"/>
+      <rect class="g-shell" x="40" y="70" width="600" height="368" rx="20"/>
+      <text class="g-shell-t" x="64" y="98">LangGraph StateGraph</text>
+      <text class="g-shell-s" x="64" y="116">Cyclic · checkpointed · interruptible</text>
+
+      <rect class="n-gray" x="64" y="134" width="130" height="52" rx="8"/>
+      <text class="g-node-t tt-gray" x="129" y="156" text-anchor="middle">plan</text>
+      <text class="g-node-s ts-gray" x="129" y="174" text-anchor="middle">frame the query</text>
+      <line class="g-edge" x1="194" y1="160" x2="222" y2="160" marker-end="url(#g-arrow)"/>
+      <rect class="n-gray" x="224" y="134" width="130" height="52" rx="8"/>
+      <text class="g-node-t tt-gray" x="289" y="156" text-anchor="middle">retrieve</text>
+      <text class="g-node-s ts-gray" x="289" y="174" text-anchor="middle">hybrid + merge</text>
+      <line class="g-edge" x1="354" y1="160" x2="382" y2="160" marker-end="url(#g-arrow)"/>
+      <rect class="n-purple" x="384" y="134" width="130" height="52" rx="8"/>
+      <text class="g-node-t tt-purple" x="449" y="156" text-anchor="middle">validate</text>
+      <text class="g-node-s ts-purple" x="449" y="174" text-anchor="middle">grounding check</text>
+
+      <text class="g-flow" x="140" y="204" text-anchor="end">insufficient</text>
+      <line class="g-edge" x1="150" y1="186" x2="150" y2="218" marker-end="url(#g-arrow)"/>
+      <rect class="n-amber" x="64" y="220" width="130" height="52" rx="8"/>
+      <text class="g-node-t tt-amber" x="129" y="242" text-anchor="middle">gap_analyze</text>
+      <text class="g-node-s ts-amber" x="129" y="260" text-anchor="middle">bounded loop</text>
+      <path class="g-edge-loop" d="M194 232 C 210 232, 210 160, 222 160" marker-end="url(#g-arrow)"/>
+
+      <text class="g-flow" x="439" y="204" text-anchor="end">grounded</text>
+      <line class="g-edge" x1="449" y1="186" x2="449" y2="218" marker-end="url(#g-arrow)"/>
+      <rect class="n-purple" x="384" y="220" width="130" height="52" rx="8"/>
+      <text class="g-node-t tt-purple" x="449" y="242" text-anchor="middle">synthesize</text>
+      <text class="g-node-s ts-purple" x="449" y="260" text-anchor="middle">DraftAnswer</text>
+      <line class="g-edge" x1="514" y1="246" x2="542" y2="246" marker-end="url(#g-arrow)"/>
+      <rect class="n-purple" x="544" y="220" width="80" height="52" rx="8"/>
+      <text class="g-node-t tt-purple" x="584" y="242" text-anchor="middle">verify</text>
+      <text class="g-node-s ts-purple" x="584" y="260" text-anchor="middle">re-check</text>
+
+      <text class="g-flow" x="486" y="300">unfaithful, retry ≤ cap</text>
+      <path class="g-edge-loop" d="M544 258 C 500 280, 480 280, 449 274" marker-end="url(#g-arrow)"/>
+
+      <text class="g-flow" x="118" y="298" text-anchor="end">exhausted</text>
+      <text class="g-flow" x="118" y="313" text-anchor="end">(either loop)</text>
+      <line class="g-edge" x1="129" y1="272" x2="129" y2="326" marker-end="url(#g-arrow)"/>
+      <path class="g-edge" d="M584 272 C 584 300, 250 320, 194 340" marker-end="url(#g-arrow)"/>
+      <rect class="n-amber" x="64" y="328" width="180" height="52" rx="8"/>
+      <text class="g-node-t tt-amber" x="154" y="350" text-anchor="middle">human_gate</text>
+      <text class="g-node-s ts-amber" x="154" y="368" text-anchor="middle">interrupt() · steer or decline</text>
+
+      <text class="g-flow" x="592" y="320">pass</text>
+      <line class="g-edge" x1="584" y1="272" x2="584" y2="328" marker-end="url(#g-arrow)"/>
+      <rect class="n-teal" x="504" y="328" width="120" height="52" rx="8"/>
+      <text class="g-node-t tt-teal" x="564" y="350" text-anchor="middle">finalize</text>
+      <text class="g-node-s ts-teal" x="564" y="368" text-anchor="middle">answer + citations</text>
+
+      <text class="g-flow" x="373" y="344" text-anchor="middle">decline</text>
+      <line class="g-edge" x1="244" y1="354" x2="502" y2="354" marker-end="url(#g-arrow)"/>
+      <path class="g-edge-loop" d="M154 380 C 154 420, 449 420, 449 274" marker-end="url(#g-arrow)"/>
+      <rect class="g-shell" x="278" y="388" width="46" height="18" rx="4" stroke="none"/>
+      <text class="g-flow" x="301" y="401" text-anchor="middle">steer</text>
+
+      <text class="g-flow" x="240" y="458" text-anchor="middle">Checkpointed by</text>
+      <line class="g-edge" x1="240" y1="438" x2="240" y2="470" marker-end="url(#g-arrow)"/>
+      <text class="g-flow" x="495" y="458" text-anchor="middle">Exposed over</text>
+      <line class="g-edge" x1="495" y1="438" x2="495" y2="470" marker-end="url(#g-arrow)"/>
+      <rect class="n-teal" x="40" y="472" width="290" height="56" rx="8"/>
+      <text class="g-node-t tt-teal" x="185" y="496" text-anchor="middle">SqliteSaver / PostgresSaver</text>
+      <text class="g-node-s ts-teal" x="185" y="514" text-anchor="middle">per-tenant checkpoint · resumable</text>
+      <rect class="n-green" x="350" y="472" width="290" height="56" rx="8"/>
+      <text class="g-node-t tt-green" x="495" y="496" text-anchor="middle">CounselService</text>
+      <text class="g-node-s ts-green" x="495" y="514" text-anchor="middle">REST + MCP, one shared code path</text>
+    </svg>
+    <figcaption>The compiled StateGraph. Two bounded loops — gap-analysis retrieval and the verify/synthesize retry — give the agent room to try harder before it escalates. Nothing loops forever.</figcaption>
+  </figure>
+
+  <p>
+    Two properties of this graph carry the reliability story. First, <strong>gap-aware retrieval doesn't escalate on the first miss.</strong> When <code>validate</code> finds the retrieved spans insufficient, <code>gap_analyze</code> asks the LLM which of the question's content tokens are still uncovered, issues those as follow-up queries, and the results from <code>retrieve</code> <em>merge into</em> — not replace — the existing set, so coverage accumulates across iterations instead of resetting. Second, <strong>every loop is capped.</strong> <code>MAX_GAP_ITERATIONS</code> bounds the retrieval loop and <code>MAX_ATTEMPTS</code> bounds the verify/synthesize retry; once exhausted, the graph falls through to <code>human_gate</code> rather than spinning. A genuinely unanswerable question still escalates — just after exhausting cheap self-help first, which is the difference between a system that tries and a system that guesses.
+  </p>
+
+  <h2>Layer three: the interrupt that crosses a stateless boundary</h2>
+
+  <p>
+    The human gate is where the cleanest part of the design met the least clean part of the transport. LangGraph's <code>interrupt()</code> pauses a run mid-graph — but Counsel is consumed over HTTP and MCP, and both are strictly request/response. A pause can't hold a socket open while a procurement director is at lunch, and it shouldn't have to: the run might resume from a different process, hours later.
+  </p>
+
+  <p>
+    Our answer was to make the pause itself a normal result rather than a special case the caller has to detect. When a run hits the gate, the call returns <code>status: "needs_input"</code> plus a <code>thread_id</code> that acts as an opaque resume token. A later, entirely independent <code>/resume</code> call carries the human's decision, and the checkpointer reconstitutes the full run state from that thread and continues exactly where it stopped.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Call</th>
+          <th>Carries</th>
+          <th>Returns</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>POST /ask</code></td>
+          <td><code>tenant_id</code>, question</td>
+          <td>answer + citations, <em>or</em> <code>needs_input</code> + <code>thread_id</code></td>
+        </tr>
+        <tr>
+          <td><code>POST /resume</code></td>
+          <td><code>tenant_id</code>, <code>thread_id</code>, action (<code>steer</code>/<code>decline</code>), guidance?</td>
+          <td>answer + citations, or a safe refusal</td>
+        </tr>
+        <tr>
+          <td><code>WS /ws/ask</code></td>
+          <td><code>tenant_id</code>, question</td>
+          <td>streamed <code>{event:"node", node}</code> per step, then a terminal <code>result</code>/<code>needs_input</code> frame</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Both transports — the FastAPI endpoints and the MCP tools the platform orchestrator calls — are thin wrappers over one shared <code>CounselService</code> object, and a test (<code>test_mcp_and_http_agree</code>) asserts they return identical results for identical inputs. That single-logic-path property is what lets us promise <code>counsel_ask</code> over MCP behaves exactly like <code>POST /ask</code> over HTTP, without a compatibility matrix to keep in sync.
+  </p>
+
+  <div class="callout">
+    <div class="callout-label">A bug the pause itself created</div>
+    <p>Even the human gate surfaced a real production bug worth recounting. When a human <em>steered</em> an initially-ungrounded question toward a specific document, <code>finalize</code> would still refuse — the original automated <code>grounded=False</code> verdict was stale and silently outranked the human's override. The fix wasn't a patch, it was a precedence rule: a human steer always wins over the automated grounding decision. Human-in-the-loop is easy to draw on a diagram; the precedence semantics between "what the model decided" and "what the human just said" are where it gets real.</p>
+  </div>
+
+  <h2>Multi-tenancy and auth</h2>
+
+  <p>
+    <code>CounselService</code> is tenant-aware end to end. Each <code>tenant_id</code> gets its own checkpointer — a SQLite file at <code>${CHECKPOINT_DIR}/{tenant_id}/checkpoints.db</code> in the default configuration, or its own Postgres schema (<code>CREATE SCHEMA tenant_&lt;id&gt;</code>) under <code>ATLAS_STATE_STORE=postgres</code> — while the retriever, which is read-only corpus data, is shared. Graphs compile lazily per tenant and are cached rather than recompiled per request. A <code>thread_id</code> is only resumable by the tenant that created it; a cross-tenant resume attempt returns a structured error, never a leak or a crash.
+  </p>
+
+  <p>
+    The <code>/mcp</code> endpoint is guarded by a small ASGI middleware supporting either a JWT (<code>tenant_id</code> claim, HS256, optional audience check) or a constant-time-compared API key. Critically, the MCP tools themselves never accept a <code>tenant_id</code> argument — it's derived from the verified auth context, so a caller can't simply assert a different tenant the way it could with a plain request parameter. Auth defaults are fail-safe in the boring direction: with neither secret configured the endpoint runs unauthenticated but logs a startup warning, and if <code>MCP_REQUIRE_AUTH</code> is set without a secret the app refuses to boot rather than silently serving unauthenticated traffic it claims to have locked down.
+  </p>
+
+  <div class="callout">
+    <div class="callout-label">Update — August 2026</div>
+    <p>
+      Two details in this section describe v1 of the MCP server and have since changed. Authentication is now mandatory: <code>MCP_REQUIRE_AUTH</code> has been removed entirely, <code>create_app</code> refuses to boot without a credential, and there is no unauthenticated mode — alongside a third accepted credential, OAuth 2.1 with per-tenant Cognito machine-to-machine tokens. Retrieval is no longer shared either; each tenant is served from its own corpus, with no fallback. The tenant-binding rule described above — identity derived from the verified credential, never from a request argument — is unchanged, and everything new is built on it. See <a href="atlas-counsel-mcp-v2-oauth.html">ATLAS Counsel MCP v2: an OAuth resource server, built for broad exposure</a>.
+    </p>
+  </div>
+
+  <h2>What we defend against explicitly</h2>
+
+  <p>
+    A doc-grounded agent exposed as a callable tool has two correctness risks that are specific to its shape, not generic LLM concerns. Both are defended structurally, not through prompt instructions, and both are proven in an adversarial CI gate rather than asserted in a README.
+  </p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">✗</div>
+        <div class="tcard-title">A retrieved span carries an injected instruction</div>
+      </div>
+      <p>Retrieved document spans and recalled memories are untrusted text — a supplier contract or a memory fragment can carry "ignore previous instructions" or an identity-reset attempt. A shield scans them at the retrieval boundary and redacts injection-bearing <em>sentences</em> (not whole chunks) before synthesis, preserving legitimate surrounding contract text. With the shield, adversarial detection is 100% and compliance 0%; the undefended baseline leaks the injected directive, so the CI gate can't pass vacuously.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">⊘</div>
+        <div class="tcard-title">A wrong answer gets remembered as fact</div>
+      </div>
+      <p>Multi-tier memory (semantic, episodic, procedural) is strictly additive — but a wrong or steered answer that persists as a remembered "fact" would poison every future session for that tenant. <code>save_memory</code> writes only answers that are grounded, faithful per <code>verify</code>, not refused, not human-escalated, and not from a run where an injection was detected. The wrong answer is still returned to the caller once; it's just never trusted twice.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-blue">⇄</div>
+        <div class="tcard-title">Vector spaces from different embedders get mixed</div>
+      </div>
+      <p>Local (bge-m3) and production (Titan) embeddings live in incompatible vector spaces even where dimensions happen to match. Rather than documenting "don't mix them," each provider declares a <code>space_id</code>, and the store's collection or index name is derived from it — <code>counsel_bge-m3</code> vs. <code>counsel_titan-v2</code> are physically separate indexes on every backend, Qdrant or OpenSearch Serverless alike. There is no code path that lets you query one against the other.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">◎</div>
+        <div class="tcard-title">A retriever or store dependency goes down mid-request</div>
+      </div>
+      <p>Every real backend's <code>ensure_collection</code>/<code>index</code>/<code>search</code> calls carry exponential-backoff retries scoped to connection/timeout errors, with a bounded client timeout — 30s for OpenSearch Serverless, generous enough to ride out its ~10s cold start after 10 minutes idle without tripping the fallback. A <code>FallbackRetriever</code> wraps the configured primary and degrades to the pre-indexed in-memory index on failure, with a <code>try_restore</code> probe to detect recovery — so a transient store outage degrades answer quality rather than the whole request.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">A bug the store migration surfaced</div>
+    <p>Moving the production vector store from self-hosted Qdrant to OpenSearch Serverless (ADR-0028, chasing the idle-cost floor rather than any retrieval-quality gain) turned up a defect that had been running silently the whole time: the service's composition root never wrapped the configured retriever in <code>FallbackRetriever</code>, so the "no retriever injected" branch always won — <strong>the deployed task had been answering every question from the in-memory index while Qdrant sat populated and unqueried.</strong> A second bug compounded it: <code>ingest.py</code> hard-coded the offline embedder, so the environment variable that was supposed to select the real one never touched ingestion at all, and a test asserting the resulting collection name had pinned the bug in place. Neither failure threw an exception; both surfaced only because the migration forced someone to trace the retriever resolution path end to end. Same invisibility this post opens with, one layer further down the stack.</p>
+  </div>
+
+  <h2>Evaluation-first, before the agent existed</h2>
+
+  <p>
+    The eval harness predates the agent, on purpose. We built the deterministic corpus and golden set first, so every later change — a new retrieval stage, a new prompt, a new model — is regression-checked against a fixed target rather than judged by feel. The refusal-mechanism failure above is what that sequencing bought us: the harness caught a broken refusal heuristic on day one, before it ever reached a user.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Dimension</th>
+          <th>How it's measured</th>
+          <th>Backend</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Retrieval quality</td>
+          <td>hit@k, context recall, AP-style context precision, MRR — exact, no LLM</td>
+          <td><span class="pill pill-disable">implemented</span></td>
+        </tr>
+        <tr>
+          <td>Answer faithfulness / relevancy</td>
+          <td>discrete 0–3 rubric with mandatory reasoning per metric, normalized to [0,1]</td>
+          <td><span class="pill pill-disable">implemented</span></td>
+        </tr>
+        <tr>
+          <td>Refuse-if-ungrounded</td>
+          <td>lexical grounding overlap, not retrieval score (see callout above)</td>
+          <td><span class="pill pill-disable">implemented</span></td>
+        </tr>
+        <tr class="row-quality">
+          <td>Judge fairness ("judging the judge")</td>
+          <td>content-preserving perturbations (fluent vs. choppy, confident vs. hedging); a fair judge shows deltas near zero</td>
+          <td><span class="pill pill-rollback">meta-eval</span></td>
+        </tr>
+        <tr class="row-quality">
+          <td>Injection defense</td>
+          <td>planted adversarial cases, with-shield vs. without-shield detection/compliance</td>
+          <td><span class="pill pill-rollback">adversarial gate</span></td>
+        </tr>
+        <tr>
+          <td>Regression</td>
+          <td>current aggregate quality locked in; a future change that degrades it fails CI like a broken test, not a report someone has to remember to check</td>
+          <td><span class="pill pill-disable">implemented</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    The harness also keeps the project honest about its own features. When we added reranking and query decomposition, the ablation showed the offline lexical reranker <em>lowering</em> context precision (0.857 → 0.762) on this small corpus, where first-stage hybrid retrieval already nearly saturates the golden set. We shipped that number instead of tuning the CI proxy toward the golden answers to manufacture a win. The same harness scored the OpenSearch Serverless migration itself: swapping the sparse channel from a hashed-token approximation to real BM25 left hit@5 and context recall unchanged and moved the ranking metrics by roughly one item at n=8 — a wash, not a regression, so the migration is justified on cost and operational grounds, not retrieval quality, and the post says so rather than rounding a coin-flip up to a win. The <code>+graph</code> ablation row shows the same discipline: FalkorDB's channel moves no metric yet, because the corpus's one <code>multi_hop</code> golden item is already reachable by first-stage hybrid retrieval. The stages ship as correct, tested infrastructure with a measured baseline; the production cross-encoder, an LLM-based decomposer, and a larger corpus with graph-only-reachable answers are what's expected to move these numbers, on a harness that can't be gamed either way.
+  </p>
+
+  <h2>What we'd do differently</h2>
+
+  <p>
+    <strong>A bigger corpus, earlier.</strong> Eight documents and 24 spans are enough to prove the plumbing — fusion, ranking, the verify loop, the refusal mechanism — but they're small enough that first-stage hybrid retrieval nearly saturates the golden set. That's the right floor for CI, but it means rerank, decomposition, and graph retrieval can't yet demonstrate their value on the same harness that made the refusal fix credible. We should have paired the deterministic small corpus with a larger, still-offline one from the start, specifically to give the advanced retrieval stages something to win on.
+  </p>
+
+  <p>
+    <strong>Register the checkpointer's custom types explicitly.</strong> LangGraph's checkpointer serializes our custom Pydantic state types today, but emits forward-compatibility warnings while doing it. Registering them explicitly is a known hardening task we've documented rather than routed around with a private API — the kind of thing that's easy to defer until it isn't.
+  </p>
+
+  <p>
+    <strong>Rate limiting is per-process, and we should say so louder.</strong> <code>ATLAS_RATE_LIMIT_PER_MINUTE</code> caps <code>/ask</code>/<code>/resume</code> per client IP with an in-process fixed-window counter. That's correct for a single task, but a multi-instance ECS deployment enforces the limit <em>per task</em>, not globally — <code>N</code> tasks effectively allow <code>N×</code> the configured rate. A shared store (Redis) would close that gap; until then it's a documented limitation, not a silent one.
+  </p>
+
+  <hr>
+
+  <h2>Summary</h2>
+
+  <p>
+    A citation-grounded RAG agent earns trust the same way the multi-tenant platform around it does: by making the guarantee an architectural property instead of a convention someone has to remember. Grounding is enforced at three independent checkpoints — stable span identity, a required field on every claim, and an independent re-check — so a hallucinated citation has to survive all three, and it never does. Escalation is bounded on both axes (gap-analysis retrieval, verify/synthesize retries) so the agent tries harder before it gives up, and the human pause is a first-class result that survives a stateless transport rather than a socket held open and hoping. And the two risks specific to a doc-grounded tool — injection and memory poisoning — are defended at the retrieval and write boundaries, proven in an adversarial CI gate that can't pass vacuously.
+  </p>
+
+  <p>
+    None of that required exotic tooling. It required measuring before building, making citation a type rather than a request, and treating "I don't know" and "ask a human" as first-class outcomes the graph is designed around — not failure modes bolted on after the fact.
+  </p>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="atlas-counsel-mcp-v2-oauth.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure</div>
+      </a>
+      <a href="dag-vs-llm-planner.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Why we chose a deterministic DAG over a pure LLM planner</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> — AI Solution Architect · July 2026</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> — an autonomous multi-agent procurement negotiation system.</p>
+    <p>ATLAS Counsel: a deterministic synthetic procurement corpus, hybrid retrieval over OpenSearch Serverless (with an optional FalkorDB graph channel), an evaluation harness with regression gates, the LangGraph agent, and the FastAPI/MCP runtime. Based on the project's ADR set (28 ADRs, one decision each) and system guide.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

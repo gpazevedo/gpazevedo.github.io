@@ -22,8 +22,7 @@
 <meta property="article:modified_time" content="2026-05-29T00:00:00+00:00"/>
 <meta property="article:section" content="Engineering"/>
 <meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
-<meta property="article:tag" content="Reliability"/>
-<meta property="article:tag" content="Durable Execution"/>
+<meta property="article:tag" content="Durability"/>
 
 <meta name="twitter:card" content="summary"/>
 <meta name="twitter:title" content="Pause for four days, resume in five seconds: durable execution in a multi-agent system"/>
@@ -71,7 +70,6 @@
     <li><a href="../../index.html">Home</a></li>
     <li><a href="../../index.html#blog">Blog</a></li>
     <li><a href="../../index.html#blog-engineering">Engineering</a></li>
-    <li><a href="../../index.html#blog-business">Business</a></li>
   </ul>
   <div class="blog-nav-right">
     <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
@@ -80,9 +78,9 @@
 
 <article class="page">
 
-<div class="breadcrumb"><a href="../../index.html#blog">Blog</a> <span class="sep">&rsaquo;</span> <a href="../../index.html#blog-engineering">Engineering</a> <span class="sep">&rsaquo;</span> <span class="current">Durable Execution</span></div>
+<div class="breadcrumb"><a href="../../index.html#blog">Blog</a> <span class="sep">&rsaquo;</span> <a href="../../index.html#blog-engineering">Engineering</a> <span class="sep">&rsaquo;</span> <span class="current">Durability</span></div>
 <!-- EYEBROW -->
-<div class="eyebrow"><span class="tag">Engineering</span> <span class="dot">&middot;</span> <span>Durable Execution</span> <span class="dot">&middot;</span> <time datetime="2026-05-29">May 2026</time> <span class="dot">&middot;</span> <span>18 min read</span></div>
+<div class="eyebrow"><span class="tag">Engineering</span> <span class="dot">&middot;</span> <span>Durability</span> <span class="dot">&middot;</span> <time datetime="2026-05-29">May 2026</time> <span class="dot">&middot;</span> <span>18 min read</span></div>
 <!-- TITLE -->
 <h1>Pause for four days, <em>resume in five seconds</em>: durable execution in a multi-agent system</h1>
 <!-- DECK -->
@@ -391,17 +389,17 @@
 <hr><!-- SECTION 3 -->
 <h2>Resume is only safe because every node is idempotent</h2>
 <p>Here's the subtlety that makes "resume from checkpoint" harder than it sounds. When a new instance picks up a negotiation, it knows the last node that <em>completed</em>. What it doesn't know is how far the <em>next</em> node got before the crash. Did Node 4x send three of five auction invitations and then die? Did Node 7 write the purchase order but crash before logging the communication? Resume can't assume the next node is a clean slate. It has to assume the next node may have already done some &mdash; or all &mdash; of its work.</p>
-<p>So the resume contract isn't "start the next node fresh." It's stronger: <strong>every node must be idempotent and detect its own previously-completed work</strong> (REQ-G005). Each node carries a dedup key that lets it recognise a side effect it already performed:</p>
-<pre><code>Node 1   &rarr;  (tenant_id, category_id, hash(items), deadline)
+<p>So the resume contract isn't "start the next node fresh." It's stronger: <strong>every node must be idempotent and detect its own previously-completed work</strong> (REQ-G005) &mdash; though not all by the same mechanism. Most carry a dedup key that lets them recognise a side effect already performed; a couple get idempotency for free from determinism instead:</p>
+<pre><code>Node 1   &rarr;  deterministic negotiation_id = uuid5(requisition_id); recreating on retry is a no-op
 Node 2   &rarr;  semantic cache key
 Node 4x  &rarr;  (negotiation_id, supplier_id, action, round_number)
-Node 5   &rarr;  existing evaluation_score on the Bid
+Node 5   &rarr;  none needed &mdash; scoring is a pure deterministic function, so overwrite is safe by construction
 Node 7   &rarr;  existing CommunicationLog entry</code></pre>
 <p>The Node 4x key is the important one, because Node 4x is where the side effects live &mdash; every message to a supplier is an irreversible act. Before any side-effecting tool call, the agent computes that deterministic idempotency key and checks the <code>{env}-idempotency</code> table (14-day TTL &mdash; widened from 7 days once 7 turned out to leave zero headroom against the 168-hour negotiation ceiling). On a hit, it returns the cached result instead of re-executing; on a miss, it executes and writes the key (REQ-R200&ndash;R202). A new instance resuming a half-finished auction round therefore re-walks the round, but each invitation it tries to re-send hits a cached key and becomes a no-op. The supplier never sees a duplicate.</p>
 <p>The Leverage Auction agent makes this concrete with two layers of round-level idempotency. Before sending an invitation, it checks the <code>CommunicationLog</code> for an existing <code>AUCTION_INVITATION</code> on <code>(negotiation_id, supplier_id, type)</code> &mdash; found means skip. Before recording a supplier's feedback for round <em>N</em>, it checks for an existing <code>AUCTION_ROUND_FEEDBACK</code> entry on <code>(negotiation_id, round_number, supplier_id, type)</code> &mdash; found means that supplier's round is already logged, skip them. The dedup is per supplier per round, not per round as a whole, so a crash three rounds into a five-round auction resumes at round four, not round one, and re-sends nothing.</p>
 <div class="callout">
-<div class="callout-label">Idempotency on the cycle-back path too</div>
-<p>The one governed loop in the graph &mdash; Node 6 rejecting an award back to Node 4x &mdash; is itself a resume hazard. When the graph cycles back, it first marks every <code>Bid</code> from the rejected round <code>SUPERSEDED</code> so stale bids don't leak into the next evaluation. That marking has to be idempotent as well: if recovery interrupts the cycle-back, re-marking an already-<code>SUPERSEDED</code> bid is a no-op, and Node 5 filters <code>SUPERSEDED</code> bids unconditionally. The retry loop and the recovery loop have to compose cleanly, because in production they will eventually overlap.</p>
+<div class="callout-label">Why the cycle-back path needs no supersede step</div>
+<p>The one governed loop in the graph &mdash; Node 6 rejecting an award back to Node 4x &mdash; looks like a resume hazard, but the same trick that makes round-level idempotency free (a deterministic key) makes it a non-issue here too. <code>Bid.bid_id</code> is <code>uuid5</code> of <code>(negotiation_id, supplier_id)</code> &mdash; per supplier, not per round &mdash; so a new round doesn't create a fresh row per supplier, it overwrites the existing one in place. There's no stale round data to mark <code>SUPERSEDED</code>, because there's only ever one bid row per supplier for the life of the negotiation, and Node 5 always evaluates whatever that row currently holds. If recovery interrupts a cycle-back mid-round, the same overwrite-on-retry idempotency covers it: re-running the round just writes the same values again.</p>
 </div>
 <hr><!-- SECTION 4 -->
 <h2>Two instances, one negotiation: the recovery lock</h2>
@@ -500,7 +498,7 @@ Node 7   &rarr;  existing CommunicationLog entry</code></pre>
 <hr><!-- SECTION 5 -->
 <h2>The part where nothing runs: pausing a DAG for four days</h2>
 <p>Everything so far is about surviving crashes. The harder durability problem is the deliberate pause. A STRATEGIC or above-threshold negotiation hits the Node 6 Approval Gate and has to stop and wait for a human. That human has up to 96 hours. You cannot hold a process &mdash; or a microVM session &mdash; open for four days waiting on a click. So the interrupt doesn't hold anything open at all.</p>
-<p>At Node 6, the gate evaluates whether approval is required (spend above threshold, or a quadrant that always requires it). If it is, the graph executes a true interrupt: persist the full state snapshot, set <code>Negotiation.status = PENDING_APPROVAL</code> and <code>Award.approval_status = PENDING_HUMAN</code>, return a <code>session_id</code> and <code>checkpoint_id</code>, publish the approval request, and <em>pause</em> (REQ-G200). The execution stops. No compute is held. The negotiation now lives entirely as a row in DynamoDB and an open span in the trace.</p>
+<p>At Node 6, the gate evaluates whether approval is required (spend above threshold, or a quadrant that always requires it). If it is, the graph executes a true interrupt: it's a Step Functions task-token wait, so pausing means persisting the token itself &mdash; <code>_pause_for_human</code> stores <code>approval_task_token</code> on the negotiation row along with <code>Negotiation.status = PENDING_APPROVAL</code> and <code>Award.approval_status = PENDING_HUMAN</code> &mdash; and the state machine then blocks (REQ-G200). There's no session handle returned to anything; the token <em>is</em> the resume capability, and it lives only in DynamoDB. The execution stops. No compute is held. The negotiation now lives entirely as a row in DynamoDB and an open span in the trace.</p>
 <figure class="diagram"><svg viewBox="0 0 860 380" xmlns="http://www.w3.org/2000/svg" font-family="'Sora', system-ui, sans-serif" role="img" aria-labelledby="int-title int-desc">
   <title id="int-title">Interrupt-and-resume: pausing a DAG for human approval</title>
   <desc id="int-desc">At Node 6 the graph serialises state to DynamoDB and tears down execution. During the wait of up to 96 hours zero compute is held; the negotiation lives only as a row. An inbound API call resumes it in under five seconds.</desc>
@@ -536,7 +534,7 @@ Node 7   &rarr;  existing CommunicationLog entry</code></pre>
     <text class="title" x="58" y="168">Approval required</text>
     <text class="sub" x="58" y="190">persist state snapshot</text>
     <text class="sub" x="58" y="206">status → PENDING_APPROVAL</text>
-    <text class="sub" x="58" y="222">return session_id + checkpoint_id</text>
+    <text class="sub" x="58" y="222">store approval_task_token on the row</text>
     <text class="mono" x="58" y="236" fill="var(--coral,#E11D48)">execution paused — torn down</text>
   </g>
   <path class="edge" d="M240,180 L300,180" marker-end="url(#i-arrow)"></path>
@@ -558,7 +556,7 @@ Node 7   &rarr;  existing CommunicationLog entry</code></pre>
     <rect class="box-teal" x="620" y="120" width="200" height="120" rx="11"></rect>
     <text class="num" x="638" y="146">RESUME (REQ-G201)</text>
     <text class="title" x="638" y="168">Inbound API call</text>
-    <text class="sub" x="638" y="190">POST /negotiations/{id}/approval</text>
+    <text class="sub" x="638" y="190">POST /requisitions/{id}/approve|reject|cycle_back</text>
     <text class="sub" x="638" y="206">JWT + claim check (REQ-G251)</text>
     <text class="sub" x="638" y="222">validate decision</text>
     <text class="mono" x="638" y="236" fill="var(--teal,#0D9488)">resumes in ≤ 5 seconds</text>
@@ -583,8 +581,8 @@ Node 7   &rarr;  existing CommunicationLog entry</code></pre>
   <g transform="translate(40,288)">
     <rect class="box" x="0" y="0" width="480" height="56" rx="9" stroke-dasharray="5 4"></rect>
     <text class="num" x="16" y="22" fill="var(--coral,#E11D48)">TIMEOUT BACKSTOP</text>
-    <text class="sub" x="16" y="40">96h no decision → SFN task-token timeout fires. Never auto-approves;</text>
-    <text class="sub" x="16" y="52">the 168h total ceiling is the backstop that eventually catches it.</text>
+    <text class="sub" x="16" y="40">96h no decision → REQUIRES_ATTENTION (never auto-approve, REQ-G203);</text>
+    <text class="sub" x="16" y="52">then +7 days stale → auto-CANCEL (REQ-G203a) — cancelling commits nothing.</text>
   </g>
 </svg>
 <figcaption>The interrupt pattern. At Node 6 the graph serialises state and tears execution down; for up to 96h the negotiation is just a <strong>DynamoDB row</strong> &mdash; zero compute, survives deploys. An inbound API call resumes it in &le; 5s.</figcaption>
@@ -592,27 +590,27 @@ Node 7   &rarr;  existing CommunicationLog entry</code></pre>
 <div class="layer-stack">
 <div class="layer l1">
 <div class="layer-meta"><span class="layer-num">T0</span> <span class="layer-name">Interrupt fires</span> <span class="layer-src">Node 6 &middot; approval required</span></div>
-<div class="chips"><span class="chip">state snapshot persisted</span> <span class="chip">status &rarr; PENDING_APPROVAL</span> <span class="chip">session_id + checkpoint_id returned</span> <span class="chip">execution paused &mdash; zero compute</span></div>
+<div class="chips"><span class="chip">status &rarr; PENDING_APPROVAL</span> <span class="chip">approval_task_token stored on the row</span> <span class="chip">execution paused &mdash; zero compute</span></div>
 </div>
 <div class="layer l2">
 <div class="layer-meta"><span class="layer-num">T0 &rarr; 96h</span> <span class="layer-name">The wait</span> <span class="layer-src">span: interrupt.waiting</span></div>
 <div class="chips"><span class="chip">negotiation exists only as a DynamoDB row</span> <span class="chip">interrupt.wait_time metric accrues</span> <span class="chip">slot retained, not decremented</span></div>
 </div>
 <div class="layer l3">
-<div class="layer-meta"><span class="layer-num">Resume</span> <span class="layer-name">Human decides</span> <span class="layer-src">POST /negotiations/{id}/approval</span></div>
-<div class="chips"><span class="chip">JWT + claim check (REQ-G251)</span> <span class="chip">validate decision, resume in &le;5s (REQ-G201)</span> <span class="chip">approve &rarr; Node 7 &middot; cycle-back &rarr; Node 4x &middot; reject &rarr; CANCELLED</span></div>
+<div class="layer-meta"><span class="layer-num">Resume</span> <span class="layer-name">Human decides</span> <span class="layer-src">POST /requisitions/{id}/approve|reject|cycle_back</span></div>
+<div class="chips"><span class="chip">JWT + claim check (REQ-G251)</span> <span class="chip">resume_approval reads the stored token, resume in &le;5s (REQ-G201)</span> <span class="chip">approve &rarr; Node 7 &middot; cycle_back &rarr; Node 4x &middot; reject &rarr; CANCELLED</span></div>
 </div>
 </div>
-<p>Resume is an inbound API call, not a polling loop. When the approver submits <code>{decision, reason, alternative_bid_id}</code>, the graph validates the decision and resumes from the checkpoint within five seconds (REQ-G201). That resume endpoint is also where user-level authorisation is enforced &mdash; a separate plane from the agent&rarr;tool policies &mdash; evaluating the caller's JWT claims against the action before the state transition is accepted (REQ-G251) &mdash; though only when the tenant has configured claim requirements in the first place; a tenant with none configured skips the check by design, since tenant-level JWT isolation upstream already holds. REQ-G251 is an additional approval-authority gate layered on top of that isolation, not a replacement for it. The agent never carries a user JWT and never evaluates user claims; entity access control is purely an orchestration-layer concern, enforced at exactly this boundary.</p>
+<p>Resume is an inbound API call, not a polling loop &mdash; three separate, purpose-built endpoints (<code>/approve</code>, <code>/reject</code>, <code>/cycle_back</code>), not one generic decision payload. Each translates to a call into <code>resume_approval({tenant_id, negotiation_id, decision, approver, reason})</code>, which reads the stored <code>approval_task_token</code> off the negotiation row and hands control back to Step Functions via <code>send_task_success</code> within five seconds (REQ-G201). That resume path is also where user-level authorisation is enforced &mdash; a separate plane from the agent&rarr;tool policies &mdash; evaluating the caller's JWT claims against the action before the state transition is accepted (REQ-G251) &mdash; though only when the tenant has configured claim requirements in the first place; a tenant with none configured skips the check by design, since tenant-level JWT isolation upstream already holds. REQ-G251 is an additional approval-authority gate layered on top of that isolation, not a replacement for it. The agent never carries a user JWT and never evaluates user claims; entity access control is purely an orchestration-layer concern, enforced at exactly this boundary.</p>
 <div class="callout">
 <div class="callout-label">Why the approval timeout doesn't auto-decide</div>
-<p>When 96 hours elapse with no decision, the negotiation does <em>not</em> auto-approve. That ceiling is enforced by Step Functions itself: the Node 6 task-token wait carries a native <code>TimeoutSeconds = 345600</code> (96h), so an unanswered approval can't hold the state machine open indefinitely. There's no path from a stalled approval to a silent, unattended outcome &mdash; the 168-hour total ceiling below is the backstop that eventually catches a negotiation stuck at this gate, same as any other non-terminal negotiation.</p>
+<p>When 96 hours elapse with no decision, the negotiation does <em>not</em> auto-approve or auto-reject. Step Functions itself ends the Node 6 task-token wait at a native <code>TimeoutSeconds = 345600</code> (96h) &mdash; cleanly, at <code>ApprovalTimedOut</code>, rather than retrying and re-arming the clock the way it used to (a durability gap closed 2026-08-04: the retry re-invoked Node 6, which reset <code>approval_started_at</code> and installed a fresh task token, so a stalled negotiation could stay in <code>PENDING_APPROVAL</code> forever). The scheduled <code>requires_attention_evaluator</code> sweep (30-minute EventBridge cadence) picks it up on its next tick and transitions it to <code>REQUIRES_ATTENTION</code> (trigger <code>approval_timeout_96h</code>, REQ-G203) with full state preserved, and a human compliance reviewer makes the call. The reasoning: a stale approval past 96 hours signals either an unavailable approver or a broken escalation path &mdash; both conditions where guessing is worse than escalating. There <em>is</em> a final backstop: if the negotiation then sits in <code>REQUIRES_ATTENTION</code> under that trigger for more than seven further days, the same sweep auto-cancels it with <code>approval_stale_7day_limit_exceeded</code> (REQ-G203a). Auto-cancel is safe in a way auto-approve never is &mdash; cancelling commits no money and signs no contract.</p>
 </div>
 <hr><!-- SECTION 6 -->
 <h2>The ceiling: 168 hours, then compensate and cancel</h2>
 <p>Stacking up the waits &mdash; a five-business-day Leverage auction, a 96-hour approval window, retry backoffs, a governed cycle-back &mdash; a negotiation's wall-clock lifespan can stretch. The outer bound is 168 hours (seven days) from <code>created_at</code> (REQ-R351). There is no single continuous sweep watching every non-terminal negotiation for this; the ceiling is enforced in two narrower places. A DLQ-redrive Lambda, running every minute, checks it for any negotiation that has already landed in the DLQ for some other reason, and routes a timed-out one to a human-facing queue instead of retrying it. Everything else &mdash; a negotiation that's simply been sitting non-terminal for a week without ever hitting the DLQ &mdash; is only caught when the recovery sweep runs, and that sweep is invoked deliberately (post-deploy, or after an incident), not on a schedule.</p>
 <p>When the sweep does find a timed-out negotiation, it doesn't just escalate &mdash; it runs the negotiation's saga compensations LIFO (cancel a purchase order, revert an award, notify suppliers of a retraction, whatever side effects that negotiation had accumulated) and, if every compensation succeeds, cancels it directly with <code>cancelled_reason = "total_timeout_exceeded"</code>. No operator has to click cancel on that path; the safety argument is that nothing gets marked <code>CANCELLED</code> until its side effects are provably undone. Only when a compensation can't complete &mdash; a still-issued PO that resists cancellation, say &mdash; does the negotiation fall back to <code>REQUIRES_ATTENTION</code> instead, so it stays on the recoverable list and a later sweep can retry the leftover undo work.</p>
-<p>The escalation path is still built to survive the failure that triggered it, though not via a bare fire-and-forget SQS publish: the <code>REQUIRES_ATTENTION</code> write and its outbound event commit together as a transactional-outbox row in the same DynamoDB transaction as the status change, and a once-a-minute poller drains that outbox to SQS at-least-once. A crash between the status write and the notification can't silently drop the escalation the way an uncoordinated publish could.</p>
+<p>This escalation doesn't route through a queue at all. <code>_flag_requires_attention</code> is a plain conditional <code>update_item</code> plus a <code>negotiation_timeout_escalation</code> CloudWatch metric &mdash; the DynamoDB status write is the whole signal, and ops watches the metric/alarm rather than consuming an event off a queue. That's a deliberate asymmetry with this codebase's other outbox uses: the transactional outbox (a same-DynamoDB-transaction commit) is reserved for AWARDED &rarr; PO export, where a real downstream system needs the event; a separate, best-effort outbox path carries retry-exhaustion failure context to SQS and a WORM S3 archive (REQ-R004/R406), but that's a different trigger from the total-timeout ceiling and isn't transactionally coupled to any status write either. Nothing here can silently drop the escalation the way a fire-and-forget publish could, for the simplest possible reason: there's no publish on this path to drop.</p>
 <hr><!-- SECTION 6.5: ARCHITECTURE DECISIONS & TRADE-OFFS -->
 <h2>The decisions behind the durability &mdash; and what they cost</h2>
 <p>None of this is free, and most of it is a deliberate trade against an alternative that looked simpler on paper. Five decisions shaped the durability model; each bought a reliability property at a real, named price.</p>
@@ -682,7 +680,7 @@ Node 7   &rarr;  existing CommunicationLog entry</code></pre>
 <hr><!-- SECTION 8 -->
 <h2>What we'd tell our past selves</h2>
 <p>Three things that took longer to land than they should have.</p>
-<p><strong>Size the lock TTL from the execution budget, not a round number.</strong> An earlier version of the recovery lock used a five-minute TTL because five minutes felt safe. It wasn't &mdash; a Node 4x execution that exhausts its retries (three A2A attempts at 150s each, plus backoff) can legitimately run past 495 seconds, and a five-minute lock would expire <em>under</em> a slow-but-healthy node, letting a second instance barge in. We re-derived the TTL from the worst-case single-node execution time and landed at 600 seconds with a 1.2&times; margin. The lesson is general: any TTL that gates failover has to be a function of the thing it's protecting, and it should be written down next to the derivation, because the inputs (timeouts, retry counts) drift over time and the TTL has to drift with them.</p>
+<p><strong>Size the lock TTL from the execution budget, not a round number.</strong> An earlier version of the recovery lock used a flat five-minute TTL because five minutes felt safe. It wasn't a real answer &mdash; it wasn't derived from anything, so nothing guaranteed it would stay ahead of a legitimately-slow node as the A2A timeout or retry count got tuned. We re-derived the TTL from the worst-case single-node execution time (A2A timeout &times; max attempts, plus backoff) and landed at 600 seconds &mdash; comfortable headroom today, but the point is that it's a number we can re-check, not one we picked by feel. The lesson is general: any TTL that gates failover has to be a function of the thing it's protecting, and it should be written down next to the derivation, because the inputs (timeouts, retry counts) drift over time and the TTL has to drift with them.</p>
 <p><strong>Don't trust DynamoDB TTL for anything time-sensitive.</strong> We initially leaned on TTL deletion to expire recovery locks, and discovered the hard way that TTL is best-effort and can lag by many minutes. A crashed recovery holding a lock would block the next instance for far longer than intended. The fix was to make <code>expires_at</code> a value we compare in the conditional write itself, and demote TTL to background cleanup only. If correctness depends on <em>when</em> something expires, expiry has to be in your control path, not in a background process you don't schedule.</p>
 <p><strong>Make resume idempotency a node-authoring requirement, not a recovery-layer afterthought.</strong> The instinct is to build resume as a clever recovery routine that figures out what to skip. That's backwards. The recovery routine should be dumb &mdash; read status, resume next node &mdash; and the cleverness should live in each node's own contract: "I detect my previously-completed work via this dedup key." We retrofitted idempotency into the auction agent after an audit found a duplicate-invitation path on cycle-back, and retrofitting it was much more painful than it would have been to require it up front. Every node that has a side effect needs a dedup key as part of its definition of done, the same way it needs a checkpoint.</p>
 <hr><!-- SUMMARY -->
