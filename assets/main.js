@@ -46,7 +46,7 @@ document.querySelectorAll('.reveal').forEach(el => io.observe(el));
     }
     container.innerHTML = posts
       .slice()
-      .sort((a, b) => a.order - b.order)
+      .sort((a, b) => b.date.localeCompare(a.date))
       .map(p => `
         <a href="${pathPrefix}${p.file}" class="blog-post">
           <div class="blog-post-tag">${p.tags[0]}</div>
@@ -58,5 +58,4 @@ document.querySelectorAll('.reveal').forEach(el => io.observe(el));
   }
 
   renderPosts('eng-posts', window.engPosts, 'blog/eng/');
-  renderPosts('bus-posts', window.businessPosts, 'blog/business/');
 })();

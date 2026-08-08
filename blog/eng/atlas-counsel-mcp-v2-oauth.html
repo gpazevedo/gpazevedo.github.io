@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure — Gustavo Azevedo</title>
+<meta name="description" content="An OAuth 2.1 resource server that cannot boot without a credential, cannot be told which tenant to act as, and cannot answer from a corpus the tenant never ingested."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/atlas-counsel-mcp-v2-oauth.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<!-- Open Graph -->
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/atlas-counsel-mcp-v2-oauth.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure"/>
+<meta property="og:description" content="Moving a multi-tenant MCP endpoint from pilot deployments to general availability: OAuth 2.1, mandatory authentication, and tenant isolation held by construction."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-08-07T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-07T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="MCP"/>
+<meta property="article:tag" content="OAuth"/>
+<meta property="article:tag" content="Multi-tenancy"/>
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure"/>
+<meta name="twitter:description" content="Moving a multi-tenant MCP endpoint from pilot deployments to general availability: OAuth 2.1, mandatory authentication, and tenant isolation held by construction."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<!-- Schema.org -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure",
+  "description": "An OAuth 2.1 resource server that cannot boot without a credential, cannot be told which tenant to act as, and cannot answer from a corpus the tenant never ingested.",
+  "datePublished": "2026-08-07",
+  "dateModified": "2026-08-07",
+  "author": {"@type": "Person", "name": "Gustavo Peixoto de Azevedo", "url": "https://gpazevedo.github.io/"},
+  "publisher": {"@type": "Person", "name": "Gustavo Peixoto de Azevedo", "url": "https://gpazevedo.github.io/"},
+  "url": "https://gpazevedo.github.io/blog/eng/atlas-counsel-mcp-v2-oauth.html",
+  "mainEntityOfPage": "https://gpazevedo.github.io/blog/eng/atlas-counsel-mcp-v2-oauth.html",
+  "image": {"@type": "ImageObject", "url": "https://gpazevedo.github.io/assets/architect.jpg"}
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://gpazevedo.github.io/"},
+    {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://gpazevedo.github.io/#blog"},
+    {"@type": "ListItem", "position": 3, "name": "ATLAS Counsel MCP v2", "item": "https://gpazevedo.github.io/blog/eng/atlas-counsel-mcp-v2-oauth.html"}
+  ]
+}
+</script>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+
+<style>
+/* ── STAT ROW ── */
+.stat-row { display: flex; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; margin: 1.75rem 0; }
+.stat-cell { flex: 1; background: var(--surface); padding: 1.25rem 1rem; text-align: center; }
+.stat-num { font-family: var(--serif); font-size: 2.4rem; color: var(--amber); line-height: 1; margin-bottom: 6px; }
+.stat-label { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+/* ── VERDICT BANNER ── */
+.verdict { background: var(--teal-light); border: 1px solid var(--teal); border-radius: 10px; padding: 1.5rem 1.75rem; margin: 1.75rem 0; display: flex; align-items: center; gap: 1.25rem; }
+.verdict-badge { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; background: var(--teal); color: var(--teal-light); padding: 4px 10px; border-radius: 4px; flex-shrink: 0; }
+.verdict-text { font-size: 14px; font-weight: 300; color: var(--ink); line-height: 1.55; }
+.verdict-text strong { font-weight: 600; }
+@media (max-width: 600px) {
+  .stat-row { flex-direction: column; }
+  .verdict { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+}
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">MCP v2 and OAuth</span>
+  </nav>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>MCP</span>
+    <span class="dot">·</span>
+    <time datetime="2026-08-07">August 2026</time>
+    <span class="dot">·</span>
+    <span>14 min read</span>
+  </div>
+
+  <h1>ATLAS Counsel MCP v2: an OAuth resource server, built for <em>broad exposure</em></h1>
+
+  <p class="deck">Version 2 of our MCP server is an OAuth 2.1 resource server that cannot boot without a credential, cannot be told which tenant to act as, and cannot answer from a corpus the tenant never ingested. Each of those is now a property of the code rather than of a deployment's configuration — which is the difference between running a pilot and opening the door.</p>
+
+  <p>When we <a href="atlas-counsel.html">wrote up ATLAS Counsel</a> — the citation-first RAG agent that answers policy and contract questions — the authentication section described a rule we still consider load-bearing: tools never take a <code>tenant_id</code> argument, and identity is derived from a verified credential. That has survived intact into v2, and everything below is built on it.</p>
+
+  <p>What has changed is the deployment posture around it. v1 served pilot and demo deployments, where the credential was configured, verified, and known to the handful of people operating it. That is a perfectly reasonable place for a system to be while it is being proven, and it is not where this one is going. Broad exposure means many customers, many deploys, and callers who bring their own machine-to-machine credentials rather than a JWT someone minted by hand and sent over email.</p>
+
+  <p>At that scale, a security property that holds because an environment variable is set correctly is a security property with a failure mode. v2's work was moving every one of them into the structure of the service, and adding OAuth 2.1 with per-tenant Cognito credentials so that onboarding a customer is an API call rather than a key exchange.</p>
+
+  <hr>
+
+  <div class="stat-row">
+    <div class="stat-cell">
+      <div class="stat-num">3</div>
+      <div class="stat-label">accepted credentials</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num">1</div>
+      <div class="stat-label">function that resolves them</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num">0</div>
+      <div class="stat-label">unauthenticated modes</div>
+    </div>
+  </div>
+
+  <h2>The posture, up front</h2>
+
+  <p>Five guarantees. What makes them worth stating is not that the service does these things, but that there is no configuration under which it does otherwise — each one is enforced by a construct that has no way to express the unsafe case.</p>
+
+  <div class="sampling-tiers">
+    <div class="tier tier-always">
+      <div class="tier-badge">auth</div>
+      <div class="tier-text"><strong>Authentication is mandatory.</strong> <code>create_app</code> raises unless a credential is configured, and no flag can relax it — the one that could has been deleted rather than defaulted.</div>
+    </div>
+    <div class="tier tier-always">
+      <div class="tier-badge">tenant</div>
+      <div class="tier-text"><strong>Tenant identity is derived, never asserted.</strong> No surface — REST, WebSocket or MCP — accepts a <code>tenant_id</code>. Request models set <code>extra="forbid"</code>, so a client that sends one gets a 422 naming the field rather than being served as whatever its credential maps to.</div>
+    </div>
+    <div class="tier tier-always">
+      <div class="tier-badge">path</div>
+      <div class="tier-text"><strong>One resolution path.</strong> Every authenticated surface goes through <code>_resolve_tenant</code> — the HTTP middleware and the WebSocket handshake alike — so a new endpoint cannot grow a weaker rule of its own.</div>
+    </div>
+    <div class="tier tier-always">
+      <div class="tier-badge">limit</div>
+      <div class="tier-text"><strong>Rate limits are per tenant.</strong> Auth-gated paths key on the authenticated tenant rather than the client address, so one customer cannot exhaust another's budget — including customers sharing an egress IP.</div>
+    </div>
+    <div class="tier tier-always">
+      <div class="tier-badge">corpus</div>
+      <div class="tier-text"><strong>A tenant is answered from its own corpus or not at all.</strong> The retriever holds exactly one tenant's store and has nothing to fall back to. An empty corpus and an unreachable one are distinct, observable events.</div>
+    </div>
+  </div>
+
+  <p>The rest of this post is how each of those is built, and what it cost.</p>
+
+  <hr>
+
+  <h2>From pilot deployment to public surface</h2>
+
+  <p>ATLAS Counsel's deployments have been authenticated throughout. Production set <code>MCP_REQUIRE_AUTH=true</code>, so every gated path required a credential, and the pilot corpora behind those paths belonged to tenants who had been onboarded by hand. The posture was sound for what it was serving.</p>
+
+  <p>It was, however, sound <em>by configuration</em>. The guarantee was a property of a particular deployment's environment rather than of the service, and that distinction is invisible right up until it matters. What changes at broad exposure is not whether the endpoint is protected — it was — but how many deploys, environments, and hands that protection now has to survive. A property held by one correctly-set variable does not scale to a fleet; a property held by the constructor does.</p>
+
+  <p>So v2 removes the choice. <code>create_app</code> raises if none of <code>MCP_API_KEY</code>, <code>MCP_JWT_SECRET</code> or <code>MCP_OAUTH_ISSUER</code> is configured, and <code>_resolve_tenant</code> denies unconditionally when nothing resolves. <code>MCP_REQUIRE_AUTH</code> is no longer read at all: once authentication is unconditional, a flag that could turn it off is not a feature, it is a way to get it wrong. A deployment now either has a credential or does not start.</p>
+
+  <div class="callout">
+    <div class="callout-label">Second-order effect</div>
+    <p>Making boot depend on deployment configuration broke <code>import atlas_counsel.service.api</code> — the module built the app at import time, so importing the package now required an auth setup. <code>app</code> became a <strong>PEP 562 module <code>__getattr__</code></strong>, which constructs lazily on attribute access. <code>uvicorn atlas_counsel.service.api:app</code> is unchanged; <code>import</code> no longer implies a deployment.</p>
+  </div>
+
+  <p>We considered keeping a dev-mode escape hatch behind a new <code>ATLAS_ALLOW_ANONYMOUS</code> variable, on the grounds that local runs should stay frictionless. We rejected it as the same flag with a better name — the requirement was that no unauthenticated access exists, and an exception that exists for developers exists. Tests configure a credential instead, which turned out to be a two-line fixture change.</p>
+
+  <hr>
+
+  <h2>Three credentials, one choke point</h2>
+
+  <p>OAuth is additive. The HS256 and API-key paths are unchanged and still accepted, because existing callers exist and a security upgrade that breaks them is a security upgrade that gets rolled back.</p>
+
+  <div class="layer-stack">
+    <div class="layer l1">
+      <div class="layer-meta">
+        <span class="layer-num">Credential 1</span>
+        <span class="layer-name">HS256 JWT</span>
+        <span class="layer-src">Authorization: Bearer</span>
+      </div>
+      <div class="chips">
+        <span class="chip">tenant_id claim</span>
+        <span class="chip">exp required</span>
+        <span class="chip">optional aud</span>
+        <span class="chip">multi-tenant</span>
+      </div>
+    </div>
+    <div class="layer l2">
+      <div class="layer-meta">
+        <span class="layer-num">Credential 2</span>
+        <span class="layer-name">API key</span>
+        <span class="layer-src">x-api-key</span>
+      </div>
+      <div class="chips">
+        <span class="chip">compare_digest</span>
+        <span class="chip">→ DEFAULT_TENANT</span>
+        <span class="chip">single-tenant fallback</span>
+      </div>
+    </div>
+    <div class="layer l3">
+      <div class="layer-meta">
+        <span class="layer-num">Credential 3</span>
+        <span class="layer-name">OAuth 2.1 — Cognito M2M</span>
+        <span class="layer-src">Authorization: Bearer</span>
+      </div>
+      <div class="chips">
+        <span class="chip">RS256 via JWKS</span>
+        <span class="chip">client_credentials</span>
+        <span class="chip">client_id → tenant map</span>
+        <span class="chip">RFC 9728 discovery</span>
+      </div>
+    </div>
+  </div>
+
+  <p>All three resolve through one function. That's the rule we care about most: a new endpoint cannot quietly grow a weaker rule of its own, which is exactly how <code>/ask</code> once ended up trusting a caller-supplied <code>tenant_id</code>. The HTTP middleware and the WebSocket handshake both call <code>_resolve_tenant</code>; nothing else may authenticate.</p>
+
+  <p>Two credentials share the <code>Bearer</code> scheme, so the order matters: HS256 is tried first, and if it doesn't verify and OAuth is configured, the same token is tried as an OAuth access token. Adding OAuth therefore disturbs no existing caller.</p>
+
+  <p>One detail there is worth more than it looks. Bearer credentials are matched on the <strong>scheme</strong>, not on a literal <code>"Bearer "</code> prefix:</p>
+
+<pre><code>scheme, _, credential = auth_header.partition(" ")
+if (mcp_jwt_secret or oauth_verifier is not None) and scheme == "Bearer":
+    if not credential:
+        return None, "missing bearer token"</code></pre>
+
+  <p>A prefix check on <code>"Bearer "</code> — with the trailing space — misses a header that is exactly <code>Authorization: Bearer</code>: no space, no token. Matching on the scheme catches it and returns an explicit <em>missing bearer token</em>. The empty-token case is the one worth handling deliberately, and it is precisely the one a prefix check drops through.</p>
+
+  <figure class="bt-figure">
+    <svg style="width:100%;height:auto;display:block" viewBox="0 0 640 438" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fig1title fig1desc">
+      <title id="fig1title">Three credentials, one resolution path</title>
+      <desc id="fig1desc">Three accepted credentials — an HS256 JWT and an OAuth 2.1 RS256 token sharing the Authorization Bearer scheme, and an API key on x-api-key — all converge on a single function, _resolve_tenant, which every authenticated surface calls: the HTTP middleware serving /ask, /mcp/ and /health/deep, and the WebSocket handshake serving /ws/ask. CORS preflight is the one exemption and reaches no handler.</desc>
+      <style>
+        .fill-surface{fill:var(--surface,#FFFFFF)} .fill-bg{fill:var(--bg,#F8F6F1)}
+        .fill-ink{fill:var(--ink,#1A1814)} .fill-muted{fill:var(--ink-muted,#6B6760)}
+        .fill-faint{fill:var(--ink-faint,#A8A49E)}
+        .fill-teal{fill:var(--teal,#0F6E56)} .fill-teal-light{fill:var(--teal-light,#E1F5EE)}
+        .fill-blue{fill:var(--blue,#185FA5)} .fill-blue-light{fill:var(--blue-light,#E6F1FB)}
+        .fill-amber{fill:var(--amber,#B07D2A)} .fill-amber-light{fill:var(--amber-light,#FDF3DC)}
+        .fill-coral{fill:var(--coral,#993C1D)} .fill-coral-light{fill:var(--coral-light,#FAECE7)}
+        .stroke-rule{stroke:var(--rule,#DDD9D2)} .stroke-teal{stroke:var(--teal,#0F6E56)}
+        .stroke-blue{stroke:var(--blue,#185FA5)} .stroke-amber{stroke:var(--amber,#B07D2A)}
+        .stroke-faint{stroke:var(--ink-faint,#A8A49E)}
+        .eyebrow{font-family:var(--mono,ui-monospace,monospace);font-size:9px;letter-spacing:0.1em}
+        .ttl{font-family:var(--sans,system-ui,sans-serif);font-size:12.5px;font-weight:600}
+        .mono{font-family:var(--mono,ui-monospace,monospace);font-size:10.5px}
+        .mono-sm{font-family:var(--mono,ui-monospace,monospace);font-size:9px;letter-spacing:0.06em}
+        .note{font-family:var(--sans,system-ui,sans-serif);font-size:9.5px}
+        .body{font-family:var(--sans,system-ui,sans-serif);font-size:10.5px}
+        .hub{font-family:var(--mono,ui-monospace,monospace);font-size:13px;font-weight:500}
+      </style>
+      <defs>
+        <marker id="f1arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0.5 L8,4 L0,7.5 Z" class="fill-faint"/>
+        </marker>
+      </defs>
+
+      <!-- column headings -->
+      <text class="eyebrow fill-faint" x="24" y="20">WHAT THE CALLER PRESENTS</text>
+      <text class="eyebrow fill-faint" x="250" y="20">ONE RESOLUTION PATH</text>
+      <text class="eyebrow fill-faint" x="430" y="20">SURFACES THAT READ IDENTITY</text>
+
+      <!-- grouping accent for the two Bearer credentials -->
+      <rect x="16" y="34" width="3" height="146" rx="1.5" class="fill-teal"/>
+
+      <!-- credential 1 -->
+      <rect x="26" y="34" width="178" height="62" rx="8" class="fill-surface stroke-teal" stroke-width="1"/>
+      <text class="eyebrow fill-teal" x="38" y="53">CREDENTIAL 1</text>
+      <text class="ttl fill-ink" x="38" y="71">HS256 JWT</text>
+      <text class="mono fill-muted" x="38" y="87">Authorization: Bearer</text>
+
+      <!-- credential 3 -->
+      <rect x="26" y="106" width="178" height="62" rx="8" class="fill-surface stroke-teal" stroke-width="1"/>
+      <text class="eyebrow fill-teal" x="38" y="125">CREDENTIAL 3</text>
+      <text class="ttl fill-ink" x="38" y="143">OAuth 2.1 · RS256</text>
+      <text class="mono fill-muted" x="38" y="159">Authorization: Bearer</text>
+
+      <!-- scheme note -->
+      <text class="mono fill-ink" x="26" y="190">scheme == "Bearer"</text>
+      <text class="note fill-muted" x="26" y="204">matched by partition, not by a prefix.</text>
+      <text class="note fill-muted" x="26" y="216">1 is tried first, then 3.</text>
+
+      <!-- credential 2 -->
+      <rect x="26" y="232" width="178" height="76" rx="8" class="fill-surface stroke-blue" stroke-width="1"/>
+      <text class="eyebrow fill-blue" x="38" y="251">CREDENTIAL 2</text>
+      <text class="ttl fill-ink" x="38" y="269">API key</text>
+      <text class="mono fill-muted" x="38" y="285">x-api-key</text>
+      <text class="note fill-muted" x="38" y="299">resolves to DEFAULT_TENANT</text>
+
+      <!-- arrows in -->
+      <path d="M206,65 C230,65 226,140 246,152" fill="none" class="stroke-faint" stroke-width="1.2" marker-end="url(#f1arrow)"/>
+      <path d="M206,137 C226,137 228,152 246,162" fill="none" class="stroke-faint" stroke-width="1.2" marker-end="url(#f1arrow)"/>
+      <path d="M206,263 C232,270 228,190 246,178" fill="none" class="stroke-faint" stroke-width="1.2" marker-end="url(#f1arrow)"/>
+
+      <!-- hub -->
+      <rect x="250" y="112" width="140" height="106" rx="10" class="fill-teal-light stroke-teal" stroke-width="1.5"/>
+      <text class="hub fill-teal" x="320" y="140" text-anchor="middle">_resolve_tenant</text>
+      <line x1="266" y1="152" x2="374" y2="152" class="stroke-teal" stroke-width="0.6" opacity="0.45"/>
+      <text class="note fill-ink" x="320" y="170" text-anchor="middle">derives tenant identity from</text>
+      <text class="note fill-ink" x="320" y="182" text-anchor="middle">a verified credential</text>
+      <rect x="270" y="192" width="100" height="17" rx="4" class="fill-teal"/>
+      <text class="mono-sm fill-teal-light" x="320" y="204" text-anchor="middle">DENY BY DEFAULT</text>
+
+      <!-- arrows out -->
+      <path d="M392,150 C412,150 410,86 428,86" fill="none" class="stroke-faint" stroke-width="1.2" marker-end="url(#f1arrow)"/>
+      <path d="M392,180 C412,180 410,216 428,216" fill="none" class="stroke-faint" stroke-width="1.2" marker-end="url(#f1arrow)"/>
+
+      <!-- HTTP middleware -->
+      <rect x="430" y="34" width="186" height="118" rx="8" class="fill-surface stroke-rule" stroke-width="1"/>
+      <text class="ttl fill-ink" x="442" y="55">HTTP middleware</text>
+      <text class="mono fill-teal" x="442" y="75">/ask</text>
+      <text class="mono fill-teal" x="442" y="91">/mcp/</text>
+      <text class="mono fill-teal" x="442" y="107">/health/deep</text>
+      <text class="note fill-muted" x="442" y="127">registered last, so it runs first —</text>
+      <text class="note fill-muted" x="442" y="139">current_tenant is set before the</text>
+      <text class="note fill-muted" x="442" y="151">rate limiter keys on it.</text>
+
+      <!-- WS handshake -->
+      <rect x="430" y="164" width="186" height="106" rx="8" class="fill-surface stroke-rule" stroke-width="1"/>
+      <text class="ttl fill-ink" x="442" y="185">WebSocket handshake</text>
+      <text class="mono fill-teal" x="442" y="205">/ws/ask</text>
+      <text class="note fill-muted" x="442" y="225">authenticates inside the handler:</text>
+      <text class="note fill-muted" x="442" y="237">Starlette short-circuits HTTP</text>
+      <text class="note fill-muted" x="442" y="249">middleware on a non-http scope.</text>
+      <text class="note fill-muted" x="442" y="261">Closes 1008 instead of a 401.</text>
+
+      <!-- exemption -->
+      <rect x="430" y="282" width="186" height="12" rx="0" fill="none"/>
+      <rect x="24" y="320" width="592" height="42" rx="8" class="fill-bg stroke-faint" stroke-width="1" stroke-dasharray="4 3"/>
+      <text class="body fill-ink" x="40" y="339">The one exemption: <tspan class="mono fill-coral">OPTIONS</tspan> CORS preflight.</text>
+      <text class="note fill-muted" x="40" y="354">Browsers never attach Authorization to a preflight, and it reaches no handler and reads no tenant data.</text>
+
+      <!-- guarantee band -->
+      <rect x="24" y="372" width="592" height="56" rx="8" class="fill-amber-light stroke-amber" stroke-width="1"/>
+      <text class="body fill-ink" x="40" y="392">Nothing else may authenticate, and nothing anywhere accepts a <tspan class="mono">tenant_id</tspan>.</text>
+      <text class="note fill-muted" x="40" y="407">Request models set <tspan class="mono">extra="forbid"</tspan>, so a client that sends one gets a 422 naming the field —</text>
+      <text class="note fill-muted" x="40" y="420">rather than being served as whatever its credential maps to.</text>
+    </svg>
+    <figcaption class="bt-figcaption"><strong>Figure 1.</strong> Three accepted credentials, one function that resolves them. Two share the <code>Bearer</code> scheme and are tried in order; all three land on <code>_resolve_tenant</code>, and every surface that reads identity calls it. A new endpoint gets this rule or gets no identity at all.</figcaption>
+  </figure>
+
+  <blockquote>
+    <p>"Before you expose a multi-tenant endpoint broadly, every safety property it has should be one you could not switch off if you tried."</p>
+  </blockquote>
+
+  <hr>
+
+  <h2>Cognito's M2M tokens don't have the claims you want</h2>
+
+  <p>Here is where the protocol stopped helping. The textbook OAuth resource-server design is: verify the signature, check the audience, read the tenant out of a claim. Cognito's <code>client_credentials</code> access tokens support none of that shape.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>What you'd want</th>
+          <th>What Cognito M2M gives you</th>
+          <th>Consequence</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>aud</code> claim naming this resource</td>
+          <td>No <code>aud</code> at all — it's an ID-token claim; access tokens carry <code>client_id</code></td>
+          <td class="row-quality">Pass no <code>audience</code> to <code>jwt.decode</code></td>
+        </tr>
+        <tr>
+          <td>A per-tenant custom claim</td>
+          <td>Not achievable — the pre-token-generation trigger does not fire for <code>client_credentials</code></td>
+          <td class="row-gov">Tenant comes from a map the app holds</td>
+        </tr>
+        <tr>
+          <td>Scopes that mean something per tenant</td>
+          <td>One resource server, one <code>invoke</code> scope, shared by every client</td>
+          <td>Scopes gate the surface, not the data</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The first row has a sharp edge. Because we pass no <code>audience</code>, a token that carries an <code>aud</code> claim <em>at all</em> is rejected. Cognito M2M tokens don't have one — but Auth0 and Okta tokens do. Pointing <code>MCP_OAUTH_ISSUER</code> at either of those rejects every token, cleanly and confusingly. That's a real limitation, and we chose it deliberately rather than loosening the check: the verifier is Cognito-specific by design, and it says so in its own docstring so that the next person to read it doesn't discover it from a support ticket.</p>
+
+  <p>The second row is the one that shaped the architecture. Tenant identity cannot come from the token, so it comes from a <code>client_id → tenant_id</code> map the application resolves itself. An unmapped client is rejected even with a perfectly valid signature.</p>
+
+  <p>We considered simply using the <code>client_id</code> <em>as</em> the tenant id — fully dynamic, no map, no table. It fails on three counts: Cognito client ids are mixed-case opaque strings that don't pass our tenant-id validation, tenant ids would stop being names anyone chose, and rotating a client would orphan that tenant's stores.</p>
+
+  <h3>The verifier never raises</h3>
+
+<pre><code>claims = jwt.decode(
+    token, key=key, algorithms=["RS256"], issuer=self._issuer,
+    options={"require": ["exp", "iss", "client_id"]},
+)
+if claims.get("token_use") != "access":
+    return None
+tenant = await self._client_tenants.resolve(claims["client_id"])</code></pre>
+
+  <p>Any decode failure, unknown key id, JWKS fetch error, or unmapped client is a <code>None</code> return, not an exception. That keeps the call site simple, and it creates the one operational problem you'd predict: a bare <code>None</code> is impossible to diagnose in a deployment. So every rejection logs its reason at DEBUG — which sounds trivial and was, in fact, one of the fixes that came out of reviewing the implementation against its own plan.</p>
+
+  <hr>
+
+  <h2>Where the map lives, and why that moved the validation</h2>
+
+  <p>The first version of the map was a JSON blob in an environment variable. It worked, and it made onboarding a tenant into a deploy: edit the ECS task definition, mint a new revision, restart the service. For a product whose pitch includes "start using it today," that's a bad shape.</p>
+
+  <p>So there are now two implementations behind one <code>ClientTenantSource</code> protocol:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th></th><th>StaticClientTenants</th><th>DynamoDBClientTenants</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Source</td><td><code>MCP_OAUTH_CLIENT_TENANTS</code> JSON</td><td><code>MCP_OAUTH_CLIENT_TENANTS_TABLE</code></td></tr>
+        <tr><td>Onboarding</td><td>Edit task definition, redeploy</td><td>Write a row</td></tr>
+        <tr><td>Validation</td><td>Once, in <code>create_app</code></td><td>On every resolve</td></tr>
+        <tr><td>Good for</td><td>Single-tenant, air-gapped</td><td>Multi-tenant production</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>That third row is the part I'd point at if you only read one paragraph of this post. When the map was an environment variable it was <em>operator configuration</em> — checked once at boot, because that's when it enters and it cannot change afterwards. As table rows it is <em>runtime data</em> that can change underneath a running process, so <code>validate_tenant_id</code> runs on every resolve.</p>
+
+  <p>The rule didn't change. The value moved, and the validation followed it. This matters downstream in a way that isn't abstract: a tenant id is interpolated into a <code>CREATE SCHEMA</code> DDL string and used as a filesystem path component. Validating operator config at boot also has a specific payoff — a typo authenticates fine and surfaces as a tool-level error on a customer's first call, with the deploy showing green.</p>
+
+  <h3>Caching a lookup that an attacker chooses the key for</h3>
+
+  <p>The table is read per request behind a ~30 second TTL cache, through <code>asyncio.to_thread</code> because boto3 is blocking and shares the event loop with every other request in the process.</p>
+
+  <p>Both hits <em>and</em> misses are cached. The miss is the important one: the caller picks the <code>client_id</code> in its own token, so caching only hits would let anyone drive one DynamoDB read per request by inventing client ids. Yes, the signature is verified before the lookup — but a valid signature from a client that maps to nothing is exactly the case we're describing.</p>
+
+  <p>On a DynamoDB failure, a still-cached entry is served even if expired. An outage should not sign out tenants that were already resolving. A client with nothing cached is denied — so the failure mode is <strong>open for the already-known, closed for anything new</strong>, which is the direction we want.</p>
+
+  <hr>
+
+  <h2>What the second review pass caught</h2>
+
+  <p>Every OAuth change went through a second review that read the finished implementation back against the plan it was built from, hunting specifically for configurations the plan hadn't enumerated. It found five things. All five were fixed before any of this reached a deployment, and all five are in the shipped code described above.</p>
+
+  <p>Four of them existed only in the <em>OAuth-only</em> configuration — a deployment with an issuer and no legacy secret, which is the shape every new customer will run and which nothing was running yet. That is the useful pattern here: the conditions were latent, reachable only by the configuration we were migrating toward, and a review aimed at exactly that question surfaced them while they were still cheap.</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">⊘</div>
+        <div class="tcard-title">Rate limiting fell back to per-IP</div>
+      </div>
+      <p>Auth-gated paths are keyed by <strong>authenticated tenant</strong> so one tenant can't exhaust another's budget. The check for "is a credential configured" tested only the two legacy secrets — so an <em>OAuth-only</em> deployment silently keyed every caller by client address, and one tenant behind a shared NAT could starve another. The most dangerous kind of bug: a security property that quietly degrades in exactly the configuration you're migrating toward.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">⊘</div>
+        <div class="tcard-title">An OAuth-only deployment refused to boot</div>
+      </div>
+      <p>Same root cause, different symptom. OAuth didn't count as a configured credential, so the new mandatory-auth check rejected a deployment that was, in fact, authenticated — and the "no auth configured" warning fired on a secured endpoint.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">⊕</div>
+        <div class="tcard-title">JWKS fetch amplification</div>
+      </div>
+      <p>The cache refetches on an unknown <code>kid</code> so a key rotation recovers without waiting out the 1-hour TTL. But that lookup runs <em>before</em> any signature check, so an unauthenticated caller could drive one JWKS fetch per request just by inventing a <code>kid</code>. Rotation refetches are now rate-limited to one a minute, and a single in-flight refresh is shared under a lock. Twenty requests cost one fetch instead of twenty.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">⊕</div>
+        <div class="tcard-title">Discovery could advertise invalid URLs</div>
+      </div>
+      <p>RFC 9728 demands absolute URLs. With <code>MCP_OAUTH_ISSUER</code> set but <code>ATLAS_PUBLIC_BASE_URL</code> missing, the discovery document would have served relative ones — valid-looking, spec-invalid, and broken only for clients doing the thing the document exists to enable. Now it fails fast at boot. Malformed <code>MCP_OAUTH_CLIENT_TENANTS</code> JSON does too, and an empty map warns loudly, since it otherwise rejects every token in silence.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-blue">⊗</div>
+        <div class="tcard-title">Rejections were undiagnosable</div>
+      </div>
+      <p>The verifier's never-raise contract meant every failure looked identical from outside: <code>None</code>. Expired token, wrong issuer, rotated key, unmapped client — one symptom, four causes, no way to tell them apart in a deployment. Each now logs its reason at DEBUG.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⊕</div>
+        <div class="tcard-title">Why the pass was worth it</div>
+      </div>
+      <p>Tests assert the behaviour you thought to specify; a plan describes the deployment you had in mind. Neither covers the configuration you are about to migrate <em>to</em>. Reading the implementation back against its own plan with that specific question — "which of these branches has nobody exercised yet?" — is what turned five latent conditions into five closed ones.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <h2>Why we didn't use the SDK's auth wiring</h2>
+
+  <p>MCP's Python SDK ships a <code>TokenVerifier</code> / <code>auth=</code> mechanism. It is the obvious thing to adopt, and we extended our own middleware in place instead. The reason is specific and, I think, generalisable.</p>
+
+  <p>The SDK resolves identity <em>inside the mounted sub-app</em>. Our rate-limit middleware runs outside it. Starlette inserts middleware at position 0, so the last-registered middleware is outermost — our auth middleware is registered last, runs first, and has already set the tenant context by the time the rate limiter executes. That ordering is exactly what lets the limiter key by authenticated tenant.</p>
+
+  <p>Adopting the SDK's wiring would have moved identity resolution to <em>after</em> the rate limiter, which would have silently dropped <code>/mcp</code> back to per-IP rate limiting for every OAuth caller. Silently: no error, no log, just a security property quietly relaxed — the same bug as the first card above, but permanent and by design.</p>
+
+  <figure class="bt-figure">
+    <svg style="width:100%;height:auto;display:block" viewBox="0 0 640 462" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="fig2title fig2desc">
+      <title id="fig2title">Where identity is resolved, and what the rate limiter can key on</title>
+      <desc id="fig2desc">Two nested-layer diagrams. On the left, the shipped design: auth middleware is the outermost layer, so it resolves the tenant before the rate-limit middleware runs, and the limiter keys on the authenticated tenant. On the right, the counterfactual under the MCP SDK's auth= mechanism: the rate limiter becomes outermost and identity is resolved inside the mounted sub-app, so the limiter can only key on the client address, and /health/deep would need a second auth implementation of its own.</desc>
+      <style>
+        .fill-surface{fill:var(--surface,#FFFFFF)} .fill-bg{fill:var(--bg,#F8F6F1)}
+        .fill-ink{fill:var(--ink,#1A1814)} .fill-muted{fill:var(--ink-muted,#6B6760)}
+        .fill-faint{fill:var(--ink-faint,#A8A49E)}
+        .fill-teal{fill:var(--teal,#0F6E56)} .fill-teal-light{fill:var(--teal-light,#E1F5EE)}
+        .fill-coral{fill:var(--coral,#993C1D)} .fill-coral-light{fill:var(--coral-light,#FAECE7)}
+        .stroke-rule{stroke:var(--rule,#DDD9D2)} .stroke-teal{stroke:var(--teal,#0F6E56)}
+        .stroke-coral{stroke:var(--coral,#993C1D)} .stroke-faint{stroke:var(--ink-faint,#A8A49E)}
+        .eyebrow{font-family:var(--mono,ui-monospace,monospace);font-size:9px;letter-spacing:0.1em}
+        .ttl{font-family:var(--sans,system-ui,sans-serif);font-size:12.5px;font-weight:600}
+        .layer{font-family:var(--sans,system-ui,sans-serif);font-size:11.5px;font-weight:600}
+        .mono{font-family:var(--mono,ui-monospace,monospace);font-size:10.5px}
+        .pill{font-family:var(--mono,ui-monospace,monospace);font-size:8px;letter-spacing:0.08em}
+        .note{font-family:var(--sans,system-ui,sans-serif);font-size:9.5px}
+        .body{font-family:var(--sans,system-ui,sans-serif);font-size:10.5px}
+      </style>
+      <defs>
+        <marker id="f2arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0.5 L8,4 L0,7.5 Z" class="fill-faint"/>
+        </marker>
+      </defs>
+
+      <!-- ── LEFT PANEL ── -->
+      <text class="eyebrow fill-teal" x="24" y="18">WHAT WE BUILT</text>
+      <text class="ttl fill-ink" x="24" y="38">Identity resolved outside the mount</text>
+      <text class="note fill-muted" x="24" y="60" text-anchor="start">request</text>
+      <path d="M70,56 L70,72" fill="none" class="stroke-faint" stroke-width="1.2" marker-end="url(#f2arrow)"/>
+
+      <rect x="24" y="76" width="286" height="268" rx="10" class="fill-teal-light stroke-teal" stroke-width="1.5"/>
+      <text class="layer fill-teal" x="36" y="97">auth middleware</text>
+      <text class="mono fill-ink" x="36" y="114">_resolve_tenant → current_tenant</text>
+
+      <rect x="40" y="124" width="254" height="204" rx="8" class="fill-surface stroke-rule" stroke-width="1"/>
+      <text class="layer fill-ink" x="52" y="145">rate-limit middleware</text>
+      <rect x="52" y="154" width="152" height="17" rx="4" class="fill-teal"/>
+      <text class="pill fill-teal-light" x="61" y="166">KEY: AUTHENTICATED TENANT</text>
+
+      <rect x="56" y="182" width="222" height="134" rx="8" class="fill-bg stroke-rule" stroke-width="1"/>
+      <text class="layer fill-ink" x="68" y="202">router</text>
+      <text class="mono fill-teal" x="68" y="220">/ask   /health/deep</text>
+
+      <rect x="72" y="232" width="190" height="72" rx="8" class="fill-surface stroke-rule" stroke-width="1"/>
+      <text class="mono fill-ink" x="84" y="252">Mount("/mcp")</text>
+      <text class="note fill-muted" x="84" y="269">MCPServer, streamable_http</text>
+      <text class="note fill-teal" x="84" y="285">identity already resolved</text>
+
+      <rect x="24" y="358" width="286" height="52" rx="8" class="fill-teal-light stroke-teal" stroke-width="1"/>
+      <text class="body fill-ink" x="36" y="378">The limiter keys on the tenant.</text>
+      <text class="note fill-muted" x="36" y="393">One customer cannot exhaust another's budget,</text>
+      <text class="note fill-muted" x="36" y="404">even sharing an egress IP.</text>
+
+      <!-- ── RIGHT PANEL ── -->
+      <text class="eyebrow fill-coral" x="330" y="18">IF WE ADOPTED THE SDK'S auth=</text>
+      <text class="ttl fill-ink" x="330" y="38">Identity resolved inside the mount</text>
+      <text class="note fill-muted" x="330" y="60" text-anchor="start">request</text>
+      <path d="M376,56 L376,72" fill="none" class="stroke-faint" stroke-width="1.2" marker-end="url(#f2arrow)"/>
+
+      <rect x="330" y="76" width="286" height="268" rx="10" class="fill-coral-light stroke-coral" stroke-width="1.5"/>
+      <text class="layer fill-coral" x="342" y="97">rate-limit middleware</text>
+      <rect x="342" y="106" width="130" height="17" rx="4" class="fill-coral"/>
+      <text class="pill fill-coral-light" x="351" y="118">KEY: CLIENT ADDRESS</text>
+      <text class="note fill-coral" x="342" y="137">nothing has resolved identity yet</text>
+
+      <rect x="346" y="148" width="254" height="180" rx="8" class="fill-surface stroke-rule" stroke-width="1"/>
+      <text class="layer fill-ink" x="358" y="168">router</text>
+      <text class="mono fill-coral" x="358" y="186">/ask   /health/deep</text>
+      <text class="note fill-coral" x="358" y="202">outside the mount — each would need</text>
+      <text class="note fill-coral" x="358" y="214">its own auth, a second implementation</text>
+
+      <rect x="362" y="226" width="222" height="88" rx="8" class="fill-bg stroke-coral" stroke-width="1"/>
+      <text class="mono fill-ink" x="374" y="246">Mount("/mcp", auth=...)</text>
+      <text class="note fill-muted" x="374" y="263">TokenVerifier resolves identity</text>
+      <text class="note fill-muted" x="374" y="275">here, inside the sub-app —</text>
+      <text class="note fill-coral" x="374" y="291">after the limiter has already</text>
+      <text class="note fill-coral" x="374" y="303">keyed by client address</text>
+
+      <rect x="330" y="358" width="286" height="52" rx="8" class="fill-coral-light stroke-coral" stroke-width="1"/>
+      <text class="body fill-ink" x="342" y="378">/mcp drops back to per-IP limiting.</text>
+      <text class="note fill-muted" x="342" y="393">Silently: no error, no log — the same bug as the</text>
+      <text class="note fill-muted" x="342" y="404">first review card, but permanent and by design.</text>
+
+      <!-- footnote -->
+      <line x1="24" y1="428" x2="616" y2="428" class="stroke-rule" stroke-width="1"/>
+      <text class="note fill-muted" x="24" y="445">Starlette inserts middleware at position 0, so the last-registered middleware is the outermost one.</text>
+      <text class="note fill-muted" x="24" y="457">Auth is registered last, runs first, and has already set the tenant by the time the limiter executes.</text>
+    </svg>
+    <figcaption class="bt-figcaption"><strong>Figure 2.</strong> The same stack with identity resolved at two different layers. Ours sits outside the mount, so the rate limiter can key on the authenticated tenant; the SDK's <code>auth=</code> would move it inside, leaving the limiter nothing but the client address — and <code>/health/deep</code> without a credential path of its own.</figcaption>
+  </figure>
+
+  <div class="callout">
+    <div class="callout-label">Architecture note</div>
+    <p>Keeping one choke point has a second payoff. <code>/health/deep</code> and <code>/mcp</code> stay on a single auth path, so an OAuth-only deployment has a credential that reaches the deep health check. Under the SDK's model, auth would live inside the MCP sub-app and <code>/health/deep</code> would need its own — a second implementation of the rule we spent this whole redesign consolidating.</p>
+  </div>
+
+  <p>The general form: <strong>a framework's auth integration point is only correct if it sits at the same layer as everything else that depends on identity.</strong> Ours doesn't, so we didn't use it.</p>
+
+  <hr>
+
+  <h2>Discovery, so a client can find its way in</h2>
+
+  <p>A resource server that requires OAuth but can't tell you where to get a token is a resource server you configure by email. RFC 9728 fixes that, and MCP's auth spec builds on it.</p>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">T0</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Client POSTs /mcp/ with no credential</div>
+        <div class="pipe-desc">401 with <code>WWW-Authenticate: Bearer resource_metadata="…"</code> — the pointer that makes the rest of this flow possible.</div>
+        <div class="pipe-fail">✗ no OAuth configured → bare <code>Bearer</code> challenge</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">T1</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">GET /.well-known/oauth-protected-resource/mcp/</div>
+        <div class="pipe-desc">Never gated — a client needs it precisely because it can't authenticate yet. Requires <code>ATLAS_PUBLIC_BASE_URL</code>, since RFC 9728 demands absolute URLs.</div>
+        <div class="pipe-pass">✓ learns the authorization server</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">T2</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">client_credentials grant against Cognito</div>
+        <div class="pipe-desc">Per-tenant app client, one <code>invoke</code> scope. Terraform provisions an M2M-only user pool and one app client per mapped tenant.</div>
+        <div class="pipe-pass">✓ RS256 access token</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">T3</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Signature and claims</div>
+        <div class="pipe-desc"><code>kid</code> → JWKS cache → RS256 verify. <code>exp</code>, <code>iss</code> and <code>client_id</code> required; <code>token_use</code> must be <code>access</code>; no <code>aud</code> accepted.</div>
+        <div class="pipe-fail">✗ any failure → <code>None</code>, reason logged at DEBUG</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">T4</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">client_id → tenant_id</div>
+        <div class="pipe-desc">Resolved per request from the configured source, not a dict captured at boot. Validated on every resolve when it comes from the table.</div>
+        <div class="pipe-fail">✗ unmapped client → denied, valid signature and all</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">T5</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Tool runs as that tenant</div>
+        <div class="pipe-desc"><code>current_tenant</code> is set; the rate limiter keys on it; every tool reads it. No tool accepts a <code>tenant_id</code> argument, and request models set <code>extra="forbid"</code> so a client that still sends one gets a 422 naming the field.</div>
+        <div class="pipe-pass">✓ answer, scoped to that tenant's corpus</div>
+      </div>
+    </div>
+  </div>
+
+  <p>One exemption is worth naming: CORS preflight. Browsers never attach <code>Authorization</code> to an <code>OPTIONS</code> preflight, so gating it would make <code>/ask</code> unreachable from exactly the browsers our CORS configuration exists to serve. The preflight reaches no handler and reads no tenant data.</p>
+
+  <p>And one that looks like an exemption but isn't: <code>/ws/ask</code> authenticates <em>inside the handler</em> rather than through the HTTP middleware. Starlette short-circuits HTTP middleware on any non-<code>http</code> scope, so listing the WebSocket path as gated would look exactly like protection and provide none. It calls the same <code>_resolve_tenant</code> and closes with 1008 on failure — the WebSocket analogue of a 401.</p>
+
+  <hr>
+
+  <h2>MCP SDK 2.0, and testing two protocol eras at one endpoint</h2>
+
+  <p>The same change moved us to <code>mcp&gt;=2.0</code>. <code>FastMCP</code> is gone; <code>build_mcp_server()</code> now returns an <code>MCPServer</code>, and host and path moved onto <code>streamable_http_app()</code> and <code>run()</code>.</p>
+
+  <p>Three mounting details are load-bearing enough to be worth stating plainly, because each one cost us a debugging session:</p>
+
+  <ul>
+    <li>The mount uses <code>streamable_http_path="/"</code>. The SDK's own default is <code>/mcp</code>, so mounting it at <code>/mcp</code> puts the endpoint at <code>/mcp/mcp</code>.</li>
+    <li><strong><code>/mcp/</code> with the trailing slash is canonical.</strong> Starlette 307-redirects a bare <code>/mcp</code>, and not every client follows a redirect on POST.</li>
+    <li><code>host</code> is passed through because the SDK validates the request's <code>Host</code> header against it as DNS-rebinding protection. Its default of <code>127.0.0.1</code> rejects everything behind API Gateway with a 421.</li>
+  </ul>
+
+  <p>And the session manager is started from the app's lifespan, because Starlette's <code>Mount</code> does not forward lifespan events into a mounted sub-app. Without it, every MCP request fails with <em>"Task group is not initialized."</em></p>
+
+  <p>The transport tests now drive both protocol eras against the same endpoint: the classic <code>initialize</code> handshake, and the 2026-07-28 stateless per-request envelope reached via the <code>mcp-protocol-version</code> header. One endpoint, two eras, both asserted — which is what you want when clients in the wild are on both.</p>
+
+  <hr>
+
+  <h2>Authentication was only half the problem</h2>
+
+  <p>A tenant that authenticates perfectly and then reads someone else's documents is not a tenant you have isolated. Two changes landed alongside OAuth, and the post would be dishonest without them.</p>
+
+  <p><strong>Corpus or nothing.</strong> A <code>FallbackRetriever</code> sat in front of the per-tenant stores and degraded to an in-memory index of the shipped demo corpus whenever the real store raised. A tenant whose index was missing — or whose store was briefly unreachable — got confident, cited answers assembled from documents it had never ingested. The latch was per-process and sticky, so it stayed that way. It is replaced by a retriever that holds exactly one tenant's store and has nothing to fall back to, and the two failure modes are now deliberately distinct: <em>never ingested</em> raises <code>CorpusNotProvisioned</code> and the agent refuses for lack of grounding; <em>unreachable</em> propagates, because an outage must not be indistinguishable from an empty corpus.</p>
+
+  <p><strong>Ingestion over the authenticated surface.</strong> Loading a tenant's corpus used to be an operator task. It is now a <code>counsel_ingest</code> tool call on the same endpoint the tenant queries, which means it inherits the entire auth stack above — the credential set, the tenant binding, the per-tenant rate-limit bucket — with no separate path to keep correct. The tenant is <code>current_tenant</code>; there is no argument to name another one with.</p>
+
+  <p>That tool replaces rather than merges. Re-ingesting a document under the same <code>doc_id</code> deletes every previously indexed span of that id first:</p>
+
+<pre><code>ingest(acme-msa, 5 spans)   -> 5 chunks
+ingest(acme-msa, 3 spans)   -> the 2 dropped spans are GONE from the index</code></pre>
+
+  <p>Upserting by chunk id would leave those two spans retrievable and citable, so an answer could quote a clause the tenant had deleted, with nothing in the response revealing it. Replacement also makes a half-applied batch converge: there's no transaction across documents, so a mid-batch failure names what was applied and what failed — and re-sending the whole batch rewrites the applied documents to the same state.</p>
+
+  <p>Onboarding a tenant is now three steps, none of which require a restart: create the Cognito app client, write the <code>client_id → tenant_id</code> row, ingest that tenant's corpus. Live within the ~30 second cache TTL.</p>
+
+  <hr>
+
+  <h2>Trade-offs we accepted</h2>
+
+  <p>Each of these is a decision with a cost attached, taken deliberately and with a mitigation we can point at. They are listed because a security posture you can only describe in the positive is one nobody has stress-tested.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Decision</th><th>Cost, and what absorbs it</th></tr>
+      </thead>
+      <tbody>
+        <tr class="row-quality">
+          <td><strong>A stateful AWS resource on the auth path.</strong> DynamoDB being unreachable now affects OAuth callers.</td>
+          <td>The TTL cache serves stale entries through an outage, so tenants that were already resolving keep working. A client with nothing cached is denied — the correct direction, and still an outage.</td>
+        </tr>
+        <tr class="row-gov">
+          <td><strong>Onboarding without a redeploy</strong> means access control is no longer wholly in version control — a row written out-of-band is invisible to <code>terraform plan</code>.</td>
+          <td>Accepted knowingly: being able to write the table between applies <em>is</em> the capability. Terraform still seeds and reviews the tenants this stack provisions, and the table's point-in-time recovery and audit trail become load-bearing rather than incidental.</td>
+        </tr>
+        <tr>
+          <td><strong>Corpus-or-nothing</strong> means an un-ingested tenant authenticates successfully and then refuses every question.</td>
+          <td>The honest failure, and preferable to the alternative it replaced — answering from someone else's documents. The cost is that a skipped onboarding step looks like a broken product rather than an error; the runbook calls it out, and nothing yet enforces it.</td>
+        </tr>
+        <tr>
+          <td><strong>Two client-tenant sources</strong> behind one protocol.</td>
+          <td>A second path to keep correct. Kept because the static map is genuinely the right choice for a single-tenant or air-gapped deployment, not because it is legacy.</td>
+        </tr>
+        <tr>
+          <td><strong>One <code>invoke</code> scope</strong>, so any credential that can call <code>counsel_ask</code> can also call <code>counsel_ingest</code>.</td>
+          <td>A known gap, named here rather than discovered later. The resource server is already the right place to split read from write, and that is the next increment on this path.</td>
+        </tr>
+        <tr>
+          <td><strong>Removing <code>MCP_REQUIRE_AUTH</code></strong> is breaking for anything that set it, and for local runs that relied on no credential at all.</td>
+          <td>The variable is documented as ignored — deliberately kept in the reference so its absence reads as a decision rather than an oversight. Infra drops it in the same change.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="verdict">
+    <div class="verdict-badge">Net position</div>
+    <div class="verdict-text"><strong>The service cannot boot without a credential, cannot be told which tenant to act as, and cannot answer from a corpus a tenant did not ingest.</strong> Those hold by construction now, not by configuration, which is the bar an endpoint has to clear before it is opened to customers who bring their own credentials. The price is a DynamoDB dependency on the auth path and an access-control surface that no longer lives entirely in Git — both taken with open eyes.</div>
+  </div>
+
+  <hr>
+
+  <h2>What generalises</h2>
+
+  <p>Four things here would apply to any MCP server growing real authentication.</p>
+
+  <p><strong>Validate where the value enters, and re-check when it moves.</strong> The same map validated at boot as config and per-resolve as data. The rule is stable; where it applies is not, and moving a value between layers silently moves its validation requirement with it.</p>
+
+  <p><strong>A framework's auth hook is only correct at the right layer.</strong> The SDK's <code>TokenVerifier</code> is well-designed and wrong for us, because identity had to be resolved outside a middleware that depends on it. Check what else in your stack reads identity before adopting one.</p>
+
+  <p><strong>Caches whose keys an attacker chooses need miss caching and refresh limits.</strong> Both the JWKS cache and the client-tenant cache had this shape, and both were amplification vectors until they didn't. The signature check doesn't save you when the expensive lookup happens first.</p>
+
+  <p><strong>Make the safe posture the only posture.</strong> Any control that a flag can disable is really two controls: the mechanism, and the discipline that keeps the flag set across every environment and every future deploy. The mechanism is the part you can test. Before broad exposure, it is worth going through each safety property and asking which of the two is actually holding it up — and moving anything in the second column into the first.</p>
+
+  <hr>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="atlas-counsel.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Building ATLAS Counsel: grounding, escalation, and safety in a citation-first RAG agent</div>
+      </a>
+      <a href="why-we-chose-agentcore.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Why we chose Bedrock AgentCore — and what we turned down to get there</div>
+      </a>
+      <a href="failure-handling.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Designing for failure in a multi-agent procurement system</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> — AI Solution Architect · August 2026</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> — an autonomous multi-agent procurement negotiation system.</p>
+    <p>Based on ADR-0012, ADR-0030 and ADR-0031 · ATLAS Counsel MCP server v2</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

@@ -17,7 +17,6 @@ blog/
   blog.js               ← mobile nav for post pages
   _template.html        ← starting point for a new post
   eng/posts.js          ← engineering post index
-  business/posts.js  ← business post index
 ```
 
 `/home/gpazevedo/blogs/` also holds a `medium/` folder for Medium-adapted versions of
@@ -25,7 +24,7 @@ these posts. Only this repo is published.
 
 ## Publishing a post
 
-1. Copy the template into the right section and name it by slug:
+1. Copy the template into `blog/eng/` and name it by slug:
 
    ```bash
    cp blog/_template.html blog/eng/my-post.html
@@ -36,13 +35,12 @@ these posts. Only this repo is published.
 3. Replace every placeholder: `POST TITLE`, `SLUG`, `SECTION`, `SECTION LABEL`,
    `TAG`, `YYYY-MM-DD`, `Month YYYY`, `N min read`, `ONE-SENTENCE DESCRIPTION`.
 4. Flip the robots tag to `index, follow`.
-5. Add an entry to the section's `posts.js` — this is what renders the card on the
+5. Add an entry to `blog/eng/posts.js` — this is what renders the card on the
    landing page:
 
    ```js
    window.engPosts = [
      {
-       "order": 1,
        "slug": "my-post",
        "file": "my-post.html",
        "title": "My post title",
@@ -54,7 +52,9 @@ these posts. Only this repo is published.
    ];
    ```
 
-   `tags[0]` is what shows on the card. Cards sort by `order` ascending.
+   `tags[0]` is what shows on the card. Cards sort by `date` descending — newest
+   first — so no manual ordering field is needed; same-date posts keep the order
+   they are listed in.
 6. Audit every internal link in the post — `related-posts-grid` cards must point at
    files that exist:
 
