@@ -125,7 +125,7 @@
 
   <h1>ATLAS Counsel MCP v2: an OAuth resource server, built for <em>broad exposure</em></h1>
 
-  <p class="deck">Version 2 of our MCP server is an OAuth 2.1 resource server that cannot boot without a credential, cannot be told which tenant to act as, and cannot answer from a corpus the tenant never ingested. Each of those is now a property of the code rather than of a deployment's configuration — which is the difference between running a pilot and opening the door.</p>
+  <p class="deck">Version 2 of our MCP server is an OAuth 2.1 resource server that cannot boot without a credential, cannot be told which tenant to act as, and cannot answer from a corpus the tenant never ingested. Each of those is now a property of the code rather than of a deployment's configuration — which is the difference between running a pilot and opening the door. None of it cost compatibility: the same endpoint still serves clients on both sides of the 2026-07-28 protocol change, so nothing in the field had to move.</p>
 
   <p>When we <a href="atlas-counsel.html">wrote up ATLAS Counsel</a> — the citation-first RAG agent that answers policy and contract questions — the authentication section described a rule we still consider load-bearing: tools never take a <code>tenant_id</code> argument, and identity is derived from a verified credential. That has survived intact into v2, and everything below is built on it.</p>
 
@@ -692,9 +692,13 @@ tenant = await self._client_tenants.resolve(claims["client_id"])</code></pre>
 
   <hr>
 
-  <h2>MCP SDK 2.0, and testing two protocol eras at one endpoint</h2>
+  <h2>MCP SDK 2.0, and serving two protocol eras at one endpoint</h2>
 
   <p>The same change moved us to <code>mcp&gt;=2.0</code>. <code>FastMCP</code> is gone; <code>build_mcp_server()</code> now returns an <code>MCPServer</code>, and host and path moved onto <code>streamable_http_app()</code> and <code>run()</code>.</p>
+
+  <p>Two version numbers move independently here, and they are worth separating before they collide. <code>mcp&gt;=2.0</code> is the SDK the server is built on; the protocol revision is what a client negotiates on the wire. Upgrading the first dropped nothing from the second — <strong>both eras are served at the same <code>/mcp/</code> endpoint</strong>: the classic stateful <code>initialize</code> handshake, and the 2026-07-28 stateless per-request envelope selected by the <code>mcp-protocol-version</code> header. A client on either one is served as it is, and neither is a migration anyone has to schedule.</p>
+
+  <p>The recency is the point. The 2026-07-28 revision went final on 28 July 2026, replacing 2025-11-25 — the largest change to the protocol since authorization was added, and the one that made it stateless at the transport layer. Ten days is not long enough for an installed base to move, and the spec's own deprecation policy holds features functional for at least twelve months after they are marked, so the stateful handshake is not a legacy path being tolerated. It is what most clients still open with.</p>
 
   <p>Three mounting details are load-bearing enough to be worth stating plainly, because each one cost us a debugging session:</p>
 
@@ -706,7 +710,7 @@ tenant = await self._client_tenants.resolve(claims["client_id"])</code></pre>
 
   <p>And the session manager is started from the app's lifespan, because Starlette's <code>Mount</code> does not forward lifespan events into a mounted sub-app. Without it, every MCP request fails with <em>"Task group is not initialized."</em></p>
 
-  <p>The transport tests now drive both protocol eras against the same endpoint: the classic <code>initialize</code> handshake, and the 2026-07-28 stateless per-request envelope reached via the <code>mcp-protocol-version</code> header. One endpoint, two eras, both asserted — which is what you want when clients in the wild are on both.</p>
+  <p>That compatibility is asserted rather than assumed. The transport tests drive both eras against the same endpoint — the handshake and the stateless envelope alike — so an SDK bump that quietly stopped serving one of them fails in CI rather than in a customer's client. One endpoint, two protocol eras, both covered, which is what you want when clients in the wild are on both.</p>
 
   <hr>
 
@@ -769,7 +773,7 @@ ingest(acme-msa, 3 spans)   -> the 2 dropped spans are GONE from the index</code
 
   <div class="verdict">
     <div class="verdict-badge">Net position</div>
-    <div class="verdict-text"><strong>The service cannot boot without a credential, cannot be told which tenant to act as, and cannot answer from a corpus a tenant did not ingest.</strong> Those hold by construction now, not by configuration, which is the bar an endpoint has to clear before it is opened to customers who bring their own credentials. The price is a DynamoDB dependency on the auth path and an access-control surface that no longer lives entirely in Git — both taken with open eyes.</div>
+    <div class="verdict-text"><strong>The service cannot boot without a credential, cannot be told which tenant to act as, and cannot answer from a corpus a tenant did not ingest.</strong> Those hold by construction now, not by configuration, which is the bar an endpoint has to clear before it is opened to customers who bring their own credentials. The price is a DynamoDB dependency on the auth path and an access-control surface that no longer lives entirely in Git — both taken with open eyes. What it did not cost is reach: clients on either side of the 2026-07-28 protocol change are still served at that one endpoint.</div>
   </div>
 
   <hr>
