@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+<channel>
+  <title>Gustavo Azevedo — Engineering Blog</title>
+  <link>https://gpazevedo.github.io/</link>
+  <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
+  <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
+  <language>en-us</language>
+  <lastBuildDate>Fri, 07 Aug 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure</title>
+      <link>https://gpazevedo.github.io/blog/eng/atlas-counsel-mcp-v2-oauth.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/atlas-counsel-mcp-v2-oauth.html</guid>
+      <pubDate>Fri, 07 Aug 2026 00:00:00 +0000</pubDate>
+      <description>An OAuth 2.1 resource server that cannot boot without a credential, cannot be told which tenant to act as, and cannot answer from a corpus the tenant never ingested.</description>
+      <category>MCP</category>
+      <category>OAuth</category>
+      <category>Multi-tenancy</category>
+    </item>
+    <item>
+      <title>Designing for failure in a multi-agent procurement system</title>
+      <link>https://gpazevedo.github.io/blog/eng/failure-handling.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/failure-handling.html</guid>
+      <pubDate>Thu, 06 Aug 2026 00:00:00 +0000</pubDate>
+      <description>How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns, the trade-offs behind them, and a production incident that changed how we think about timeouts.</description>
+      <category>Reliability</category>
+      <category>Architecture</category>
+    </item>
+    <item>
+      <title>What Fails Next</title>
+      <link>https://gpazevedo.github.io/blog/eng/what-fails-next.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/what-fails-next.html</guid>
+      <pubDate>Mon, 03 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Building an ingest client for 50 million records, one failure at a time — eleven stages, each one built because the previous version broke against something specific.</description>
+      <category>Scalable Consumer</category>
+    </item>
+    <item>
+      <title>The Sink Was a Lie</title>
+      <link>https://gpazevedo.github.io/blog/eng/the-sink-was-a-lie.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/the-sink-was-a-lie.html</guid>
+      <pubDate>Mon, 03 Aug 2026 00:00:00 +0000</pubDate>
+      <description>What breaks when the destination stops being a stand-in: a real database, a dual write no ordering can save, CDC, an outbox that had to justify itself, and a benchmark that lied four times.</description>
+      <category>Scalable Producer</category>
+    </item>
+    <item>
+      <title>Building ATLAS Counsel: grounding, escalation, and safety in a citation-first RAG agent</title>
+      <link>https://gpazevedo.github.io/blog/eng/atlas-counsel.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/atlas-counsel.html</guid>
+      <pubDate>Fri, 10 Jul 2026 00:00:00 +0000</pubDate>
+      <description>A LangGraph agent that cites every claim to a retrievable span, refuses when the corpus doesn't cover a question, and escalates to a human across a stateless HTTP/MCP boundary when it isn't sure.</description>
+      <category>RAG</category>
+      <category>LangGraph</category>
+      <category>AI Procurement</category>
+    </item>
+    <item>
+      <title>How we decided to build Buyer Team</title>
+      <link>https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html</guid>
+      <pubDate>Tue, 09 Jun 2026 00:00:00 +0000</pubDate>
+      <description>Why we built the procurement-negotiation agents on Strands instead of CrewAI, AutoGen, LangGraph, or a hand-rolled loop — and the one guarantee that decided it.</description>
+      <category>Agentic Frameworks</category>
+      <category>Architecture Decision</category>
+    </item>
+    <item>
+      <title>Why we chose Bedrock AgentCore — and what we turned down to get there</title>
+      <link>https://gpazevedo.github.io/blog/eng/why-we-chose-agentcore.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/why-we-chose-agentcore.html</guid>
+      <pubDate>Fri, 05 Jun 2026 00:00:00 +0000</pubDate>
+      <description>The runtime decision behind Buyer Team: AgentCore vs. ECS/Fargate, Lambda, and raw Bedrock — alternatives weighed, tradeoffs accepted, and the two constraints that decided it.</description>
+      <category>Infrastructure</category>
+      <category>Architecture Decision</category>
+    </item>
+    <item>
+      <title>Pause for four days, resume in five seconds: durable execution in a multi-agent system</title>
+      <link>https://gpazevedo.github.io/blog/eng/durable-orchestration.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/durable-orchestration.html</guid>
+      <pubDate>Fri, 29 May 2026 00:00:00 +0000</pubDate>
+      <description>How a procurement negotiation survives crashes, restarts, and a 96-hour approval pause — per-node DynamoDB checkpoints, idempotent resume, recovery locks, and the interrupt pattern.</description>
+      <category>Durability</category>
+    </item>
+    <item>
+      <title>Why we chose a deterministic DAG over a pure LLM planner</title>
+      <link>https://gpazevedo.github.io/blog/eng/dag-vs-llm-planner.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/dag-vs-llm-planner.html</guid>
+      <pubDate>Fri, 01 May 2026 00:00:00 +0000</pubDate>
+      <description>Governance, not capability, is why autonomous negotiation needs a deterministic graph — not a free-running LLM.</description>
+      <category>Architecture</category>
+    </item>
+</channel>
+</rss>

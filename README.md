@@ -1,12 +1,19 @@
 # gpazevedo.github.io
 
-Personal site and blog. Static HTML, no build step, served by GitHub Pages.
+Personal site and blog. Static HTML, served by GitHub Pages — no build step to
+deploy, but publishing a post requires one local generation step (see below).
 
 ## Layout
 
 ```text
-index.html              ← landing: about + blog index
+index.html              ← landing: about + blog index (post cards are pre-rendered,
+                           see "Crawlability" below)
+sitemap.xml              ← generated — do not hand-edit
+rss.xml                   ← generated — do not hand-edit
+robots.txt                ← generated — do not hand-edit
 favicon.svg
+scripts/
+  build_site.py          ← regenerates index.html's post cards + sitemap/rss/robots
 assets/
   style.css             ← landing-page shell
   main.js               ← reveal animation, mobile nav, blog index rendering
@@ -16,7 +23,7 @@ blog/
   site-blog.css         ← personal-site additions on top of it
   blog.js               ← mobile nav for post pages
   _template.html        ← starting point for a new post
-  eng/posts.js          ← engineering post index
+  eng/posts.js          ← engineering post index (source of truth for the generator)
 ```
 
 `/home/gpazevedo/blogs/` also holds a `medium/` folder for Medium-adapted versions of
@@ -64,7 +71,32 @@ these posts. Only this repo is published.
    done
    ```
 
-7. Commit and push. GitHub Pages deploys from the default branch.
+7. Regenerate the static post cards, sitemap, and RSS feed from `posts.js`:
+
+   ```bash
+   uv run scripts/build_site.py
+   ```
+
+8. Commit and push (including the regenerated `index.html`, `sitemap.xml`,
+   `rss.xml`, `robots.txt`). GitHub Pages deploys from the default branch.
+
+## Crawlability
+
+The `#eng-posts` block in `index.html` is pre-rendered — real `<a>` tags sit
+between the `<!-- BUILD:eng-posts:START -->` / `END` markers, generated from
+`blog/eng/posts.js` by `scripts/build_site.py`. `assets/main.js` still
+re-renders the same cards client-side on load (harmless, identical markup) so
+nothing changes for browser visitors, but a plain `curl`/crawler/link-unfurler
+that never executes JS now sees every post link too — that's what was
+previously missing.
+
+`sitemap.xml` and `robots.txt` (which points at it) are also generated,
+along with an `rss.xml` feed linked from `<head>` via `rel="alternate"`.
+
+Don't hand-edit `index.html`'s generated block, `sitemap.xml`, `rss.xml`, or
+`robots.txt` — edit `blog/eng/posts.js` and rerun the generator; it's
+idempotent (safe to rerun with no pending changes) and fails loudly if the
+markers in `index.html` are ever removed or edited.
 
 ## Analytics
 
