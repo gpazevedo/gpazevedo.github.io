@@ -6,17 +6,7 @@
   <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
   <language>en-us</language>
-  <lastBuildDate>Wed, 12 Aug 2026 00:00:00 +0000</lastBuildDate>
-    <item>
-      <title>Security Without Trust: How Buyer Team Defends an Autonomous Negotiation Agent</title>
-      <link>https://gpazevedo.github.io/blog/eng/security-without-trust.html</link>
-      <guid>https://gpazevedo.github.io/blog/eng/security-without-trust.html</guid>
-      <pubDate>Wed, 12 Aug 2026 00:00:00 +0000</pubDate>
-      <description>How an autonomous procurement negotiation agent is defended with deterministic, infrastructure-level controls — extended with a full MITRE ATLAS threat model alongside OWASP Top 10 for Agentic Applications.</description>
-      <category>Security</category>
-      <category>Architecture</category>
-      <category>MITRE ATLAS</category>
-    </item>
+  <lastBuildDate>Fri, 07 Aug 2026 00:00:00 +0000</lastBuildDate>
     <item>
       <title>ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure</title>
       <link>https://gpazevedo.github.io/blog/eng/atlas-counsel-mcp-v2-oauth.html</link>
@@ -32,7 +22,7 @@
       <link>https://gpazevedo.github.io/blog/eng/failure-handling.html</link>
       <guid>https://gpazevedo.github.io/blog/eng/failure-handling.html</guid>
       <pubDate>Thu, 06 Aug 2026 00:00:00 +0000</pubDate>
-      <description>How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns, the trade-offs behind them, and a production incident that changed how we think about timeouts.</description>
+      <description>How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns and the trade-offs behind them.</description>
       <category>Reliability</category>
       <category>Architecture</category>
     </item>
