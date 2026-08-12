@@ -462,59 +462,6 @@ tenant = await self._client_tenants.resolve(claims["client_id"])</code></pre>
 
   <hr>
 
-  <h2>What the second review pass caught</h2>
-
-  <p>Every OAuth change went through a second review that read the finished implementation back against the plan it was built from, hunting specifically for configurations the plan hadn't enumerated. It found five things. All five were fixed before any of this reached a deployment, and all five are in the shipped code described above.</p>
-
-  <p>Four of them existed only in the <em>OAuth-only</em> configuration — a deployment with an issuer and no legacy secret, which is the shape every new customer will run and which nothing was running yet. That is the useful pattern here: the conditions were latent, reachable only by the configuration we were migrating toward, and a review aimed at exactly that question surfaced them while they were still cheap.</p>
-
-  <div class="tradeoff-grid">
-    <div class="tcard">
-      <div class="tcard-head">
-        <div class="tcard-icon icon-coral">⊘</div>
-        <div class="tcard-title">Rate limiting fell back to per-IP</div>
-      </div>
-      <p>Auth-gated paths are keyed by <strong>authenticated tenant</strong> so one tenant can't exhaust another's budget. The check for "is a credential configured" tested only the two legacy secrets — so an <em>OAuth-only</em> deployment silently keyed every caller by client address, and one tenant behind a shared NAT could starve another. The most dangerous kind of bug: a security property that quietly degrades in exactly the configuration you're migrating toward.</p>
-    </div>
-    <div class="tcard">
-      <div class="tcard-head">
-        <div class="tcard-icon icon-coral">⊘</div>
-        <div class="tcard-title">An OAuth-only deployment refused to boot</div>
-      </div>
-      <p>Same root cause, different symptom. OAuth didn't count as a configured credential, so the new mandatory-auth check rejected a deployment that was, in fact, authenticated — and the "no auth configured" warning fired on a secured endpoint.</p>
-    </div>
-    <div class="tcard">
-      <div class="tcard-head">
-        <div class="tcard-icon icon-amber">⊕</div>
-        <div class="tcard-title">JWKS fetch amplification</div>
-      </div>
-      <p>The cache refetches on an unknown <code>kid</code> so a key rotation recovers without waiting out the 1-hour TTL. But that lookup runs <em>before</em> any signature check, so an unauthenticated caller could drive one JWKS fetch per request just by inventing a <code>kid</code>. Rotation refetches are now rate-limited to one a minute, and a single in-flight refresh is shared under a lock. Twenty requests cost one fetch instead of twenty.</p>
-    </div>
-    <div class="tcard">
-      <div class="tcard-head">
-        <div class="tcard-icon icon-amber">⊕</div>
-        <div class="tcard-title">Discovery could advertise invalid URLs</div>
-      </div>
-      <p>RFC 9728 demands absolute URLs. With <code>MCP_OAUTH_ISSUER</code> set but <code>ATLAS_PUBLIC_BASE_URL</code> missing, the discovery document would have served relative ones — valid-looking, spec-invalid, and broken only for clients doing the thing the document exists to enable. Now it fails fast at boot. Malformed <code>MCP_OAUTH_CLIENT_TENANTS</code> JSON does too, and an empty map warns loudly, since it otherwise rejects every token in silence.</p>
-    </div>
-    <div class="tcard">
-      <div class="tcard-head">
-        <div class="tcard-icon icon-blue">⊗</div>
-        <div class="tcard-title">Rejections were undiagnosable</div>
-      </div>
-      <p>The verifier's never-raise contract meant every failure looked identical from outside: <code>None</code>. Expired token, wrong issuer, rotated key, unmapped client — one symptom, four causes, no way to tell them apart in a deployment. Each now logs its reason at DEBUG.</p>
-    </div>
-    <div class="tcard">
-      <div class="tcard-head">
-        <div class="tcard-icon icon-teal">⊕</div>
-        <div class="tcard-title">Why the pass was worth it</div>
-      </div>
-      <p>Tests assert the behaviour you thought to specify; a plan describes the deployment you had in mind. Neither covers the configuration you are about to migrate <em>to</em>. Reading the implementation back against its own plan with that specific question — "which of these branches has nobody exercised yet?" — is what turned five latent conditions into five closed ones.</p>
-    </div>
-  </div>
-
-  <hr>
-
   <h2>Why we didn't use the SDK's auth wiring</h2>
 
   <p>MCP's Python SDK ships a <code>TokenVerifier</code> / <code>auth=</code> mechanism. It is the obvious thing to adopt, and we extended our own middleware in place instead. The reason is specific and, I think, generalisable.</p>

@@ -14,10 +14,10 @@ window.engPosts = [
     "slug": "failure-handling",
     "file": "failure-handling.html",
     "title": "Designing for failure in a multi-agent procurement system",
-    "description": "How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns, the trade-offs behind them, and a production incident that changed how we think about timeouts.",
+    "description": "How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns and the trade-offs behind them.",
     "tags": ["Reliability", "Architecture"],
     "date": "2026-08-06",
-    "readingTime": 18
+    "readingTime": 20
   },
   {
     "slug": "what-fails-next",

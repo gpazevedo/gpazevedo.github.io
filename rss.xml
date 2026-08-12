@@ -22,7 +22,7 @@
       <link>https://gpazevedo.github.io/blog/eng/failure-handling.html</link>
       <guid>https://gpazevedo.github.io/blog/eng/failure-handling.html</guid>
       <pubDate>Thu, 06 Aug 2026 00:00:00 +0000</pubDate>
-      <description>How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns, the trade-offs behind them, and a production incident that changed how we think about timeouts.</description>
+      <description>How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns and the trade-offs behind them.</description>
       <category>Reliability</category>
       <category>Architecture</category>
     </item>
