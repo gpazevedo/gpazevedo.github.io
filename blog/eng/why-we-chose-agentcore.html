@@ -101,14 +101,16 @@
 
   <!-- DECK -->
   <p class="deck">
-    Buyer Team runs seven specialized procurement-negotiation agents in production. The most consequential infrastructure decision we made wasn't which model to use — it was where the agents run. Here's the runtime decision in full: the four alternatives we evaluated, the tradeoffs we accepted, and the two constraints that ultimately decided it.
+    Buyer Team runs seven specialized procurement-negotiation agents in production — deployed and multi-tenant by design, running real negotiations against a simulated supplier population, no external tenants yet. The most consequential infrastructure decision we made wasn't which model to use — it was where the agents run. Here's the runtime decision in full: the four alternatives we evaluated, the tradeoffs we accepted, and the two constraints that ultimately decided it.
   </p>
+
+  <p><strong>Note (added later):</strong> one of those seven agents, Bid Evaluation, was folded into deterministic scoring soon after this post — six LLM agents run the pipeline today; see <a href="failure-handling.html">Designing for failure</a>.</p>
 
   <hr>
 
   <!-- INTRO -->
   <p>
-    Every serious agent system eventually faces the same fork in the road: do you build the runtime, or do you buy it? For most of our twenty-year careers the answer has been "build" — containers on ECS, a queue, an autoscaling group, and you own your destiny. So when we put Buyer Team's agents on <strong>Amazon Bedrock AgentCore</strong>, it wasn't a default. It was a decision we argued through, and one we could just as easily have made the other way.
+    Every serious agent system eventually faces the same fork in the road: do you build the runtime, or do you buy it? For most of our twenty-five-year careers the answer has been "build" — containers on ECS, a queue, an autoscaling group, and you own your destiny. So when we put Buyer Team's agents on <strong>Amazon Bedrock AgentCore</strong>, it wasn't a default. It was a decision we argued through, and one we could just as easily have made the other way.
   </p>
 
   <p>

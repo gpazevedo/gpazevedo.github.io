@@ -6,7 +6,7 @@
 <meta name="robots" content="index, follow">
 <meta name="author" content="Gustavo Peixoto de Azevedo">
 <title>Designing for Failure in a Multi-Agent Procurement System — Gustavo Azevedo</title>
-<meta name="description" content="How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns, the trade-offs behind them, and a real incident that taught us to rethink timeout ordering."/>
+<meta name="description" content="How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns and the trade-offs behind them."/>
 <link rel="canonical" href="https://gpazevedo.github.io/blog/eng/failure-handling.html"/>
 <link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
 <meta name="theme-color" content="#0F172A"/>
@@ -15,11 +15,11 @@
 <meta property="og:url" content="https://gpazevedo.github.io/blog/eng/failure-handling.html"/>
 <meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
 <meta property="og:title" content="Designing for Failure in a Multi-Agent Procurement System"/>
-<meta property="og:description" content="How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns, the trade-offs behind them, and a real incident that taught us to rethink timeout ordering."/>
+<meta property="og:description" content="How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns and the trade-offs behind them."/>
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-08-06T00:00:00+00:00"/>
-<meta property="article:modified_time" content="2026-08-06T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-12T00:00:00+00:00"/>
 <meta property="article:section" content="Engineering"/>
 <meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
 <meta property="article:tag" content="Reliability"/>
@@ -27,10 +27,10 @@
 
 <meta name="twitter:card" content="summary"/>
 <meta name="twitter:title" content="Designing for Failure in a Multi-Agent Procurement System"/>
-<meta name="twitter:description" content="How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns, the trade-offs behind them, and a real incident that taught us to rethink timeout ordering."/>
+<meta name="twitter:description" content="How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns and the trade-offs behind them."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Designing for Failure in a Multi-Agent Procurement System","description":"How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns, the trade-offs behind them, and a real incident that taught us to rethink timeout ordering.","datePublished":"2026-08-06","dateModified":"2026-08-06","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/failure-handling.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/failure-handling.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Designing for Failure in a Multi-Agent Procurement System","description":"How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns and the trade-offs behind them.","datePublished":"2026-08-06","dateModified":"2026-08-12","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/failure-handling.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/failure-handling.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Designing for Failure in a Multi-Agent Procurement System","item":"https://gpazevedo.github.io/blog/eng/failure-handling.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -97,12 +97,12 @@
   <h1>Designing for Failure in a<br><em>Multi-Agent Procurement System</em></h1>
 
   <!-- DECK -->
-  <p class="deck">How 6 autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the decisions behind that design, the trade-offs they carry, and a production incident that changed how we think about timeouts.</p>
+  <p class="deck">How 6 autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the decisions behind that design and the trade-offs they carry.</p>
 
   <!-- INTRO -->
   <p>Agentic systems introduce a class of failure modes that traditional microservices don't prepare you for. When an LLM agent calls a tool that times out, the system can't simply return a 500 — it must decide: retry, approximate, escalate, or halt. And that decision has business consequences. In procurement automation, a wrong move can mean a missed auction round, a corrupted bid evaluation, or a PO that never gets issued.</p>
 
-  <p>This post walks through how we designed for that reality on the Buyer Team — a deterministic DAG of 6 autonomous agents plus a deterministic scoring node that handle the full supplier negotiation lifecycle. We'll cover the architectural decisions that shaped how the system handles failure, the trade-offs behind them, and a real incident that taught us something we hadn't gotten right.</p>
+  <p>This post walks through how we designed for that reality on the Buyer Team — a deterministic DAG of 6 autonomous agents plus a deterministic scoring node that handle the full supplier negotiation lifecycle. We'll cover the architectural decisions that shaped how the system handles failure and the trade-offs behind them.</p>
 
   <!-- SYSTEM OVERVIEW STATS -->
   <div class="stat-row">
@@ -378,6 +378,21 @@
 
   <p>The same problem exists in reverse at shutdown. When a replica is told to stop, it keeps draining in-flight work — but if it keeps reporting healthy while doing so, new traffic keeps arriving at a process that's on its way out. Each agent now flips its health status to unhealthy the moment shutdown begins, before it starts draining, so new requests route away first and in-flight ones get to finish cleanly within a bounded window. Readiness and draining are the same fail-open window, just at opposite ends of a replica's life — closing only one of them would have left the other exposed.</p>
 
+  <h3>Steering Guards: The Fail-Open Window Nobody Saw</h3>
+
+  <p>Readiness and draining close a fail-open window in the availability layer — the gap between when a process <em>can</em> accept work and when it <em>should</em>. The same pattern existed in the safety layer, and it was open for months before anyone noticed.</p>
+
+  <p>Strands' steering framework ships fail-open: if a hook's <code>check()</code> function raises an exception, the framework catches it, logs at debug level, and lets the tool call proceed unguarded. For a hook whose entire job is "block this before it happens," an exception is functionally identical to deleting the guard — and at default log verbosity, nothing tells you it happened. The ADR governing this behavior stated the fail-closed guarantee as settled fact, and it wasn't true.</p>
+
+  <p>A <code>GuardHandler</code> base class now inverts that default. All eight steering hooks run through it; any exception escaping <code>check()</code> cancels the tool call with model guidance not to retry, and a dedicated <code>governance.hook_error</code> metric fires — deliberately distinct from the metric that fires when a hook <em>works</em> and blocks something, because one means the guards are doing their job and the other means a guard is broken. A same-day follow-up (AD-024) closed what was still untested: <code>steer_before_tool</code> wraps <code>check()</code> in <code>asyncio.wait_for</code> (10s default) so a guard that hangs fails closed the same way a raise does, and a static test asserts every guard overrides only <code>check()</code>, never <code>steer_before_tool</code> directly — closing the one place the invariant still rested on an author remembering a convention rather than the build enforcing it. Every guard also gained a test that drives its actual <code>check()</code> body through a genuine failure, and every agent's spec gained a test asserting the guard is registered — the fail-closed guarantee only protects a guard that's wired in.</p>
+
+  <p>A second fail-open case sat one layer below. If the Bedrock Guardrail's <code>GUARDRAIL_ID</code> or <code>GUARDRAIL_VERSION</code> were unset — a dropped env var, a bad Terraform output — the agent logged a warning, emitted a metric nobody alarmed on, and served requests unfiltered. This wasn't hypothetical: a July adversarial replay scored 0/60 blocked for exactly this reason. Every deployed agent runtime now sets <code>GUARDRAIL_REQUIRED=true</code>; the wiring code raises instead of returning an empty config when required-but-unconfigured, and because each agent constructs its model at import time, the raise crashes the process before it binds its port. A deploy that loses its Guardrail doesn't serve a single unprotected request — it just doesn't come up. A CloudWatch alarm on the underlying metric means it won't fail silently either.</p>
+
+  <div class="callout">
+    <div class="callout-label">The common shape</div>
+    <p>Three fail-open windows, same fix: readiness at startup, draining at shutdown, and safety at every tool call. In each case the mechanism that was supposed to protect was itself unprotected — a guard that could silently stop guarding. The fix is the same in all three: crash or reject at the boundary rather than proceed degraded, and emit a distinct metric so the degradation is observable even without the fix.</p>
+  </div>
+
   <h3>State Recovery and Idempotency</h3>
 
   <p>Three mechanisms underpin recovery specifically:</p>
@@ -451,30 +466,12 @@
         <tr><td>State/event writes diverging on crash</td><td>Orchestrator</td><td>transactional outbox, single DynamoDB commit</td></tr>
         <tr><td>Abandoned negotiation with committed side effects</td><td>Orchestrator</td><td>saga compensation, LIFO undo</td></tr>
         <tr><td>Approval gate reaches its 96h ceiling</td><td>Orchestrator (scheduled sweep)</td><td>pipeline ends cleanly; a 30-min sweep escalates to REQUIRES_ATTENTION, then auto-cancels after 7 more days</td></tr>
-        <tr><td>Timeout-ordering (the Node 3 incident)</td><td>Orchestrator</td><td>call timeout kept below the executing Lambda's own budget</td></tr>
+        <tr><td>Timeout-ordering across a call chain</td><td>Orchestrator</td><td>call timeout kept below the executing Lambda's own budget</td></tr>
         <tr><td>Auction partial failure</td><td>Human</td><td>manual restart, no automated recovery</td></tr>
         <tr><td>Suspicious-bid overflow</td><td>Node executor (Node 5, no longer an agent)</td><td>inline deterministic halt + escalate</td></tr>
       </tbody>
     </table>
   </div>
-
-  <hr>
-
-  <!-- SECTION 6: WHAT WE GOT WRONG -->
-  <h2>What We Got Wrong: The Timeout That Outlived Its Budget</h2>
-
-  <p>All of the design above is meant to guarantee one thing: when an agent call fails, the node's own fallback logic gets a chance to run. Every agent node wraps its work in a try/except with a deterministic fallback — approximate, cache, or escalate. That guarantee turned out to have a hole in it, and it took a real incident to find it.</p>
-
-  <p>Shortly after a VPC restore, a cold AgentCore runtime hung on Node 3's strategy invocation for the full length of its read timeout. Nothing unusual there — cold starts happen. What was unusual was what happened next: the Lambda running that node hit its own hard timeout <em>before</em> the read timeout on the call it was waiting on ever expired. The node died mid-call. Its try/except never got the chance to catch anything, because the process was gone before the exception could be raised. No fallback ran. No graceful degradation. Just a hard failure with no defined recovery.</p>
-
-  <div class="incident">
-    <div class="incident-badge">Root Cause</div>
-    <p>The read timeout on the outbound agent-to-agent call was configured longer than the timeout of the Lambda making that call. The node's own execution budget was shorter than the thing it was waiting on — so the executor was always going to die first if the call ever actually hung, and when one finally did, it did exactly that.</p>
-  </div>
-
-  <p>Once we saw it, the fix was straightforward: bring the call's timeout below the executor's own budget, so a hang fails the call from <em>inside</em> the Lambda, with enough time left for the fallback to actually execute. We also dropped the retry count on that call from several attempts to one — with a shorter timeout, a second full-length retry no longer fit inside the budget either, and retrying a runtime that's already hung isn't useful when every node has a deterministic fallback waiting regardless. Separately, we added a warm-up step that proactively pays for AgentCore cold starts after a restore or deploy, so the rare cold-start hang becomes rarer still, and a genuine failure rather than a routine first-call artifact.</p>
-
-  <p>The generalizable version of this, and the thing we now check for on every new outbound call in the system: <strong>every external-call timeout has to sit below the timeout of whatever process would otherwise be killed first while waiting on it.</strong> Get that ordering backwards, and your fallback logic — however carefully designed — simply never runs. It's a small inequality to get wrong, and it will pass every test that doesn't specifically exercise a hang under time pressure.</p>
 
   <hr>
 
@@ -581,7 +578,7 @@
 
   <p><strong>Idempotency is not optional in agentic systems.</strong> Agents retry. Infrastructure restarts. The same action will be attempted more than once. Every tool call that produces side effects needs an idempotency key, and every cache needs an input hash, not just a result.</p>
 
-  <p><strong>Order your timeouts deliberately, not by default.</strong> A fallback that's correct in isolation can still never run if the process hosting it dies first. Every timeout in a call chain needs to sit below the budget of whatever would otherwise kill it — we learned this one the hard way.</p>
+  <p><strong>Order your timeouts deliberately, not by default.</strong> A fallback that's correct in isolation can still never run if the process hosting it dies first. Every timeout in a call chain needs to sit below the budget of whatever would otherwise kill it.</p>
 
   <p><strong>Some failures deserve manual intervention, not automation.</strong> The temptation to automate recovery from every failure mode is real — but some failure states carry enough ambiguity that automated recovery could make things worse. The Leverage auction partial failure is a deliberate example: the right answer is a human decision, not an algorithm.</p>
 
@@ -604,6 +601,10 @@
       <a href="why-we-chose-agentcore.html" class="related-post-card">
         <div class="rpc-tag">Engineering</div>
         <div class="rpc-title">Why we chose Bedrock AgentCore — and what we turned down to get there</div>
+      </a>
+      <a href="security-without-trust.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Security Without Trust: How Buyer Team Defends an Autonomous Negotiation Agent</div>
       </a>
     </div>
   </div>

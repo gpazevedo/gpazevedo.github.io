@@ -544,11 +544,6 @@ class DraftAnswer(BaseModel):
     </div>
   </div>
 
-  <div class="callout">
-    <div class="callout-label">A bug the store migration surfaced</div>
-    <p>Moving the production vector store from self-hosted Qdrant to OpenSearch Serverless (ADR-0028, chasing the idle-cost floor rather than any retrieval-quality gain) turned up a defect that had been running silently the whole time: the service's composition root never wrapped the configured retriever in <code>FallbackRetriever</code>, so the "no retriever injected" branch always won — <strong>the deployed task had been answering every question from the in-memory index while Qdrant sat populated and unqueried.</strong> A second bug compounded it: <code>ingest.py</code> hard-coded the offline embedder, so the environment variable that was supposed to select the real one never touched ingestion at all, and a test asserting the resulting collection name had pinned the bug in place. Neither failure threw an exception; both surfaced only because the migration forced someone to trace the retriever resolution path end to end. Same invisibility this post opens with, one layer further down the stack.</p>
-  </div>
-
   <h2>Evaluation-first, before the agent existed</h2>
 
   <p>
