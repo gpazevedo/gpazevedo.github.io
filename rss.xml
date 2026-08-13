@@ -6,7 +6,17 @@
   <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
   <language>en-us</language>
-  <lastBuildDate>Fri, 07 Aug 2026 00:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Wed, 12 Aug 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>scalable-mcp: a reusable base for MCP servers and clients, grown out of ATLAS Counsel</title>
+      <link>https://gpazevedo.github.io/blog/eng/scalable-mcp.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/scalable-mcp.html</guid>
+      <pubDate>Wed, 12 Aug 2026 00:00:00 +0000</pubDate>
+      <description>The auth, rate-limiting, session-lifecycle, and sealed continuation-token infrastructure ATLAS Counsel's MCP server grew, packaged as a base for building MCP servers and clients on the current protocol.</description>
+      <category>MCP</category>
+      <category>Open Source</category>
+      <category>Architecture</category>
+    </item>
     <item>
       <title>ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure</title>
       <link>https://gpazevedo.github.io/blog/eng/atlas-counsel-mcp-v2-oauth.html</link>
@@ -31,15 +41,15 @@
       <link>https://gpazevedo.github.io/blog/eng/what-fails-next.html</link>
       <guid>https://gpazevedo.github.io/blog/eng/what-fails-next.html</guid>
       <pubDate>Mon, 03 Aug 2026 00:00:00 +0000</pubDate>
-      <description>Building an ingest client for 50 million records, one failure at a time — eleven stages, each one built because the previous version broke against something specific.</description>
+      <description>The read half of a reference implementation for scalable ingestion: 50 million records, eleven stages, each one added because data volume outgrew the last.</description>
       <category>Scalable Consumer</category>
     </item>
     <item>
-      <title>The Sink Was a Lie</title>
-      <link>https://gpazevedo.github.io/blog/eng/the-sink-was-a-lie.html</link>
-      <guid>https://gpazevedo.github.io/blog/eng/the-sink-was-a-lie.html</guid>
+      <title>The Sink Gets Real</title>
+      <link>https://gpazevedo.github.io/blog/eng/the-sink-gets-real.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/the-sink-gets-real.html</guid>
       <pubDate>Mon, 03 Aug 2026 00:00:00 +0000</pubDate>
-      <description>What breaks when the destination stops being a stand-in: a real database, a dual write no ordering can save, CDC, an outbox that had to justify itself, and a benchmark that lied four times.</description>
+      <description>The write half of the same reference implementation: a real database, CDC in place of an unsafe dual write, an outbox that had to earn its place, and a benchmark rig rebuilt until it could be trusted.</description>
       <category>Scalable Producer</category>
     </item>
     <item>

@@ -19,7 +19,7 @@
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-08-03T00:00:00+00:00"/>
-<meta property="article:modified_time" content="2026-08-03T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-12T00:00:00+00:00"/>
 <meta property="article:section" content="Engineering"/>
 <meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
 <meta property="article:tag" content="Scalable Consumer"/>
@@ -29,7 +29,7 @@
 <meta name="twitter:description" content="Eleven stages of an ingest client for a cursor-paginated API, each one built because the previous version broke against something specific — with the live numbers an adversarial mock server produced."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"What Fails Next","description":"Eleven stages of an ingest client for a cursor-paginated API, each one built because the previous version broke against something specific — with the live numbers an adversarial mock server produced.","datePublished":"2026-08-03","dateModified":"2026-08-03","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/what-fails-next.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/what-fails-next.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"What Fails Next","description":"Eleven stages of an ingest client for a cursor-paginated API, each one built because the previous version broke against something specific — with the live numbers an adversarial mock server produced.","datePublished":"2026-08-03","dateModified":"2026-08-12","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/what-fails-next.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/what-fails-next.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"What Fails Next","item":"https://gpazevedo.github.io/blog/eng/what-fails-next.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -80,10 +80,10 @@
   <div class="tldr">
     <div class="tldr-label">TL;DR</div>
     <p><strong>The problem.</strong> Read fifty million records out of a cursor-paginated HTTP API and land every one of them — over hours, at high throughput, against a server that rate-limits, stalls, serves malformed rows, and changes while you are reading it.</p>
-    <p><strong>What you get.</strong> A working consumer, built in eleven stages, each one added because the previous version broke against something specific at scale: streaming pagination that never buffers, a retry <em>policy</em> rather than a retry loop, validation split in two, checkpoints that survive <code>SIGKILL</code>, a worker pool whose watermark cannot skip a page, proactive rate limiting, sharding across parallel walkers, and detection for a dataset that mutates mid-walk.</p>
+    <p><strong>What you get.</strong> The read half of a reference implementation for scalable ingestion, built in eleven stages. Each stage adds one capability, and only the one the previous stage was missing once volume exposed it: streaming pagination that never buffers, a retry <em>policy</em> rather than a retry loop, validation split in two, checkpoints that survive <code>SIGKILL</code>, a worker pool whose watermark cannot skip a page, proactive rate limiting, sharding across parallel walkers, and detection for a dataset that mutates mid-walk.</p>
     <p><strong>Why it is worth your time.</strong> The failure modes here return <strong>exit code 0</strong>. Every stage carries the live numbers that prove it, reconciled against a server that counts independently — so no claim in this post is the client grading its own homework.</p>
     <p><strong>The code.</strong> <a href="https://github.com/gpazevedo/api-consumer">gpazevedo/api-consumer</a> — one merge commit per stage, each carrying its tests, its mutations and its live numbers.</p>
-    <p><strong>Part 1 of 2</strong> — this half is about getting the data <em>out</em>. <a href="the-sink-was-a-lie.html">Part 2</a> is about saving it.</p>
+    <p><strong>Part 1 of 2</strong> — together with <a href="the-sink-gets-real.html">Part 2</a>, this pair is a reference implementation for scalable reads and writes. This half gets the data <em>out</em>, one concern solved at a time as volume makes the previous version insufficient; Part 2 lands it the same way.</p>
   </div>
 
   <p>The brief is ordinary: read every record from a cursor-paginated API and land it somewhere. Fifty million rows. Write it.</p>
@@ -250,12 +250,12 @@ await asyncio.sleep(delay)                # ... is the number slept</code></pre>
         <div class="tcard-title">Giving up raises the underlying fault</div>
       </div>
       <p>The caller sees httpx's own exception, not a wrapper. When it eventually fails at 3am, the traceback names the thing that actually happened.</p>
+    </div>
+  </div>
 
   <div class="takeaway">
     <div class="takeaway-label">Reuse this</div>
     <p>Put retries in <strong>one funnel underneath the iterator</strong>, and make retryable-versus-terminal a policy rather than a status-code range. Full jitter, honour <code>Retry-After</code>, and log the delay you actually slept.</p>
-  </div>
-    </div>
   </div>
 
   <h3>Stage 3 · Bad data is not an error</h3>
@@ -299,7 +299,7 @@ await asyncio.sleep(delay)                # ... is the number slept</code></pre>
 
   <h2>Part II — Surviving the environment</h2>
 
-  <h3>Stage 4 · The checkpoint that lies</h3>
+  <h3>Stage 4 · Never ahead of the disk</h3>
 
   <p>A job that runs for hours in an environment where things die every few minutes may never finish. So: persist the cursor, resume from it.</p>
 
@@ -410,13 +410,13 @@ await asyncio.sleep(delay)                # ... is the number slept</code></pre>
     <p>Add counters <strong>before</strong> you tune anything, and give every one a counterpart the other side keeps independently. A disagreement is then a bug rather than a matter of opinion.</p>
   </div>
 
-  <h3>Stage 7 · The sink is slow, and now the checkpoint lies again</h3>
+  <h3>Stage 7 · The sink is slow, and the checkpoint gets ahead again</h3>
 
   <p>Fifty million single-row inserts outlast your patience regardless of fetch speed. So rows buffer and flush on size or age.</p>
 
   <p>And immediately, <em>processed</em> stops meaning <em>durable</em>.</p>
 
-  <p>If the checkpoint advances when rows enter the buffer, it certifies records that are sitting in RAM. Crash, resume, and they are gone — the checkpoint is lying, which is worse than not having one. So marking progress moves into the flush path, and the flush becomes one ordered breath.</p>
+  <p>If the checkpoint advances when rows enter the buffer, it certifies records that are sitting in RAM. Crash, resume, and they are gone — the checkpoint has certified rows that were never written, which is worse than not having one. So marking progress moves into the flush path, and the flush becomes one ordered breath.</p>
 
   <div class="pipeline">
     <div class="pipe-stage">
@@ -785,7 +785,7 @@ await asyncio.sleep(delay)                # ... is the number slept</code></pre>
 
   <p>Over keyset: <code>keyset_duplicate_records = 0</code>. Exactly zero, not "low" — a served <code>seq</code> can never satisfy <code>seq &gt; cursor</code> again, so it is structural rather than probabilistic. And the loss is finally <em>named</em>: 210 rows deleted before the cursor reached them. An explained absence instead of an unexplained shortfall.</p>
 
-  <p>What no pagination scheme fixes without snapshot isolation or CDC: a row deleted before the cursor arrives is never served. That is arriving one page late to a live table. It is not corruption, and pretending it is would be its own kind of lie.</p>
+  <p>What no pagination scheme fixes without snapshot isolation or CDC: a row deleted before the cursor arrives is never served. That is arriving one page late to a live table. It is not corruption, and treating it as one would misdiagnose the system.</p>
 
   <div class="takeaway">
     <div class="takeaway-label">Reuse this</div>
@@ -893,15 +893,15 @@ await asyncio.sleep(delay)                # ... is the number slept</code></pre>
   <p>The client is about eleven hundred lines. Most of them are prose explaining why the thirty lines around them are the way they are — because the failure modes here are the kind that return exit code 0, and the only defence against those is writing down what you checked and how you would know if you were wrong.</p>
 
   <div class="bt-callout">
-    The second row of that table is the one that bothered me. A sink that cannot fail cannot test the claims made about it — so the next post makes the destination real and follows whatever breaks: <strong><a href="the-sink-was-a-lie.html">The Sink Was a Lie</a></strong>.
+    The second row of that table is the one that bothered me. A sink that cannot fail cannot test the claims made about it — so the next post makes the destination real and follows the capabilities that turn out to be needed: <strong><a href="the-sink-gets-real.html">The Sink Gets Real</a></strong>.
   </div>
 
   <div class="related-posts">
     <div class="related-posts-label">Related reading</div>
     <div class="related-posts-grid">
-      <a href="the-sink-was-a-lie.html" class="related-post-card">
+      <a href="the-sink-gets-real.html" class="related-post-card">
         <div class="rpc-tag">Engineering</div>
-        <div class="rpc-title">The Sink Was a Lie — what breaks when the destination stops being a stand-in</div>
+        <div class="rpc-title">The Sink Gets Real — five capabilities the destination needed once it stopped being a stand-in</div>
       </a>
     </div>
   </div>

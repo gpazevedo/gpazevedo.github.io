@@ -2,6 +2,15 @@
    Add one entry per file in this folder. Ties keep the order listed here. */
 window.engPosts = [
   {
+    "slug": "scalable-mcp",
+    "file": "scalable-mcp.html",
+    "title": "scalable-mcp: a reusable base for MCP servers and clients, grown out of ATLAS Counsel",
+    "description": "The auth, rate-limiting, session-lifecycle, and sealed continuation-token infrastructure ATLAS Counsel's MCP server grew, packaged as a base for building MCP servers and clients on the current protocol.",
+    "tags": ["MCP", "Open Source", "Architecture"],
+    "date": "2026-08-12",
+    "readingTime": 9
+  },
+  {
     "slug": "atlas-counsel-mcp-v2-oauth",
     "file": "atlas-counsel-mcp-v2-oauth.html",
     "title": "ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure",
@@ -23,16 +32,16 @@ window.engPosts = [
     "slug": "what-fails-next",
     "file": "what-fails-next.html",
     "title": "What Fails Next",
-    "description": "Building an ingest client for 50 million records, one failure at a time — eleven stages, each one built because the previous version broke against something specific.",
+    "description": "The read half of a reference implementation for scalable ingestion: 50 million records, eleven stages, each one added because data volume outgrew the last.",
     "tags": ["Scalable Consumer"],
     "date": "2026-08-03",
     "readingTime": 19
   },
   {
-    "slug": "the-sink-was-a-lie",
-    "file": "the-sink-was-a-lie.html",
-    "title": "The Sink Was a Lie",
-    "description": "What breaks when the destination stops being a stand-in: a real database, a dual write no ordering can save, CDC, an outbox that had to justify itself, and a benchmark that lied four times.",
+    "slug": "the-sink-gets-real",
+    "file": "the-sink-gets-real.html",
+    "title": "The Sink Gets Real",
+    "description": "The write half of the same reference implementation: a real database, CDC in place of an unsafe dual write, an outbox that had to earn its place, and a benchmark rig rebuilt until it could be trusted.",
     "tags": ["Scalable Producer"],
     "date": "2026-08-03",
     "readingTime": 16
