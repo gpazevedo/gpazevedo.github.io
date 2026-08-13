@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>scalable-mcp: a reusable base for MCP servers and clients, grown out of ATLAS Counsel — Gustavo Azevedo</title>
+<meta name="description" content="scalable_mcp and scalable_mcp_client — the auth, rate-limiting, session-lifecycle, and sealed continuation-token infrastructure ATLAS Counsel's MCP server grew, packaged as a base for building MCP servers and clients on the current protocol."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/scalable-mcp.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<!-- Open Graph -->
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/scalable-mcp.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="scalable-mcp: a reusable base for MCP servers and clients, grown out of ATLAS Counsel"/>
+<meta property="og:description" content="scalable_mcp and scalable_mcp_client — the auth, rate-limiting, session-lifecycle, and sealed continuation-token infrastructure ATLAS Counsel's MCP server grew, packaged as a base for building MCP servers and clients on the current protocol."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-08-12T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-12T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="MCP"/>
+<meta property="article:tag" content="Open Source"/>
+<meta property="article:tag" content="Architecture"/>
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="scalable-mcp: a reusable base for MCP servers and clients, grown out of ATLAS Counsel"/>
+<meta name="twitter:description" content="scalable_mcp and scalable_mcp_client — the auth, rate-limiting, session-lifecycle, and sealed continuation-token infrastructure ATLAS Counsel's MCP server grew, packaged as a base for building MCP servers and clients on the current protocol."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<!-- Schema.org -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "scalable-mcp: a reusable base for MCP servers and clients, grown out of ATLAS Counsel",
+  "description": "scalable_mcp and scalable_mcp_client — the auth, rate-limiting, session-lifecycle, and sealed continuation-token infrastructure ATLAS Counsel's MCP server grew, packaged as a base for building MCP servers and clients on the current protocol.",
+  "datePublished": "2026-08-12",
+  "dateModified": "2026-08-12",
+  "author": {"@type": "Person", "name": "Gustavo Peixoto de Azevedo", "url": "https://gpazevedo.github.io/"},
+  "publisher": {"@type": "Person", "name": "Gustavo Peixoto de Azevedo", "url": "https://gpazevedo.github.io/"},
+  "url": "https://gpazevedo.github.io/blog/eng/scalable-mcp.html",
+  "mainEntityOfPage": "https://gpazevedo.github.io/blog/eng/scalable-mcp.html",
+  "image": {"@type": "ImageObject", "url": "https://gpazevedo.github.io/assets/architect.jpg"}
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://gpazevedo.github.io/"},
+    {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://gpazevedo.github.io/#blog"},
+    {"@type": "ListItem", "position": 3, "name": "scalable-mcp", "item": "https://gpazevedo.github.io/blog/eng/scalable-mcp.html"}
+  ]
+}
+</script>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+
+<style>
+/* ── STAT ROW ── */
+.stat-row { display: flex; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; margin: 1.75rem 0; }
+.stat-cell { flex: 1; background: var(--surface); padding: 1.25rem 1rem; text-align: center; }
+.stat-num { font-family: var(--serif); font-size: 2.4rem; color: var(--amber); line-height: 1; margin-bottom: 6px; }
+.stat-label { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+/* ── VERDICT BANNER ── */
+.verdict { background: var(--teal-light); border: 1px solid var(--teal); border-radius: 10px; padding: 1.5rem 1.75rem; margin: 1.75rem 0; display: flex; align-items: center; gap: 1.25rem; }
+.verdict-badge { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; background: var(--teal); color: var(--teal-light); padding: 4px 10px; border-radius: 4px; flex-shrink: 0; }
+.verdict-text { font-size: 14px; font-weight: 300; color: var(--ink); line-height: 1.55; }
+.verdict-text strong { font-weight: 600; }
+@media (max-width: 600px) {
+  .stat-row { flex-direction: column; }
+  .verdict { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+}
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">scalable-mcp</span>
+  </nav>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>MCP</span>
+    <span class="dot">·</span>
+    <time datetime="2026-08-12">August 2026</time>
+    <span class="dot">·</span>
+    <span>9 min read</span>
+  </div>
+
+  <h1><code>scalable-mcp</code>: a <em>reusable</em> base for MCP servers and clients, grown out of ATLAS Counsel</h1>
+
+  <p class="deck"><code>scalable_mcp</code> and <code>scalable_mcp_client</code> are the server and client base that grew out of building and operating ATLAS Counsel's MCP server — auth, rate limiting, session lifecycle, and a sealed pause/resume convention, generalized so the next MCP server doesn't have to rederive them from the SDK's primitives. This round adds two capabilities: protection for the MCP SDK's own <code>tools/call</code> elicitation round trip, and continuation tokens sealed with the same AES-256-GCM codec the SDK now ships.</p>
+
+  <p>When we <a href="atlas-counsel-mcp-v2-oauth.html">wrote up ATLAS Counsel MCP v2</a>, the server had grown a full production posture: mandatory auth across three credential types, per-tenant rate limiting, a sealed continuation-token convention for pausing an agent thread across separate HTTP requests, and — because the protocol itself doesn't stand still — support for two eras of the MCP transport at one endpoint. None of that is specific to legal-document retrieval. It's what any MCP server taking real traffic needs, so it now ships on its own as <code>scalable_mcp</code> for the server side and <code>scalable_mcp_client</code> for the client side: a base other MCP servers and clients can build on directly, instead of re-deriving the same posture from the SDK's primitives each time.</p>
+
+  <p>This post is about what that base gives you today, and two things it does now that it didn't when we first wrote it up: it protects the SDK's own mid-call round trip, not just the REST convention layered on top of it, and its continuation tokens are sealed with the same cryptography the SDK maintains rather than a signature <code>scalable_mcp</code> computed on its own.</p>
+
+  <hr>
+
+  <div class="stat-row">
+    <div class="stat-cell">
+      <div class="stat-num">2</div>
+      <div class="stat-label">packages — server, client</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num">231</div>
+      <div class="stat-label">tests</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num">2</div>
+      <div class="stat-label">protocol eras, one endpoint</div>
+    </div>
+  </div>
+
+  <h2>What building on it gets you</h2>
+
+  <p>Five things, all enforced by construction rather than by a checklist a consumer has to remember:</p>
+
+  <div class="sampling-tiers">
+    <div class="tier tier-always">
+      <div class="tier-badge">auth</div>
+      <div class="tier-text"><strong>A pluggable <code>AuthResolver</code> protocol</strong>, plus reference implementations — <code>JwtAuth</code>, <code>ApiKeyAuth</code>, <code>ChainAuth</code> — that are constant-time and enumeration-safe by construction: every failure mode returns the same string, and comparisons use <code>hmac.compare_digest</code>.</div>
+    </div>
+    <div class="tier tier-always">
+      <div class="tier-badge">limit</div>
+      <div class="tier-text"><strong>Rate limiting behind one <code>RateLimiter</code> protocol</strong>, with an in-memory or a Redis-backed implementation, and the ordering that makes it effective — rate-limit runs before auth — built into <code>create_app</code> itself, not documented as something a consumer has to get right.</div>
+    </div>
+    <div class="tier tier-always">
+      <div class="tier-badge">session</div>
+      <div class="tier-text"><strong>Session lifecycle handled for you</strong>: the anyio threadpool raised past the SDK's default cap, the MCP session manager entered from the app's own lifespan, idle Streamable HTTP sessions reaped automatically.</div>
+    </div>
+    <div class="tier tier-always">
+      <div class="tier-badge">resume</div>
+      <div class="tier-text"><strong>A sealed pause/resume convention</strong> for REST handlers that need to pause a LangGraph-style agent thread across separate HTTP requests, plus — new — protection for the SDK's own <code>tools/call</code> round trip.</div>
+    </div>
+    <div class="tier tier-always">
+      <div class="tier-badge">protocol</div>
+      <div class="tier-text"><strong>Built on <code>mcp&gt;=2.0</code></strong> and serves both the classic stateful handshake and the current stateless revision at the same endpoint, so a server built on <code>scalable_mcp</code> doesn't drop older clients to gain the new ones.</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <h2>Two packages, matched to two audiences</h2>
+
+  <p><code>scalable_mcp</code> is the server side; <code>scalable_mcp_client</code> is the client side. Install only the one you need. Internally, the server package is organized in three layers, each independently testable:</p>
+
+  <div class="layer-stack">
+    <div class="layer l1">
+      <div class="layer-meta">
+        <span class="layer-num">Layer 1</span>
+        <span class="layer-name">Primitives</span>
+        <span class="layer-src">rate_limit.py, crypto.py</span>
+      </div>
+      <div class="chips">
+        <span class="chip">no framework deps</span>
+        <span class="chip">pure logic</span>
+      </div>
+    </div>
+    <div class="layer l2">
+      <div class="layer-meta">
+        <span class="layer-num">Layer 2</span>
+        <span class="layer-name">Middleware</span>
+        <span class="layer-src">middleware.py</span>
+      </div>
+      <div class="chips">
+        <span class="chip">ASGI</span>
+        <span class="chip">FastAPI-aware</span>
+        <span class="chip">transport-agnostic</span>
+      </div>
+    </div>
+    <div class="layer l3">
+      <div class="layer-meta">
+        <span class="layer-num">Layer 3</span>
+        <span class="layer-name">App factory</span>
+        <span class="layer-src">app.py, server.py, simple.py</span>
+      </div>
+      <div class="chips">
+        <span class="chip">FastAPI</span>
+        <span class="chip">MCP SDK integration</span>
+      </div>
+    </div>
+  </div>
+
+  <p>Two ways in at the top of that stack: <code>AppConfig</code> + <code>create_app</code> for full control over auth, rate limiting, CORS, timeouts, and hooks — or <code>SimpleServerConfig</code> + <code>create_simple_server</code> for an opinionated one-call setup that's usually enough. Neither pulls in more than it needs: no <code>httpx</code>, no <code>boto3</code>, and Redis is an optional extra rather than a hard dependency.</p>
+
+  <hr>
+
+  <h2>Current with the protocol</h2>
+
+  <p>The MCP transport moved to a stateless-per-request revision on 2026-07-28, the largest change to the protocol since authorization was added. A server built on <code>scalable_mcp</code> serves that revision and the earlier stateful handshake at the same <code>/mcp/</code> endpoint, so picking up the new revision costs a client nothing and forces no migration window on the ones that haven't moved yet. The mounting details that make that work — <code>streamable_http_path="/"</code>, the trailing slash, host validation against the proxy's <code>Host</code> header — are exactly the ones we <a href="atlas-counsel-mcp-v2-oauth.html">covered in depth</a> when ATLAS Counsel MCP v2 shipped them; a server built on <code>scalable_mcp</code> inherits all three without re-deriving them.</p>
+
+  <hr>
+
+  <h2>New: protecting the SDK's own <code>tools/call</code> round trip</h2>
+
+  <p>The MCP SDK has its own multi-round-trip mechanism for tool parameters that need client input mid-call — elicitation, sampling, roots — built on a <code>Resolve</code>/<code>InputRequiredResult</code> pair inside the JSON-RPC <code>tools/call</code> request itself. <code>create_mcp_server</code> now threads a <code>RequestStateSecurity</code> straight through to it:</p>
+
+<pre><code>def create_mcp_server(
+    name: str, *, request_state_security: RequestStateSecurity | None = None
+) -> MCPServer:
+    """Create an MCPServer with the given name. The caller registers tools on
+    the returned server via @mcp.tool(...) decorators.
+
+    Pass request_state_security to protect the native tools/call elicitation
+    round trip (Resolve/InputRequiredResult — see mcp.server.mcpserver.resolve).
+    Multi-instance deployments need RequestStateSecurity(keys=[shared_secret]);
+    omitting it leaves the SDK's per-process ephemeral default, which rejects
+    state minted before a restart or by another worker. This is independent of
+    scalable_mcp's own crypto.mint_request_state, which protects the separate
+    /ask-/resume-style REST continuation convention, not tools/call.
+    """
+    return MCPServer(name, request_state_security=request_state_security)</code></pre>
+
+  <p>Single-process deployments — stdio, one HTTP worker — can leave the parameter out entirely; the SDK's ephemeral default covers them. A multi-instance HTTP deployment passes <code>RequestStateSecurity(keys=[shared_secret])</code>, so state minted mid-elicitation on one replica still verifies when the client's next request lands on another.</p>
+
+  <hr>
+
+  <h2>New: continuation tokens sealed with the SDK's own codec</h2>
+
+  <p><code>scalable_mcp</code>'s own pause/resume convention — the one behind consumer-defined REST endpoints like <code>/ask</code> and <code>/resume</code> — now delegates sealing to the same primitive:</p>
+
+<pre><code>def mint_request_state(*, secret: str, thread_id: str, tenant_id: str, iat: int | None = None) -> str:
+    payload = RequestStatePayload(
+        thread_id=thread_id, tenant_id=tenant_id,
+        iat=iat if iat is not None else int(time.time()),
+    )
+    codec = AESGCMRequestStateCodec(keys=[secret])
+    return codec.seal(payload.model_dump_json().encode("utf-8"))</code></pre>
+
+  <p>The payload — <code>{thread_id, tenant_id, iat}</code> — is sealed with AES-256-GCM via the MCP SDK's <code>AESGCMRequestStateCodec</code>: encrypted and authenticated, not merely signed, and a fresh nonce on every call so minting the same payload twice produces two different tokens that both verify to identical contents. <code>scalable_mcp</code> doesn't carry cryptographic code of its own for this anymore — it owns the envelope the convention actually needs: the 120-second TTL, the <code>thread_id</code>/<code>tenant_id</code> binding that stops a token minted for one thread or tenant from being replayed against another, and the degrade-to-checkpoint-only behavior when <code>MCP_HMAC_SECRET</code> is unset. Both of <code>scalable_mcp</code>'s pause/resume mechanisms — the SDK's native one above, and this REST convention — now rest on the same AES-256-GCM codec, configured and keyed independently for the two different round trips they protect.</p>
+
+  <hr>
+
+  <h2>Two pause points, two protections</h2>
+
+  <p>Both mechanisms implement the same SEP-2322 MRTR idea — a sealed token that proves a pause was legitimate — for two structurally different round trips, which is worth laying out side by side once rather than re-deriving from the docstrings each time:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th></th><th>Native <code>tools/call</code> elicitation</th><th><code>/ask</code>, <code>/resume</code> REST convention</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Protects</td><td>The JSON-RPC <code>tools/call</code> request itself, mid-call</td><td>Consumer-defined REST handlers pausing an agent thread across requests</td></tr>
+        <tr><td>Configured via</td><td><code>create_mcp_server(request_state_security=...)</code></td><td><code>MCP_HMAC_SECRET</code> env var, read via <code>hmac_secret()</code></td></tr>
+        <tr><td>Single-process default</td><td>SDK's ephemeral per-process key</td><td>No token minted — degrades to checkpoint-only resume</td></tr>
+        <tr><td>Multi-instance</td><td><code>RequestStateSecurity(keys=[shared_secret])</code></td><td>Same <code>MCP_HMAC_SECRET</code> set across every replica</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr>
+
+  <h2>Composed, not duplicated</h2>
+
+  <p>The client side follows the same layering. <code>MCPConnection</code> is the primitive — it owns connect-retry and a background health-check loop over a Streamable HTTP session. <code>SimpleMCPClient</code>, the convenience client, is built by composing it rather than reimplementing connection lifecycle on its own:</p>
+
+<pre><code>class SimpleMCPClient:
+    def __init__(self, url: str):
+        self._connection = MCPConnection(ConnectionConfig(url=url))
+        self._tool_proxy: ToolProxy | None = None
+        self.cache = ResponseCache()
+
+    async def _connect(self) -> None:
+        await self._connection.connect()
+        self._tool_proxy = ToolProxy(self._connection.session)
+
+    async def _disconnect(self) -> None:
+        await self._connection.close()
+        self._tool_proxy = None</code></pre>
+
+  <p>Any improvement to <code>MCPConnection</code>'s retry policy or health-check cadence reaches <code>SimpleMCPClient</code> automatically, since it's the same object rather than a parallel copy. What <code>SimpleMCPClient</code> adds on top is genuinely its own: <code>ToolProxy</code> for calling tools as attributes, and <code>ResponseCache</code> for short-lived result caching — neither of which a caller using <code>MCPConnection</code> directly would necessarily want by default.</p>
+
+  <hr>
+
+  <h2>Getting started</h2>
+
+  <p>A server:</p>
+
+<pre><code>from scalable_mcp import create_mcp_server, SimpleServerConfig, create_simple_server
+
+mcp = create_mcp_server("my-app")
+
+@mcp.tool()
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+
+app = create_simple_server(config=SimpleServerConfig(
+    server_name="my-app",
+    mcp=mcp,
+    auth="api-key",
+    api_keys={"my-secret-key"},
+))
+
+# Run with: uvicorn app:app</code></pre>
+
+  <p>A client:</p>
+
+<pre><code>import asyncio
+from scalable_mcp_client import SimpleMCPClient
+
+async def main():
+    async with SimpleMCPClient.connect("http://localhost:8000/mcp") as c:
+        tools = await c.list_tools()
+        print([t["name"] for t in tools])
+
+asyncio.run(main())</code></pre>
+
+  <p>And a CLI for exercising either side without writing a client at all:</p>
+
+<pre><code>scalable-mcp-client list-tools http://localhost:8000/mcp
+scalable-mcp-client call http://localhost:8000/mcp greet --arg name World --pretty
+scalable-mcp-client probe http://localhost:8000/mcp</code></pre>
+
+  <div class="callout">
+    <div class="callout-label">Where the boundary sits</div>
+    <p><code>scalable_mcp</code> resolves a credential to a tenant and makes that identity available everywhere — <code>current_tenant</code>, the rate limiter's key, the MCP SDK's session-ownership check. Deciding which tools a given tenant may call is still the consumer's job: <code>AccessToken.scopes</code> is empty by default, and there's no per-tool authorization model in the base itself. Identity and transport are what this package gives you; what a tenant is allowed to do with that identity is the application's.</p>
+  </div>
+
+  <div class="verdict">
+    <div class="verdict-badge">What you get</div>
+    <div class="verdict-text"><strong>A server and client base that already knows how to authenticate, rate-limit, manage session lifecycle, and pause/resume an agent thread safely — current with both eras of the MCP transport, and now covering the SDK's own mid-call round trip in addition to the REST convention layered on top of it.</strong> Two focused packages, 231 tests, and one cryptographic primitive — the SDK's own AES-256-GCM codec — backing both of its pause/resume mechanisms.</div>
+  </div>
+
+  <hr>
+
+  <h2>What generalises</h2>
+
+  <p><strong>Bake ordering guarantees into the framework, not the docs.</strong> A consumer building on <code>scalable_mcp</code> cannot get rate-limit-before-auth wrong — it isn't a checklist item, it's the only order <code>create_app</code> assembles.</p>
+
+  <p><strong>When the protocol SDK ships a primitive you need, build on it.</strong> Both of <code>scalable_mcp</code>'s pause/resume mechanisms now rest on the same <code>AESGCMRequestStateCodec</code> the SDK maintains, configured independently for the two round trips they protect.</p>
+
+  <p><strong>Compose the convenience layer from the primitive, don't duplicate it.</strong> A one-call factory or a convenience client should be a thin wrapper over the flexible path, not a parallel implementation — that's what keeps <code>create_simple_server</code> and <code>SimpleMCPClient</code> current automatically as the primitives underneath them grow.</p>
+
+  <p><strong>When two protections share a spec-derived name, say which is which where the reader will actually see it.</strong> <code>tools/call</code> elicitation and the REST continuation convention both implement SEP-2322 MRTR's <code>requestState</code> idea; each one's docstring names the other.</p>
+
+  <hr>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="atlas-counsel-mcp-v2-oauth.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure</div>
+      </a>
+      <a href="atlas-counsel.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Building ATLAS Counsel: grounding, escalation, and safety in a citation-first RAG agent</div>
+      </a>
+      <a href="durable-orchestration.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Pause for four days, resume in five seconds: durable execution in a multi-agent system</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> — AI Solution Architect · August 2026</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> — an autonomous multi-agent procurement negotiation system.</p>
+    <p><code>scalable-mcp</code> v0.1.0 · <a href="https://github.com/gpazevedo/scalable-mcp" target="_blank" rel="noopener noreferrer">github.com/gpazevedo/scalable-mcp</a></p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>
