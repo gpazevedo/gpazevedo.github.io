@@ -20,7 +20,7 @@
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-08-12T00:00:00+00:00"/>
-<meta property="article:modified_time" content="2026-08-12T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-13T00:00:00+00:00"/>
 <meta property="article:section" content="Engineering"/>
 <meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
 <meta property="article:tag" content="MCP"/>
@@ -41,7 +41,7 @@
   "headline": "scalable-mcp: a reusable base for MCP servers and clients, grown out of ATLAS Counsel",
   "description": "scalable_mcp and scalable_mcp_client — the auth, rate-limiting, session-lifecycle, and sealed continuation-token infrastructure ATLAS Counsel's MCP server grew, packaged as a base for building MCP servers and clients on the current protocol.",
   "datePublished": "2026-08-12",
-  "dateModified": "2026-08-12",
+  "dateModified": "2026-08-13",
   "author": {"@type": "Person", "name": "Gustavo Peixoto de Azevedo", "url": "https://gpazevedo.github.io/"},
   "publisher": {"@type": "Person", "name": "Gustavo Peixoto de Azevedo", "url": "https://gpazevedo.github.io/"},
   "url": "https://gpazevedo.github.io/blog/eng/scalable-mcp.html",
@@ -312,6 +312,14 @@
 
   <h2>Getting started</h2>
 
+  <p><code>scalable_mcp</code> is on PyPI:</p>
+
+<pre><code>uv add scalable-mcp
+# or
+pip install scalable-mcp</code></pre>
+
+  <p><code>scalable_mcp_client</code> follows the same install path once it publishes — the packages are split so a client-only consumer never pulls in FastAPI.</p>
+
   <p>A server:</p>
 
 <pre><code>from scalable_mcp import create_mcp_server, SimpleServerConfig, create_simple_server
@@ -394,7 +402,7 @@ scalable-mcp-client probe http://localhost:8000/mcp</code></pre>
   <div class="post-footer">
     <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> — AI Solution Architect · August 2026</p>
     <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> — an autonomous multi-agent procurement negotiation system.</p>
-    <p><code>scalable-mcp</code> v0.1.0 · <a href="https://github.com/gpazevedo/scalable-mcp" target="_blank" rel="noopener noreferrer">github.com/gpazevedo/scalable-mcp</a></p>
+    <p><code>scalable-mcp</code> v0.1.0 · <a href="https://pypi.org/project/scalable-mcp/" target="_blank" rel="noopener noreferrer">pypi.org/project/scalable-mcp</a> · <a href="https://github.com/gpazevedo/scalable-mcp" target="_blank" rel="noopener noreferrer">github.com/gpazevedo/scalable-mcp</a></p>
   </div>
 
 </article>
