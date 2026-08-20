@@ -19,7 +19,7 @@
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-08-19T00:00:00+00:00"/>
-<meta property="article:modified_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-20T00:00:00+00:00"/>
 <meta property="article:section" content="Engineering"/>
 <meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
 <meta property="article:tag" content="Security"/>
@@ -30,7 +30,7 @@
 <meta name="twitter:description" content="How Buyer Team extended multi-tenant isolation when prompt injection became an active threat — JWT claim normalisation, a Gateway request interceptor, per-request ABAC, and a SQL rewriter that doesn't trust the agent."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"When the agent is the attack vector: extending tenant isolation beyond partition keys","description":"How Buyer Team extended multi-tenant isolation when prompt injection became an active threat — JWT claim normalisation, a Gateway request interceptor, per-request ABAC, and a SQL rewriter that doesn't trust the agent.","datePublished":"2026-08-19","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/tenant-isolation-agent-attack-vector.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/tenant-isolation-agent-attack-vector.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"When the agent is the attack vector: extending tenant isolation beyond partition keys","description":"How Buyer Team extended multi-tenant isolation when prompt injection became an active threat — JWT claim normalisation, a Gateway request interceptor, per-request ABAC, and a SQL rewriter that doesn't trust the agent.","datePublished":"2026-08-19","dateModified":"2026-08-20","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/tenant-isolation-agent-attack-vector.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/tenant-isolation-agent-attack-vector.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"When the agent is the attack vector: extending tenant isolation beyond partition keys","item":"https://gpazevedo.github.io/blog/eng/tenant-isolation-agent-attack-vector.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -77,7 +77,7 @@
   <h1>When the agent is the <em>attack vector:</em> extending tenant isolation beyond partition keys</h1>
 
   <p class="deck">
-    Our original multi-tenant design assumed the agent was honest about which tenant it was acting for. The MITRE ATLAS threat model assumed it wasn't. This post documents the four controls we added — JWT claim normalisation, a Gateway request interceptor, per-request ABAC, and a SQL rewriter — and the principle that ties them together.
+    Our original multi-tenant design assumed the agent was honest about which tenant it was acting for. The MITRE ATLAS threat model assumed it wasn't. This post documents the four controls we designed — JWT claim normalisation, a Gateway request interceptor, per-request ABAC, and a SQL rewriter — and the principle that ties them together. Three are live today; per-request ABAC is built and provisioned but still a Phase-2 fast-follow, not yet wired into the request path — that distinction matters enough that we call it out where it belongs, in Control 3.
   </p>
 
   <hr>
@@ -87,7 +87,11 @@
   </p>
 
   <p>
-    Then we did the MITRE ATLAS threat-modelling pass on the system. The exercise that shifted our thinking was <strong>AML.T0051 (Prompt Injection)</strong> — specifically, what happens when supplier-submitted bid responses, which are by design ingested into the Bid Evaluation Agent's reasoning context, contain crafted instructions that try to manipulate the agent's subsequent tool calls. The original three-layer model has a gap: <strong>Cedar policies permit the tool binding, but Cedar can't inspect the request body.</strong> A prompt-injected agent running under a JWT for tenant A can emit <code>params.arguments.tenant_id = "tenant_B"</code> in a <code>tools/call</code>, and every layer downstream of Cedar will happily honour it.
+    Then we did the MITRE ATLAS threat-modelling pass on the system. The exercise that shifted our thinking was <strong>AML.T0051 (Prompt Injection)</strong> — specifically, what happens at our actual agent-facing boundary: the Skill runtime, the MCP server that fronts requisition ingest, PO receiving, and workflow orchestration for every external caller, whether that caller is a customer's own AI-driven integration or straightforward automation. We can't assume that caller is honest about which tenant it's acting for — a compromised client, a bug, or (for an AI-driven one) its own prompt injection can all produce the same failure mode. The original three-layer model has a gap: <strong>Cedar's permit at these Gateways is coarse — it decides whether the caller's token may reach the Gateway at all, not whether a specific tool call is legitimate, and the request body is opaque to it by construction.</strong> A caller authenticated for tenant A can put <code>tenant_id: "tenant_B"</code> in the body of an otherwise Cedar-permitted call, and every layer downstream of Cedar will happily honour it unless something else intervenes.
+  </p>
+
+  <p class="callout-note" style="font-size:0.95em;font-style:italic;">
+    (Note: our own negotiation agents — Spot Bidding, the negotiation strategy agents, Award &amp; Comms — don't sit behind this boundary at all. Their tools run in-process via the Strands SDK, and <code>tenant_id</code> is bound from agent context rather than accepted as an LLM-supplied argument, so this particular confused-deputy shape doesn't apply to them. The Skill runtime, fronted by AgentCore Gateways with Cedar in front, is where an external caller's request body genuinely reaches us un-trusted — which is why it's the running example below.)
   </p>
 
   <p>
@@ -104,9 +108,9 @@
     <div class="tcard">
       <div class="tcard-head">
         <div class="tcard-icon icon-coral">⚠</div>
-        <div class="tcard-title">The agent fills in the tool arguments</div>
+        <div class="tcard-title">The caller fills in the request body</div>
       </div>
-      <p>An LLM that has been prompt-injected via untrusted supplier content can emit <code>tenant_id=B</code> in a <code>tools/call</code> while operating under a JWT bound to tenant A. Cedar evaluates whether the binding (agent → tool) is permitted; it does not parse the body. The downstream Plugin Lambda receives <code>tenant_id=B</code> and, unless something else intervenes, acts on it.</p>
+      <p>A caller against the Skill runtime — whether it's a buggy integration or an AI-driven one that's been prompt-injected — can put <code>tenant_id=B</code> in the body of a <code>tools/call</code> while authenticated under a JWT bound to tenant A. Cedar evaluates only whether that token may reach this Gateway at all; it does not parse the body. The downstream Plugin Lambda receives <code>tenant_id=B</code> and, unless something else intervenes, acts on it.</p>
     </div>
     <div class="tcard">
       <div class="tcard-head">
@@ -195,11 +199,11 @@ def lambda_handler(event, context):
   <h2>Control 2: The Gateway request interceptor</h2>
 
   <p>
-    With claim shape pinned, the next gap is the request body. Cedar decides whether an agent is permitted to invoke a specific tool — "the Bid Evaluation Agent may call <code>rank_bids</code>." It does not inspect the <code>params.arguments</code> the agent emits. If the agent has been prompt-injected and emits a foreign <code>tenant_id</code>, Cedar permits the call.
+    With claim shape pinned, the next gap is the request body. On our Gateways, Cedar's permit is coarse — it checks the caller's OAuth <code>scope</code> and, in one case, that a <code>tenantId</code> session tag exists at all, both read off the JWT-derived principal, never off the payload. It does not parse <code>params.arguments</code>, and it has no notion of "this caller may invoke this specific tool with this specific tenant_id" — that per-tool binding doesn't exist for an AgentCore-Runtime-fronted Gateway like this one. So a caller authenticated for tenant A can still put a foreign <code>tenant_id</code> in the body of a call Cedar has already permitted, and Cedar's own check has nothing more to say about it.
   </p>
 
   <p>
-    The control is a Lambda interceptor attached to every AgentCore Gateway. It runs <em>before</em> Cedar evaluation. Its job is small and deterministic: decode the inbound JWT (no re-verification — an earlier layer already validated it), extract the <code>tenantId</code> claim, and overwrite <code>params.arguments.tenant_id</code> in the request body. The value Cedar then evaluates against, and the value the target Plugin Lambda eventually receives, is the JWT-claimed <code>tenantId</code> — never an agent-supplied value.
+    The control is a Lambda interceptor attached to every AgentCore Gateway. Its job is small and deterministic: decode the inbound JWT (no re-verification — an earlier layer already validated it), extract the <code>tenantId</code> claim, and overwrite <code>params.arguments.tenant_id</code> in the request body before it reaches the target. This doesn't change what Cedar itself evaluates — Cedar's own check stays scoped to the principal's tags, body or no body — but it's what makes the value the target Plugin Lambda actually receives the JWT-claimed <code>tenantId</code> rather than whatever the caller wrote.
   </p>
 
   <div class="layer-stack">
@@ -212,7 +216,7 @@ def lambda_handler(event, context):
       <div class="chips">
         <span class="chip">Authorization: Bearer eyJ…</span>
         <span class="chip">tools/call payload</span>
-        <span class="chip">params.arguments.tenant_id (agent-supplied, untrusted)</span>
+        <span class="chip">params.arguments.tenant_id (caller-supplied, untrusted)</span>
       </div>
     </div>
     <div class="layer l2">
@@ -231,12 +235,12 @@ def lambda_handler(event, context):
     <div class="layer l3">
       <div class="layer-meta">
         <span class="layer-num">Step 3</span>
-        <span class="layer-name">Cedar evaluates rewritten request</span>
-        <span class="layer-src">AgentCore Policy (deny-by-default)</span>
+        <span class="layer-name">Cedar evaluates the Gateway-level permit</span>
+        <span class="layer-src">AgentCore Policy (deny-by-default, coarse)</span>
       </div>
       <div class="chips">
-        <span class="chip">Cedar sees the trusted tenant_id</span>
-        <span class="chip">per-agent tool permissions</span>
+        <span class="chip">checks scope + tenantId tag, not the body</span>
+        <span class="chip">one permit per Gateway, not per tool</span>
         <span class="chip">deny → request rejected before Plugin invocation</span>
       </div>
     </div>
@@ -258,7 +262,7 @@ def lambda_handler(event, context):
   </p>
 
   <p>
-    The control is per-request ABAC. For Plugins whose backing ARNs are tenant-partitioned — the domain tables (all <code>tenant_id#</code>-prefixed), the tenant-scoped S3 prefixes, supplier-comm, and the ERP connector's Token Vault path — the interceptor doesn't just rewrite the request body. It also calls <code>sts:AssumeRole</code> on a per-Gateway ABAC role with <code>sts:TagSession</code> setting <code>tenant_id</code> to the JWT-claimed value, and passes the resulting temporary credentials to the Plugin Lambda as <code>tenant_credentials</code> in the request payload.
+    The control we designed for this is per-request ABAC — and it's worth being precise about where it stands today, because we shipped a status note correcting our own earlier "GA" claim on this. For Plugins whose backing ARNs are tenant-partitioned — the domain tables (all <code>tenant_id#</code>-prefixed), the tenant-scoped S3 prefixes, supplier-comm, and the ERP connector's Token Vault path — the interceptor is <em>built</em> to call <code>sts:AssumeRole</code> on a per-Gateway ABAC role with <code>sts:TagSession</code> setting <code>tenant_id</code> to the JWT-claimed value, and to pass the resulting temporary credentials to the Plugin Lambda as <code>tenant_credentials</code> in the request payload, failing the request closed if the assume-role call fails. The five per-Gateway ABAC roles are provisioned. None of it runs yet: every deployed Gateway shares one interceptor Lambda, and its <code>ABAC_TOOL_ROLES</code> map is intentionally left empty, which makes the AssumeRole branch inert everywhere. It's a Phase-2 fast-follow, not v1.0 GA — which is exactly why Controls 1, 2, and 4 can't be waved off as redundant with it. Today's isolation rests on the interceptor's <code>tenant_id</code> rewrite, the partition-key check, and the SQL rewriter alone; ABAC will add an IAM-layer guarantee on top of that baseline once it's wired, not replace a gap those three are currently covering by themselves.
   </p>
 
   <p>
@@ -285,12 +289,12 @@ def lambda_handler(event, context):
 }</code></pre>
 
   <p>
-    The Plugin Lambda constructs its AWS SDK clients from <code>tenant_credentials</code> rather than its own execution role. Now, even if the Plugin's code is buggy or compromised, IAM denies the operation at the AWS API unless the <code>LeadingKeys</code> condition matches the session-tagged <code>tenant_id</code>. The enforcement point has moved out of application code and into AWS itself.
+    Once wired, a Plugin Lambda would construct its AWS SDK clients from <code>tenant_credentials</code> rather than its own execution role — so even a buggy or compromised Plugin would have IAM deny the operation at the AWS API unless the <code>LeadingKeys</code> condition matched the session-tagged <code>tenant_id</code>, moving the enforcement point out of application code and into AWS itself. That's the design; it isn't live traffic's reality yet, which is the whole reason this section exists as a status callout rather than a victory lap.
   </p>
 
   <div class="callout">
     <div class="callout-label">Why ABAC is not redundant with the PK partition check</div>
-    <p>The DynamoDB partition key prevents <em>scans</em> across tenants — you cannot query for "all negotiations" without specifying a partition. But <code>PutItem</code> with a foreign <code>tenant_id#</code> as part of the key would succeed if IAM permits it, because the partition-key mechanism is about read isolation, not write authorisation. ABAC's <code>LeadingKeys</code> condition closes that write surface. Together, the two controls cover the read and write directions of the same isolation goal — but neither alone is sufficient.</p>
+    <p>The DynamoDB partition key prevents <em>scans</em> across tenants — you cannot query for "all negotiations" without specifying a partition. But <code>PutItem</code> with a foreign <code>tenant_id#</code> as part of the key would succeed if IAM permits it, because the partition-key mechanism is about read isolation, not write authorisation. ABAC's <code>LeadingKeys</code> condition is designed to close that write surface — which is exactly why it's the fast-follow we want next, not evidence the surface is already closed. Until it's wired, that write path leans on the interceptor's request-body rewrite and on application code getting the write correct, the same trust boundary Control 1 exists to narrow.</p>
   </div>
 
   <h2>Control 4: The SQL rewriter for query-bearing Plugins</h2>
@@ -480,11 +484,11 @@ def lambda_handler(event, context):
   <h2>Summary</h2>
 
   <p>
-    The original three-layer multi-tenant model — JWT, partition keys, agent context injection — was correct as far as it went, but it assumed the agent was honest about which tenant it was acting for. Prompt injection invalidates that assumption. The four controls — claim normalisation at token issuance, Gateway request interceptor, per-request ABAC, and SQL rewriter at query-bearing Plugins — move enforcement out of the agent's reasoning loop and into deterministic transforms the agent can't influence.
+    The original three-layer multi-tenant model — JWT, partition keys, agent context injection — was correct as far as it went, but it assumed the agent was honest about which tenant it was acting for. Prompt injection invalidates that assumption. The four controls — claim normalisation at token issuance, Gateway request interceptor, per-request ABAC, and SQL rewriter at query-bearing Plugins — are designed to move enforcement out of the agent's reasoning loop and into deterministic transforms the agent can't influence. Three of the four do that today; ABAC is built and provisioned but still waiting on its fast-follow to actually run.
   </p>
 
   <p>
-    The principle that ties them together is that <strong>each layer must close a gap the others leave open</strong>. ABAC handles read isolation at the IAM boundary; the SQL rewriter handles write-time predicates on tables that aren't PK-conditioned; the Gateway interceptor handles the body of the tool call before Cedar sees it; claim normalisation handles the upstream identity layer that all of them depend on. Remove any one and an attacker has a path. Keep all four and the agent's own reasoning is no longer load-bearing for tenant isolation.
+    The principle that ties them together is that <strong>each layer must close a gap the others leave open</strong>. ABAC, once wired, will handle read <em>and write</em> isolation at the IAM boundary; the SQL rewriter handles write-time predicates on tables that aren't PK-conditioned; the Gateway interceptor handles the body of the tool call before Cedar sees it; claim normalisation handles the upstream identity layer that all of them depend on. Remove any one and an attacker has a path — which is exactly why the live three don't get a pass just because the fourth is designed to help: today's tenant isolation stands on the interceptor rewrite, the partition-key check, and the SQL rewriter alone, and it has to hold on its own until ABAC lands.
   </p>
 
   <p>

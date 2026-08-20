@@ -19,7 +19,7 @@
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-08-06T00:00:00+00:00"/>
-<meta property="article:modified_time" content="2026-08-12T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-20T00:00:00+00:00"/>
 <meta property="article:section" content="Engineering"/>
 <meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
 <meta property="article:tag" content="Reliability"/>
@@ -30,7 +30,7 @@
 <meta name="twitter:description" content="How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns and the trade-offs behind them."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Designing for Failure in a Multi-Agent Procurement System","description":"How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns and the trade-offs behind them.","datePublished":"2026-08-06","dateModified":"2026-08-12","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/failure-handling.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/failure-handling.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Designing for Failure in a Multi-Agent Procurement System","description":"How six autonomous agents are built to fail, degrade, and recover without corrupting state or acting silently — the resilience patterns and the trade-offs behind them.","datePublished":"2026-08-06","dateModified":"2026-08-20","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/failure-handling.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/failure-handling.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Designing for Failure in a Multi-Agent Procurement System","item":"https://gpazevedo.github.io/blog/eng/failure-handling.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -425,13 +425,13 @@
     <div class="layer l3">
       <div class="layer-meta">
         <span class="layer-num">Mechanism 3</span>
-        <span class="layer-name">SUPERSEDED Marking on Cycle-Back</span>
-        <span class="layer-src">REQ-G305 · 3 retries, 500ms/1s/2s backoff</span>
+        <span class="layer-name">Idempotent Bid IDs on Cycle-Back</span>
+        <span class="layer-src">bid_id = uuid5(negotiation_id, supplier_id)</span>
       </div>
       <div class="chips">
-        <span class="chip">all bids marked before reinvoke</span>
-        <span class="chip">re-marking is a no-op</span>
-        <span class="chip">all retries exhausted → halt → RA</span>
+        <span class="chip">one row per supplier per negotiation</span>
+        <span class="chip">reject-with-retry overwrites in place</span>
+        <span class="chip">no marking step, nothing to fail</span>
       </div>
     </div>
   </div>
@@ -559,7 +559,7 @@
 
   <h3>Spot Bidding Agent — Circuit Breaker per Supplier</h3>
 
-  <p>The Spot Bidding agent introduced a design that's worth highlighting: rather than using a single circuit breaker for all supplier communications, it maintains a circuit breaker per supplier. This means one supplier going offline doesn't halt the entire bidding round — the agent continues polling remaining suppliers and compiles partial results. The zero-bids terminal path (all suppliers fail to respond) is handled as a distinct escalation, not as a degenerate case of partial failure. Deduplication uses a <code>(negotiation_id, supplier_id, type)</code> composite key in DynamoDB to prevent duplicate bids from retries.</p>
+  <p>The Spot Bidding agent introduced a design that's worth highlighting: each <code>send_bid_invitation</code> call is wrapped in its own try/except, so one supplier going offline doesn't halt the entire bidding round — a failed send is reported as unreachable rather than raised, the agent continues on to the remaining suppliers, and the round compiles partial results. That's isolation, not a circuit breaker: there's no per-supplier failure count or open/half-open state, just each send standing or falling on its own. Our actual circuit breakers live one layer down, scoped per dependency type rather than per supplier — one for the shared supplier-communications channel, one per A2A agent, one per Bedrock region — because those are the dependencies whose repeated failures are worth tripping a breaker over. The zero-bids terminal path (all suppliers fail to respond) is handled as a distinct escalation, not as a degenerate case of partial failure. Deduplication uses a <code>(negotiation_id, supplier_id, type)</code> composite key in DynamoDB to prevent duplicate bids from retries.</p>
 
   <h3>Bid Evaluation — Quality-Gated, Deterministically</h3>
 
