@@ -19,7 +19,7 @@
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-08-19T00:00:00+00:00"/>
-<meta property="article:modified_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-20T00:00:00+00:00"/>
 <meta property="article:section" content="Engineering"/>
 <meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
 <meta property="article:tag" content="Reliability"/>
@@ -30,7 +30,7 @@
 <meta name="twitter:description" content="Buyer Team handles failure in exactly five places: the agent microkernel, a shared Lambda layer, a shared MCP base, the orchestrator resilience layer, and the AWS alarms. A mechanism-by-mechanism tour — and the silent failures that proved each tool necessary."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Five tools, no silent failures: where Buyer Team handles failure","description":"Buyer Team handles failure in exactly five places: the agent microkernel, a shared Lambda layer, a shared MCP base, the orchestrator resilience layer, and the AWS alarms. A mechanism-by-mechanism tour — and the silent failures that proved each tool necessary.","datePublished":"2026-08-19","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/no-silent-failures.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/no-silent-failures.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Five tools, no silent failures: where Buyer Team handles failure","description":"Buyer Team handles failure in exactly five places: the agent microkernel, a shared Lambda layer, a shared MCP base, the orchestrator resilience layer, and the AWS alarms. A mechanism-by-mechanism tour — and the silent failures that proved each tool necessary.","datePublished":"2026-08-19","dateModified":"2026-08-20","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/no-silent-failures.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/no-silent-failures.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Five tools, no silent failures: where Buyer Team handles failure","item":"https://gpazevedo.github.io/blog/eng/no-silent-failures.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -70,7 +70,7 @@
     <span class="dot">·</span>
     <time datetime="2026-08-19">August 2026</time>
     <span class="dot">·</span>
-    <span>21 min read</span>
+    <span>22 min read</span>
   </div>
 
   <h1>Five tools, no silent failures: <em>where Buyer Team handles failure</em></h1>
@@ -131,6 +131,7 @@
         <span class="layer-src">orchestrator/resilience · the SFN node executors</span>
       </div>
       <div class="chips">
+        <span class="chip">ASL retry/catch</span>
         <span class="chip">retry</span>
         <span class="chip">circuit breakers</span>
         <span class="chip">timeouts</span>
@@ -278,6 +279,12 @@
 
   <p>Tools 1–3 make each layer's failure handling consistent and observable. Tool 4 is where the machinery actually lives: six orchestrator node Lambdas (ingest/validate, Kraljic classify, strategy execute, bid evaluation, approval gate, award comms) run a procurement negotiation through a Step Functions state machine, and the <code>resilience</code> package is where the real retry-and-recover work happens — retries, circuit breakers, idempotency, a dead-letter queue, fallback classification, saga compensation, and state recovery.</p>
 
+  <h3>A safety net below the code: ASL retry and catch</h3>
+
+  <p>Before any of that application code runs, the state machine itself has a retry layer — declared once in Terraform and attached to every node's Task state. Each one carries a <code>Retry</code> block (the standard Lambda service-fault and timeout error types — 3 attempts, 2s interval, 2x backoff) and a <code>Catch</code> on <code>States.ALL</code> routing to a <code>Failed</code> state. This catches a different class of failure than tenacity does: a node Lambda that never started, a transient AWS Lambda service fault, an invocation that hangs past its own hard timeout — failures at the invocation boundary, outside the node's own code, before the <code>resilience</code> package ever gets a chance to run.</p>
+
+  <p>One node carries a deliberate exception to the shared block. The human-in-the-loop approval step excludes timeouts from its retry set, because retrying it means re-invoking the step — which resets its start timestamp and installs a fresh task token, silently re-arming the 96-hour approval clock on every retry. Instead, a timeout on that state routes straight to a dedicated timed-out outcome — a valid outcome, not a failure — and the scheduled sweep performs the REQUIRES_ATTENTION routing on its next 30-minute tick. Same principle as everywhere else in this post: the generic retry policy is the default, and an exception to it is scoped narrowly and left as a comment explaining exactly which incident it prevents, not silently special-cased.</p>
+
   <h3>A chokepoint you can't opt out of</h3>
 
   <p><code>invoke_agent_runtime</code> is the single function every agent call in the orchestrator goes through. It composes the retry decorator, the per-agent circuit breaker, and an explicit timeout in one place — and it's also the instrumentation point: token ceilings (200K/100K), a hook-rejection-loop guard (five consecutive rejections and it stops), and the cost/health metrics (<code>cost.usd</code>, <code>cost.unpriced_model_invocation</code>, <code>agentcore.invocation_success</code> 0-or-1, and <code>agentcore.session_seconds</code> in a <code>finally</code>). One chokepoint means no agent call can skip the resilience stack by forgetting to wire it in.</p>
@@ -386,8 +393,8 @@
         </tr>
         <tr>
           <td>Orchestrator-resilience</td>
-          <td>Retry, circuit breakers, idempotency, outbox, DLQ, fallback, compensation, recovery</td>
-          <td>Retries, then recovers forward from a checkpoint or backward via saga — or escalates with a full context record</td>
+          <td>ASL retry/catch on every Task state, tenacity retry, circuit breakers, idempotency, outbox, DLQ, fallback, compensation, recovery</td>
+          <td>Retries at the state-machine level first, then the application level; recovers forward from a checkpoint or backward via saga — or escalates with a full context record</td>
         </tr>
         <tr>
           <td>AWS metrics &amp; alarms</td>

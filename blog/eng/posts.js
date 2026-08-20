@@ -44,7 +44,7 @@ window.engPosts = [
     "description": "Buyer Team handles failure in exactly five places: the agent microkernel, a shared Lambda layer, a shared MCP base, the orchestrator resilience layer, and the AWS alarms. A mechanism-by-mechanism tour — and the silent failures that proved each tool necessary.",
     "tags": ["Reliability", "Architecture"],
     "date": "2026-08-19",
-    "readingTime": 21
+    "readingTime": 22
   },
   {
     "slug": "cost-architecture",
