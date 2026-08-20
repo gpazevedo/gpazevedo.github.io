@@ -6,7 +6,90 @@
   <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
   <language>en-us</language>
-  <lastBuildDate>Wed, 12 Aug 2026 00:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Wed, 19 Aug 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>No users table: the OAuth 2.0 resource server pattern, adapted</title>
+      <link>https://gpazevedo.github.io/blog/eng/oauth-resource-server-pattern.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/oauth-resource-server-pattern.html</guid>
+      <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
+      <description>How a multi-agent AI procurement system became an OAuth 2.0 resource server — Cognito as OIDC relying party and federation hub, two principal types, two authorisation planes, and the architectural trade-offs along the way.</description>
+      <category>OAuth</category>
+      <category>Identity</category>
+      <category>Multi-tenancy</category>
+    </item>
+    <item>
+      <title>Shipping Agents Safely: deployment, rollout, and rollback</title>
+      <link>https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html</guid>
+      <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
+      <description>How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback.</description>
+      <category>Deployment</category>
+      <category>GitOps</category>
+    </item>
+    <item>
+      <title>Not a Testing Problem: how a multi-agent system evaluates itself in production</title>
+      <link>https://gpazevedo.github.io/blog/eng/evaluation.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/evaluation.html</guid>
+      <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
+      <description>The evaluation architecture behind an autonomous multi-agent procurement system: three evaluator types, a 25-point quality composite, risk-tiered sampling, and alarms wired to five automated remediations — plus the gaps still open.</description>
+      <category>Evaluation</category>
+      <category>Quality</category>
+    </item>
+    <item>
+      <title>Security Without Trust: defending an autonomous negotiation agent</title>
+      <link>https://gpazevedo.github.io/blog/eng/security-without-trust.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/security-without-trust.html</guid>
+      <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Six independent layers of deterministic, infrastructure-level control around an autonomous procurement agent — and an honest audit of which ones are as strong as they sound.</description>
+      <category>Security</category>
+      <category>MITRE ATLAS</category>
+      <category>Architecture</category>
+    </item>
+    <item>
+      <title>Five tools, no silent failures: where Buyer Team handles failure</title>
+      <link>https://gpazevedo.github.io/blog/eng/no-silent-failures.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/no-silent-failures.html</guid>
+      <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Buyer Team handles failure in exactly five places: the agent microkernel, a shared Lambda layer, a shared MCP base, the orchestrator resilience layer, and the AWS alarms. A mechanism-by-mechanism tour — and the silent failures that proved each tool necessary.</description>
+      <category>Reliability</category>
+      <category>Architecture</category>
+    </item>
+    <item>
+      <title>The cost architecture of an autonomous procurement agent</title>
+      <link>https://gpazevedo.github.io/blog/eng/cost-architecture.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/cost-architecture.html</guid>
+      <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
+      <description>How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured.</description>
+      <category>Cost Architecture</category>
+      <category>FinOps</category>
+    </item>
+    <item>
+      <title>One microkernel, six plug-ins: the patterns behind Buyer Team</title>
+      <link>https://gpazevedo.github.io/blog/eng/architecture-and-design-patterns.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/architecture-and-design-patterns.html</guid>
+      <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
+      <description>A named-patterns tour of the Buyer Team agent runtime: a microkernel core with per-agent plug-ins, held together by Factory Method, two-phase Builder, Strategy, load shedding, and graceful drain — and an honest split between the guarantees the code enforces and the ones a CI test stands in for.</description>
+      <category>Architecture</category>
+      <category>Design Patterns</category>
+    </item>
+    <item>
+      <title>When the agent is the attack vector: extending tenant isolation beyond partition keys</title>
+      <link>https://gpazevedo.github.io/blog/eng/tenant-isolation-agent-attack-vector.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/tenant-isolation-agent-attack-vector.html</guid>
+      <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
+      <description>How Buyer Team extended multi-tenant isolation when prompt injection became an active threat — JWT claim normalisation, a Gateway request interceptor, per-request ABAC, and a SQL rewriter that doesn't trust the agent.</description>
+      <category>Security</category>
+      <category>Multi-tenancy</category>
+    </item>
+    <item>
+      <title>Observing the Unobservable: how a multi-agent system watches itself think</title>
+      <link>https://gpazevedo.github.io/blog/eng/observability.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/observability.html</guid>
+      <pubDate>Wed, 19 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Agentic systems fail silently — they don't crash, they drift. The four-layer metric model, distributed tracing, three evaluator types, and alarm-to-action loop built to catch quality degradation before it costs a contract.</description>
+      <category>Observability</category>
+      <category>Evaluation</category>
+    </item>
     <item>
       <title>scalable-mcp: a reusable base for MCP servers and clients, grown out of ATLAS Counsel</title>
       <link>https://gpazevedo.github.io/blog/eng/scalable-mcp.html</link>

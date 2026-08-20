@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Not a Testing Problem — Gustavo Azevedo</title>
+<meta name="description" content="The evaluation architecture behind an autonomous multi-agent procurement system: three evaluator types, a 25-point quality composite, risk-tiered sampling, and alarms wired to five automated remediations — plus the gaps still open."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/evaluation.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/evaluation.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Not a Testing Problem: how a multi-agent system evaluates itself in production"/>
+<meta property="og:description" content="The evaluation architecture behind an autonomous multi-agent procurement system: three evaluator types, a 25-point quality composite, risk-tiered sampling, and alarms wired to five automated remediations — plus the gaps still open."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-05-23T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Evaluation"/>
+<meta property="article:tag" content="Quality"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Not a Testing Problem: how a multi-agent system evaluates itself in production"/>
+<meta name="twitter:description" content="The evaluation architecture behind an autonomous multi-agent procurement system: three evaluator types, a 25-point quality composite, risk-tiered sampling, and alarms wired to five automated remediations — plus the gaps still open."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Not a Testing Problem: how a multi-agent system evaluates itself in production","description":"The evaluation architecture behind an autonomous multi-agent procurement system: three evaluator types, a 25-point quality composite, risk-tiered sampling, and alarms wired to five automated remediations — plus the gaps still open.","datePublished":"2026-05-23","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/evaluation.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/evaluation.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Not a Testing Problem","item":"https://gpazevedo.github.io/blog/eng/evaluation.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Evaluation</span>
+  </div>
+
+  <!-- ── EYEBROW ── -->
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Evaluation</span>
+    <span class="dot">·</span>
+    <time datetime="2026-05-23">May 2026</time>
+    <span class="dot">·</span>
+    <span>15 min read</span>
+  </div>
+
+  <!-- ── TITLE ── -->
+  <h1>Not a <em>Testing</em> Problem:<br>how a multi-agent system evaluates itself in production</h1>
+  <p class="deck">Evaluating an autonomous procurement system isn't a testing problem — it's an architecture problem. Here's how three evaluator types, a 25-point quality composite, and five automated remediations got built into a multi-agent system's production fabric from day one — and what's still just scaffolding.</p>
+
+  <hr>
+
+  <!-- ── INTRO ── -->
+  <p>Procurement is a domain of consequences. An agent that misclassifies an item sends it down the wrong negotiation strategy. An agent that produces a vague bid rationale creates legal exposure. An agent that breaks confidentiality by revealing a competitor's price can unravel supplier relationships in hours.</p>
+
+  <p>When you automate 80% of an organization's purchasing volume at machine speed, the cost of silent quality drift is not academic. Buyer Team — a multi-agent system that autonomously negotiates purchase orders from requisition to award — forced us to confront this early: traditional testing is necessary but not sufficient for agentic systems.</p>
+
+  <blockquote>
+    <p>"The right mental model isn't 'how do we test this agent?' It's 'how do we continuously know the state of our agent's quality, in production, at all times?'"</p>
+  </blockquote>
+
+  <p>This post walks through the evaluation architecture we built, the decisions behind it, and the trade-offs we consciously accepted. Observability tells you <em>what happened</em>. Evaluation tells you <em>how well</em>. This post is about the second half.</p>
+
+  <hr>
+
+  <!-- ── SECTION 1 ── -->
+  <h2>The core problem: why agents are different to evaluate</h2>
+
+  <p>Before designing anything, we mapped the failure modes that make agentic systems hard to evaluate. There are four.</p>
+
+  <p><strong>Non-determinism.</strong> The same input doesn't produce the same output. A traditional function is easy to regression-test; an LLM agent requires statistical evaluation over distributions. Binary pass/fail harnesses generate false negatives constantly unless they're written to tolerate variance — which defeats the purpose of a tight gate.</p>
+
+  <p><strong>Multi-hop opacity.</strong> A Bid Evaluation agent might rank Supplier A over Supplier B correctly, but for the wrong reasons. The answer passes; the reasoning is brittle. You won't catch this until the third similar scenario where the reasoning pattern breaks.</p>
+
+  <p><strong>Cost opacity.</strong> Every agent invocation burns tokens. A single buggy retry loop can silently multiply the cost per negotiation before anyone notices. Token usage isn't a test concern — it's an operational reality that needs the same continuous monitoring as error rates.</p>
+
+  <p><strong>Silent quality drift.</strong> The model doesn't know it's getting worse. Evaluation scores degrade gradually, and a slow slide in a quality score doesn't trigger any infrastructure alarm on its own — only a purpose-built quality alarm does.</p>
+
+  <hr>
+
+  <!-- ── SECTION 2 ── -->
+  <h2>Three evaluator types, zero guessing</h2>
+
+  <p>The most important early decision was to stop thinking of evaluation as a single thing and decompose it into three types, each optimized for a different class of question.</p>
+
+  <div class="eval-grid">
+    <div class="eval-card">
+      <div class="ec-label">Type A</div>
+      <div class="ec-name">LLM-as-Judge</div>
+      <span class="ec-badge badge-llm">qualitative</span>
+      <div class="ec-desc">Used for Communication Tone, the Negotiation Quality Composite, and Rationale Defensibility — the last of these twice: once as an equally-weighted slice of the composite, and again through a dedicated three-axis rubric that gates auto-award on its own. Every judge call, from PR checks through production, runs on the same model — one calibration surface to maintain, not two.</div>
+    </div>
+    <div class="eval-card">
+      <div class="ec-label">Type B</div>
+      <div class="ec-name">Ground Truth</div>
+      <span class="ec-badge badge-ground">deterministic</span>
+      <div class="ec-desc">Kraljic classification is graded at three tiers of the same metric: a 1.0 rule-floor on synthetic fixtures (offline, every PR), a 0.80 floor on a live name-only agent call (every PR), and a 0.90 floor on a live full-axes run (daily, feeding the production alarm). Bid ranking is graded by mean Spearman rho ≥ 0.90 across a golden dataset, plus zero top-1 mismatches on close calls.</div>
+    </div>
+    <div class="eval-card">
+      <div class="ec-label">Type C</div>
+      <div class="ec-name">Code-based (Lambda)</div>
+      <span class="ec-badge badge-code">structural</span>
+      <div class="ec-desc">Bid Format Compliance and Governance Policy Compliance run as deterministic Lambda checks before any LLM judge sees the output. Scores are binary: 1.0 or 0.0. Either one firing triggers the same halt-negotiations remediation — there's no partial credit and no separate code path to keep in sync.</div>
+    </div>
+  </div>
+
+  <h3>LLM-as-Judge: outsourcing qualitative judgment</h3>
+
+  <p>Some questions cannot be answered deterministically. "Is this supplier communication appropriately professional and relationship-preserving?" has no regex. "Is this bid rationale logically sound and evidence-based?" has no lookup table. For these, we use a judge model — a separate LLM invocation that scores the output against a rubric.</p>
+
+  <p>The variance issue deserves emphasis. An LLM judge is itself a probabilistic system — calibrating it is as important as calibrating the agent it evaluates. That's why judge consistency and judge-vs-human calibration are checked on a recurring cadence rather than assumed once and forgotten, and why every eval surface, from the PR gate to production, is pinned to the same model. Two models to keep in sync would mean two calibration problems.</p>
+
+  <h3>Ground truth: the anchor for objective accuracy</h3>
+
+  <p>Where objective labels exist, we use them. The domain provides two natural ground truth datasets: a Kraljic Strategy Dataset with labeled item classifications, and a golden bid-ranking dataset with known rankings from historical negotiations.</p>
+
+  <p>Kraljic accuracy isn't gated by a single number — it's gated at three tiers, each cheaper and looser the earlier it runs. A synthetic-fixture rule baseline must hit 1.0 offline on every PR — no network call, no excuse. A live name-only classification call must clear 0.80 on every PR — a floor set just under the measured baseline, so it catches regressions without being a coin-flip gate. A live full-axes run must clear 0.90 daily, and that number is the one that feeds the production alarm. Getting the quadrant wrong is a category-level error — it decides which negotiation strategy runs at all, not just how one negotiation is scored — which is why it gets the tightest, most frequently re-checked floor of any ground-truth metric in the system.</p>
+
+  <h3>Code-based evaluators: the zeroth gate</h3>
+
+  <p>Before any LLM judge touches an output, Lambda-based deterministic checks run against it. Bid Format Compliance validates JSON schema, required fields, and format constraints. Governance Policy Compliance checks budget ceiling, approved supplier list, ESG minimum score, and confidentiality rules. Both are binary: 1.0 or halt. There is no partial credit for governance violations, and no partial credit for malformed bids. These are the fastest, cheapest, most reliable layer — which is why they run first, and why the same remediation Lambda listens for either one.</p>
+
+  <hr>
+
+  <!-- ── SECTION 3 ── -->
+  <h2>The communication tone sampling problem</h2>
+
+  <p>Communication Tone is the most expensive evaluator to run at scale — it fires per supplier message, not per negotiation. Running an LLM judge on every message in a busy multi-supplier auction adds up quickly.</p>
+
+  <p>The solution is a tiered sampling strategy driven by risk, not randomness — scoped specifically to award and rejection notifications, the two message types where a wrong tone or a leaked price carries the most consequence.</p>
+
+  <div class="sampling-tiers">
+    <div class="tier tier-always">
+      <div class="tier-badge">100%</div>
+      <div class="tier-text"><strong>Always:</strong> Award notifications. Legally binding — no threshold applies, no sampling.</div>
+    </div>
+    <div class="tier tier-threshold">
+      <div class="tier-badge">100%</div>
+      <div class="tier-text"><strong>Value threshold:</strong> Rejection notifications where the awarded price meets or exceeds a configurable USD threshold (default $50,000). High-value negotiations warrant full scrutiny on the rejection side too.</div>
+    </div>
+    <div class="tier tier-sampled">
+      <div class="tier-badge">10%</div>
+      <div class="tier-text"><strong>Sampled:</strong> Rejection notifications below the value threshold. Sampling is deterministic — a SHA-256 hash of the communication id decides inclusion, not <code>random()</code> — so a retried Step Functions execution samples the same message the same way every time. Both the threshold and the rate are per-tenant DynamoDB overrides, resolved through the same governance-config lookup as every other threshold in the system.</div>
+    </div>
+  </div>
+
+  <p><strong>Trade-off accepted:</strong> below-threshold rejection notifications go tone-scored only 10% of the time. That's mitigated by a separate, unconditional mechanism: a <code>WinnerDisclosureGuard</code> hook inspects <em>every</em> rejection message for winner-price leakage, regardless of whether that message happened to be sampled for tone scoring. Confidentiality enforcement doesn't depend on the sampling rate at all — only the softer, qualitative tone score does.</p>
+
+  <hr>
+
+  <!-- ── SECTION 4 ── -->
+  <h2>The quality composite: a 25-point rubric</h2>
+
+  <p>The most important evaluation metric is the Negotiation Quality Composite — six components, each scored 0.0–1.0 by the judge, weighted equally, then averaged and scaled to a 25-point maximum. This is the single number that determines whether an automated model rollback fires.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Weight</th>
+          <th>Max points (of 25)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Ranking Accuracy</td><td>16.7%</td><td>4.17</td></tr>
+        <tr><td>Rationale Defensibility</td><td>16.7%</td><td>4.17</td></tr>
+        <tr><td>Risk Detection Accuracy</td><td>16.7%</td><td>4.17</td></tr>
+        <tr><td>Scoring Consistency</td><td>16.7%</td><td>4.17</td></tr>
+        <tr><td>Completeness</td><td>16.7%</td><td>4.17</td></tr>
+        <tr><td>Savings Calculation</td><td>16.7%</td><td>4.17</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>There's no individually-gated sub-threshold per component today — only the blended average is enforced. The production alarm reads the score normalized back to a 0–1 scale (composite ÷ 25) and compares it against 0.60 — equivalent to a 15-out-of-25 floor — which automatically rolls the deployed model tier back to its previous configuration. Equal weighting is the simpler default to build and reason about; it doesn't yet reflect that a wrong ranking should probably cost more than an incomplete field (more on that in "What we'd do differently").</p>
+
+  <p>Rationale Defensibility carries more real weight than its equal composite share suggests, because it's also scored independently — a dedicated three-axis rubric (logical soundness, evidence grounding, defensibility under challenge) — and that standalone score, not the composite slice, is what a separate production alarm at 0.70 watches to block auto-award. The composite catches slow drift across a whole negotiation; the standalone gate catches one indefensible rationale before it reaches a supplier. Two evaluators looking at the same concern from different angles, not duplicated effort.</p>
+
+  <hr>
+
+  <!-- ── SECTION 5 ── -->
+  <h2>Evaluation thresholds as configuration, not constants</h2>
+
+  <p>Hardcoding evaluation thresholds into agent code was one of the architectural decisions we explicitly rejected. A threshold appropriate for a $500 tail-spend item is not the same threshold appropriate for a $5M strategic contract. And a threshold appropriate in month one may not be right in month six when the agents have demonstrated reliability.</p>
+
+  <p>Every governance and evaluation threshold resolves through a two-stage DynamoDB lookup, run fresh on every node invocation — no cache, no TTL, no propagation delay to reason about:</p>
+
+  <pre><code># Two-stage resolution, re-run on every Step Functions node invocation
+cfg = load_config("governance", "default")                   # 1. platform profile
+override = load_config("governance", f"tenant#{tenant_id}")  # 2. tenant override
+if override:
+    cfg = {**cfg, **override}   # shallow merge: override replaces matching top-level keys
+
+# Table: {env}-system-config, keys (config_group, config_key)
+# Payload is a JSON blob run through config_schema.migrate() on read</code></pre>
+
+  <p>Because the merge is shallow, a tenant override of a block like <code>approval_thresholds</code> replaces that whole block rather than deep-merging individual keys inside it — a deliberate simplicity trade-off that keeps override semantics easy to audit, at the cost of requiring a full block on write. And because there's no cache layer, a tenant override takes effect on the very next node execution, not on any polling interval.</p>
+
+  <p>One flag breaks this pattern on purpose: <code>auto_award_blocked</code>, the kill-switch a Rationale Defensibility alarm flips, is cached for 30 seconds rather than read fresh every time. It sits on the hottest path in the system — every approval-gate invocation checks it — so a small, deliberate staleness window trades a sliver of responsiveness for meaningfully less DynamoDB read load. Everywhere else, staleness is worse than an extra read.</p>
+
+  <hr>
+
+  <!-- ── SECTION 6 ── -->
+  <h2>Alarms that actually do something</h2>
+
+  <p>Most observability implementations stop at "alert the on-call." We went further: several alarms trigger automated remediation Lambdas without human intervention.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Alarm</th>
+          <th>Threshold</th>
+          <th>Automated action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="row-quality">
+          <td>Negotiation Quality Drop</td>
+          <td><code>score &lt; 0.60</code></td>
+          <td><span class="pill pill-rollback">roll model tier back</span></td>
+        </tr>
+        <tr>
+          <td>Communication Tone Drop</td>
+          <td><code>tone &lt; 0.80</code></td>
+          <td><span class="pill pill-disable">disable auto-send</span></td>
+        </tr>
+        <tr>
+          <td>Rationale Defensibility Drop</td>
+          <td><code>score &lt; 0.70</code></td>
+          <td><span class="pill pill-disable">block auto-award</span></td>
+        </tr>
+        <tr class="row-gov">
+          <td>Bid Format Non-compliance</td>
+          <td><code>score &lt; 1.0</code></td>
+          <td><span class="pill pill-halt">halt negotiations</span></td>
+        </tr>
+        <tr class="row-gov">
+          <td>Governance Policy Non-compliance</td>
+          <td><code>score &lt; 1.0</code></td>
+          <td><span class="pill pill-halt">halt negotiations</span></td>
+        </tr>
+        <tr>
+          <td>Kraljic Accuracy Drop</td>
+          <td><code>accuracy &lt; 0.90</code></td>
+          <td><span class="pill pill-sns">invalidate cache + alert</span></td>
+        </tr>
+        <tr>
+          <td>Governance Violation (any type)</td>
+          <td><code>count ≥ 1</code></td>
+          <td><span class="pill pill-sns">compliance SNS</span></td>
+        </tr>
+        <tr>
+          <td>Confidentiality Violation</td>
+          <td><code>count ≥ 1</code></td>
+          <td><span class="pill pill-sns">critical SNS</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The automated actions are tiered by severity, and by how much we trust the signal to be a true positive. The two score-based compliance checks — Bid Format and Governance Policy, both binary, both structural — are trusted enough to halt new negotiations automatically the moment either one fires. The count-based violation alarms, which aggregate across looser violation categories, route to compliance and critical SNS topics for human escalation instead of an automatic halt: a broader net is more useful for alerting a person than for deciding, unattended, to stop the system. Quality-drop alarms sit in between — they disable a specific capability (auto-send, auto-award, or the deployed model tier) rather than halting outright, so the agent keeps working while a human reviews the affected surface.</p>
+
+  <p>Disabling auto-send when Communication Tone drops is the clearest example of graceful degradation over hard failure. Supplier communications route to a human review queue; the negotiation continues; the messages wait for approval before transmission. Five separate remediation Lambdas exist for these actions, each subscribed to the same evaluation-alerts SNS topic and self-filtering on the alarm name it cares about — this is only possible because the evaluation layer is tightly integrated with the agent's execution path, not bolted on after the fact.</p>
+
+  <hr>
+
+  <!-- ── SECTION 7 ── -->
+  <h2>The CI/CD pipeline: evaluation at every gate</h2>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">PR</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">pr-checks.yml — offline evals + live smoke checks</div>
+        <div class="pipe-desc">Offline: Kraljic rule-baseline, Bid Format and Governance Policy Compliance, bid-ranking rho, four strategy-quality Lambda evaluators, an auction price-model drift canary. Live: 24 fixed judge-smoke calls, plus a live Kraljic name-only run gated at 0.80. All judges run on the same model as staging and production.</div>
+        <div class="pipe-pass">✓ pass → mergeable</div>
+        <div class="pipe-fail">✗ fail → blocked + eval report in PR comment</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">Daily</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">eval-kraljic-accuracy-daily.yml — 06:00 UTC, live full-axes run</div>
+        <div class="pipe-desc">The full-fidelity Kraljic accuracy number, gated at 0.90, feeds the production Kraljic Accuracy alarm directly.</div>
+        <div class="pipe-pass">✓ above 0.90 → normal operation</div>
+        <div class="pipe-fail">✗ below 0.90 → alarm fires, semantic cache invalidated automatically</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">Weekly</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">staging-eval-suite.yml — Monday, full judge suite</div>
+        <div class="pipe-desc">Negotiation Quality and Communication Tone judges run against the human-calibration panel subset, alongside a judge-consistency check and a human-calibration drift check (blocking if drift exceeds threshold).</div>
+        <div class="pipe-pass">✓ green → healthy calibration signal</div>
+        <div class="pipe-fail">✗ red or suspended calibration → blocks the signal, which is a manual go/no-go input to promotion, not an automatic gate on it</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">Production</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Continuous online evaluation — every trace</div>
+        <div class="pipe-desc">Scores written to CloudWatch. Communication Tone follows the tiered sampling strategy above; every other evaluator runs on every trace. Alarms trigger the automated responses in the table above.</div>
+        <div class="pipe-pass">✓ above thresholds → normal operation</div>
+        <div class="pipe-fail">✗ quality/governance drop → automated response</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Decision: one model everywhere, not two</h3>
+
+  <p>Every judge call — PR smoke test, weekly staging suite, production trace — runs on the same lightweight model. We considered a cheaper model for the PR gate and a stronger one for staging certification, but rejected it: two models means two consistency checks and two calibration curves to keep in sync, for a signal that's only used directionally at the PR stage anyway. One model, checked periodically for judge-vs-human agreement, is a smaller surface to trust.</p>
+
+  <h3>Trade-off: promotion to production is still a human call</h3>
+
+  <p>There is no automated staging-to-production promotion gate today. A failed or suspended weekly staging run is a manual go/no-go signal for whoever dispatches that promotion — not a block enforced by the pipeline itself. That's a real gap relative to the fully automated PR and production layers, and it's an honest one: judge calibration against the human panel isn't yet confident enough, at a wide enough sample, to hand that decision to a script. In the meantime, the production alarms in the table above are the real backstop — they respond to a bad promotion within minutes of it going live, whether or not a human caught it in staging first.</p>
+
+  <hr>
+
+  <!-- ── SECTION 8 ── -->
+  <h2>Degrading under memory failure</h2>
+
+  <p>AgentCore Memory is designed to provide cross-negotiation context — supplier performance history, previous award patterns, category expertise. The intended failure mode is a circuit breaker around every call to it (and to the underlying Mem0 store): a call that trips the breaker or fails with a storage-related error should mark the negotiation <code>memory_degraded = true</code> and let execution continue rather than failing the negotiation outright, clearing the flag automatically once a subsequent call succeeds.</p>
+
+  <p>That mechanism exists as a correctly-implemented module — but it has no callers anywhere in the codebase today. The memory path actually running in production is a simpler DynamoDB-backed supplier-memory substitute, and it degrades silently: on a lookup or write failure it falls through without ever touching <code>memory_degraded</code>. So the honest gap isn't "the flag is set but nothing downstream reads it" — no negotiation is ever marked degraded in the first place. The circuit breaker is unwired scaffolding for a fail-open pattern, not a fail-open pattern quietly running in production. We consider that an open gap, not a finished feature, and it's first on our list below.</p>
+
+  <hr>
+
+  <!-- ── SECTION 9 ── -->
+  <h2>Architectural trade-offs: the summary</h2>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">⊕</div>
+        <div class="tcard-title">Three evaluator types, not one</div>
+      </div>
+      <p>LLM-as-Judge, Ground Truth, and Code-based serve different classes of question. Added complexity, but each type is optimized for its domain — no single evaluator could cover qualitative tone and binary governance compliance equally well.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⊕</div>
+        <div class="tcard-title">Risk-tiered evaluation sampling</div>
+      </div>
+      <p>Cuts Communication Tone evaluation cost on routine rejection traffic. Accepted risk: below-threshold rejections go tone-scored only 10% of the time. Mitigated by unconditional confidentiality checking (<code>WinnerDisclosureGuard</code>) that never samples — it runs on every rejection regardless of the tone-scoring rate.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">⊕</div>
+        <div class="tcard-title">Thresholds as always-fresh configuration</div>
+      </div>
+      <p>A two-stage, uncached DynamoDB lookup means tenant overrides take effect on the very next invocation. The risk is override misuse — a tenant can currently set any threshold, including governance ones, below the platform's intended minimum, because the merge has no server-side floor. Still open (see below).</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-blue">⊕</div>
+        <div class="tcard-title">Automated remediation where the signal is trustworthy</div>
+      </div>
+      <p>Binary, structural alarms (format, governance-policy compliance) halt automatically; count-based violation alarms escalate to humans instead; quality-drop alarms disable one capability rather than the whole system. Calibrating which alarms deserve which tier of trust is itself an ongoing design decision, not a one-time choice.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ── SECTION 10 ── -->
+  <h2>What we'd do differently</h2>
+
+  <p><strong>Start with the golden datasets earlier.</strong> The Kraljic ground truth dataset and the bid-ranking golden set were constructed alongside the agents. Ground truth should exist before the first agent line is written — it defines what "correct" means before you have anything to evaluate.</p>
+
+  <p><strong>Move the composite from equal weighting to priority weighting.</strong> All six Negotiation Quality Composite components currently count the same. A wrong ranking or an indefensible rationale should probably move the score more than an incomplete field does — that's a judgment call we haven't encoded yet, and the equal-weight default is a placeholder more than a decision.</p>
+
+  <p><strong>Wire up memory degradation before instrumenting it.</strong> The circuit breaker and <code>memory_degraded</code> field exist as isolated, correctly-built code with zero callers — the DynamoDB-backed memory substitute that actually runs in production degrades silently and never sets the flag. A metric or a post-completion review queue is the second step; the first is connecting the breaker to the real memory call path so a degraded negotiation gets marked at all.</p>
+
+  <p><strong>Add a governance floor on per-tenant threshold overrides.</strong> The two-stage config merge is a plain shallow overlay with no server-side ceiling or floor. A tenant who sets <code>negotiation_quality_composite_minimum</code> — or any other governance threshold — below the platform's intended minimum can currently do so unopposed. Clamping the resolved value against a non-overridable platform floor, in the same resolution path, would close this without adding a second system to keep in sync.</p>
+
+  <hr>
+
+  <!-- ── CLOSING ── -->
+  <h2>The broader lesson</h2>
+
+  <p>The investment in evaluation is proportional to the autonomy of the system. A traditional CRUD application fails loudly and recovers quickly — you can afford to evaluate it lightly. An autonomous negotiation agent that makes decisions on behalf of an organization, communicates directly with external suppliers, and recommends contract awards needs to be evaluated at every layer, continuously, and capable of constraining itself before a human notices the problem.</p>
+
+  <p>Evaluation in agentic systems is not a QA activity. It is an architectural layer — with its own data infrastructure, its own alarm topology, and its own automated response behaviors. Building it that way from the beginning is what makes it safe to trust the autonomy — and being honest about which parts of that layer are still manual is part of the same discipline.</p>
+
+  <!-- ── FOOTER ── -->
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="observability.html" class="related-post-card">
+        <div class="rpc-tag">Observability</div>
+        <div class="rpc-title">Observing the Unobservable: how a multi-agent system watches itself think</div>
+      </a>
+      <a href="dag-vs-llm-planner.html" class="related-post-card">
+        <div class="rpc-tag">Architecture</div>
+        <div class="rpc-title">Why we chose a deterministic DAG over a pure LLM planner</div>
+      </a>
+      <a href="security-without-trust.html" class="related-post-card">
+        <div class="rpc-tag">Security</div>
+        <div class="rpc-title">Security Without Trust: defending an autonomous negotiation agent</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; May 2026</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> &mdash; an autonomous multi-agent procurement negotiation system. Based on its PRD-001 (System Overview &amp; Domain Model) and PRD-004 (Observability &amp; Evaluations) &middot; updated 2026-08-19.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

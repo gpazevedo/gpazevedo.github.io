@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Observing the Unobservable — Gustavo Azevedo</title>
+<meta name="description" content="The observability and evaluation architecture behind an autonomous multi-agent procurement system: a four-layer metric model, distributed tracing across agents, three evaluator types, and alarms that now fire automated responses."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/observability.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/observability.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Observing the Unobservable: how a multi-agent system watches itself think"/>
+<meta property="og:description" content="The observability and evaluation architecture behind an autonomous multi-agent procurement system: a four-layer metric model, distributed tracing across agents, three evaluator types, and alarms that now fire automated responses."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-05-16T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Observability"/>
+<meta property="article:tag" content="Evaluation"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Observing the Unobservable: how a multi-agent system watches itself think"/>
+<meta name="twitter:description" content="The observability and evaluation architecture behind an autonomous multi-agent procurement system: a four-layer metric model, distributed tracing across agents, three evaluator types, and alarms that now fire automated responses."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Observing the Unobservable: how a multi-agent system watches itself think","description":"The observability and evaluation architecture behind an autonomous multi-agent procurement system: a four-layer metric model, distributed tracing across agents, three evaluator types, and alarms that now fire automated responses.","datePublished":"2026-05-16","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/observability.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/observability.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Observing the Unobservable","item":"https://gpazevedo.github.io/blog/eng/observability.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Observability</span>
+  </div>
+
+  <!-- ── EYEBROW ── -->
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Observability</span>
+    <span class="dot">·</span>
+    <time datetime="2026-05-16">May 2026</time>
+    <span class="dot">·</span>
+    <span>19 min read</span>
+  </div>
+
+  <!-- ── TITLE ── -->
+  <h1>Observing the <em>Unobservable</em>:<br>how a multi-agent system watches itself think</h1>
+  <p class="deck">Agentic systems fail silently. They don't crash — they drift. Here's the architecture we built to catch quality degradation in a multi-agent procurement system before it costs anyone a contract.</p>
+
+  <hr>
+
+  <!-- ── INTRO ── -->
+  <p>Traditional software fails loudly. A service throws a 500, the latency alarm fires, the on-call engineer wakes up. Agentic systems have a much more sinister failure mode: they keep running, returning HTTP 200s, spending tokens — and producing subtly wrong outputs that no dashboard catches until a procurement decision is already made.</p>
+
+  <p>Buyer Team is a multi-agent AI system that automates procurement negotiation end-to-end: classifying purchase requisitions, selecting bid strategies, communicating autonomously with suppliers, and recommending contract awards. The agents run on AWS Bedrock AgentCore and the Strands Agents SDK. When something goes wrong here, it isn't a null pointer exception — it's a negotiation that saves 4% instead of 12%, or a supplier rejection notification that inadvertently reveals who won the auction.</p>
+
+  <p>This post walks through the observability architecture we designed to catch those failures, and the trade-offs behind every major decision.</p>
+
+  <hr>
+
+  <!-- ── SECTION 1 ── -->
+  <h2>The core problem: four failure modes unique to agents</h2>
+
+  <p>Before designing anything, we mapped the failure modes that make agentic systems hard to observe. There are four.</p>
+
+  <p><strong>Non-determinism.</strong> The same input doesn't produce the same output. A traditional function is easy to regression-test; an LLM agent requires statistical evaluation over distributions.</p>
+
+  <p><strong>Multi-hop reasoning opacity.</strong> A negotiation spans dozens of tool calls across six specialized agents. The final output is only as good as the weakest reasoning step in the chain — and the weakest step is invisible unless every hop is traced.</p>
+
+  <p><strong>Cost opacity.</strong> Every agent invocation burns tokens. A single buggy retry loop in one agent can silently 3× the cost per negotiation before anyone notices.</p>
+
+  <p><strong>Silent quality drift.</strong> The model doesn't know it's getting worse. Evaluation scores degrade gradually — a Communication Tone score drifting from 0.95 to 0.79 over two weeks doesn't trigger any infrastructure alarm on its own.</p>
+
+  <blockquote>
+    <p>"The agents keep running, returning 200s, spending tokens — and producing subtly wrong outputs that no dashboard catches until a procurement decision is already made."</p>
+  </blockquote>
+
+  <p>Our architecture addresses all four with a four-layer observability model layered on top of continuous automated evaluation. The two concerns are deliberately separated: observability tells you <em>what happened</em>; evaluations tell you <em>how well</em>.</p>
+
+  <hr>
+
+  <!-- ── SECTION 2 ── -->
+  <h2>The four-layer observability model</h2>
+
+  <p>Each layer has a different granularity, owner, and instrumentation cost. Together they create complete coverage from raw infrastructure to business outcome to dollar cost.</p>
+
+  <div class="layer-stack">
+    <div class="layer l1">
+      <div class="layer-meta">
+        <span class="layer-num">Layer 1</span>
+        <span class="layer-name">Platform</span>
+        <span class="layer-src">AgentCore → CloudWatch</span>
+      </div>
+      <div class="chips">
+        <span class="chip">session count</span>
+        <span class="chip">latency p50/p90/p99</span>
+        <span class="chip">error rate</span>
+        <span class="chip">throttle count</span>
+        <span class="chip">token usage</span>
+        <span class="chip">tool call errors</span>
+        <span class="chip">memory retrieval latency</span>
+      </div>
+    </div>
+    <div class="layer l2">
+      <div class="layer-meta">
+        <span class="layer-num">Layer 2</span>
+        <span class="layer-name">Application</span>
+        <span class="layer-src">ADOT + custom spans → X-Ray</span>
+      </div>
+      <div class="chips">
+        <span class="chip">procurement.negotiation_id</span>
+        <span class="chip">procurement.tenant_id</span>
+        <span class="chip">procurement.strategy</span>
+        <span class="chip">procurement.agent.model_id</span>
+        <span class="chip">config.source</span>
+        <span class="chip">security.guardrail.triggered</span>
+        <span class="chip">W3C traceparent A2A</span>
+      </div>
+    </div>
+    <div class="layer l3">
+      <div class="layer-meta">
+        <span class="layer-num">Layer 3</span>
+        <span class="layer-name">Domain</span>
+        <span class="layer-src">OTEL metrics → CloudWatch EMF</span>
+      </div>
+      <div class="chips">
+        <span class="chip">negotiation.savings_pct</span>
+        <span class="chip">bid.response_rate</span>
+        <span class="chip">governance.compliance_rate</span>
+        <span class="chip">kpi.cycle_time_days</span>
+        <span class="chip">approval.wait_time</span>
+        <span class="chip">bid.count_per_negotiation</span>
+      </div>
+    </div>
+    <div class="layer l4">
+      <div class="layer-meta">
+        <span class="layer-num">Layer 4</span>
+        <span class="layer-name">FinOps</span>
+        <span class="layer-src">EMF + Cost Explorer → CloudWatch</span>
+      </div>
+      <div class="chips">
+        <span class="chip">tokens.input</span>
+        <span class="chip">tokens.output</span>
+        <span class="chip">cost.usd</span>
+        <span class="chip">negotiation.total_cost_usd</span>
+        <span class="chip">agentcore.session_seconds</span>
+        <span class="chip">cache.hit</span>
+        <span class="chip">aws_cost.usd</span>
+      </div>
+    </div>
+  </div>
+
+  <h3>Trade-off: why not a single observability plane?</h3>
+
+  <p>The obvious simplification would be to emit everything to one system. We rejected this for three reasons. First, Layer 1 is free — AgentCore emits platform metrics with zero instrumentation. Routing those through our OTEL pipeline would add latency and cost for no benefit. Second, the audiences diverge: SRE reads Layer 1 (is the agent up?), engineering reads Layer 2 (what did the agent do?), procurement reads Layer 3 (did the negotiation succeed?), and finance reads Layer 4 (what did it cost?). Separate namespaces (<code>AWS/Bedrock-AgentCore</code>, <code>procurement/business</code>, <code>procurement/kpi</code>, <code>procurement/cost</code>, and — most relevant to the rest of this post — <code>procurement/evaluation</code>, plus narrower ones for resilience, security and observability internals) let each team build dashboards without fighting over metric cardinality. Third, FinOps sits at a different altitude, not just a different namespace: Layers 1–3 are separated by <em>how</em> they're instrumented, but Layer 4 shares Domain's EMF mechanism and is split out on audience and unit economics. The reconciled <code>aws_cost.usd</code> figure Cost Explorer republishes belongs to no other layer.</p>
+
+  <hr>
+
+  <!-- ── SECTION 3 ── -->
+  <h2>Distributed tracing across agents</h2>
+
+  <p>Buyer Team uses a Step Functions orchestrator whose node Lambdas invoke six specialized A2A agents: a Kraljic Classifier routes each category into one of four Kraljic-quadrant strategy agents — Strategic Partnership, Bottleneck Negotiation, Leverage Auction, and Spot Bidding — while an Award Communications agent handles all supplier messaging. A complete negotiation is not a single request — it's a choreography that spans several of them.</p>
+
+  <p>The key architectural decision here is <strong>W3C <code>traceparent</code> propagation across every A2A invocation</strong>. Every agent-to-agent call carries the same root trace context, so the entire negotiation — from purchase requisition intake to award recommendation — appears as a single distributed trace in X-Ray. This is not the default behavior; it requires explicit instrumentation on every tool call boundary.</p>
+
+  <p>Why does this matter? Because the failure we're trying to catch often lives at a boundary. An Award Communications agent that calls a <code>generate_rejection_notification</code> tool and leaks winner information to losing suppliers is invisible in Layer 1 metrics — error rate is zero, latency is fine. What catches it is the <code>WinnerDisclosureGuard</code> steering hook, which runs <em>pre-call</em>: it inspects the tool's render map for any winner-identifying field (<code>winner_name</code>, <code>awarded_price</code>, <code>score</code>, <code>rank</code>, and nine more), and on a hit returns Strands' <code>Guide</code> — cancelling the tool call and feeding the model back exactly which fields to remove, so the leak never reaches a supplier and the model recomposes a winner-free call.</p>
+
+  <p>The observable trace of that block is a metric, not a span event: <code>governance.violation_count</code> in <code>procurement/business</code>, dimensioned <code>violation_type = confidentiality_leak</code>. Two alarms watch that one metric at different severities, which is what makes the guard auditable rather than merely effective.</p>
+
+  <h3>Span attribute design: procurement-native semantics</h3>
+
+  <p>Spans on the orchestrator's node Lambdas carry procurement-native attributes rather than generic HTTP ones — <code>procurement.negotiation_id</code> and <code>procurement.tenant_id</code> on every node, plus <code>procurement.strategy</code> on strategy execution and <code>procurement.agent.model_id</code> on each A2A hop, so a trace answers "which tenant, which negotiation, which quadrant, which model" without a join. Config resolution tags its own span with <code>config.source</code>, which is how a fallback to <code>security_critical_fallback</code> becomes visible instead of silent — the failure mode that bit us before (see the resilience-layer reseed problem) was agents quietly running on defaults.</p>
+
+  <p>The honest limitation: this is a useful set, not a uniform schema. Attribute coverage grew per node as each one needed it, so which attributes you can filter on depends on which span you caught — a real seam we call out again at the end of this post.</p>
+
+  <hr>
+
+  <!-- ── SECTION 4 ── -->
+  <h2>Three evaluator types, zero guessing</h2>
+
+  <p>Observability tells you what happened. Evaluation tells you whether it was any good. We rely on three evaluator types, each chosen for different reasons.</p>
+
+  <div class="eval-grid">
+    <div class="eval-card">
+      <div class="ec-label">Type A</div>
+      <div class="ec-name">LLM-as-Judge</div>
+      <span class="ec-badge badge-llm">qualitative</span>
+      <div class="ec-desc">Three rubrics — Communication Tone, Rationale Defensibility, and the Negotiation Quality Composite — all scoring live production output. Tone reads the persisted supplier communications; the other two score the strategy agents' persisted <code>reasoning</code> text post-award. All three run in Node 7's asynchronous <code>_eval_only</code> self-invoke, deliberately off the synchronous PO-issuance path so a Bedrock judge call can never stall a purchase order. Costs ~$0.004/eval. Reserve for criteria that require reasoning, not parsing.</div>
+    </div>
+    <div class="eval-card">
+      <div class="ec-label">Type B</div>
+      <div class="ec-name">Ground Truth</div>
+      <span class="ec-badge badge-ground">deterministic</span>
+      <div class="ec-desc">Compares Kraljic classification, bid-ranking coverage, and six Lambda-tier evaluators against fixture-based golden datasets. Offline, no AWS calls, sub-second. The CI gate is strict — it asserts 100% pass/fail agreement on every known-good and known-bad fixture row, not a tolerance threshold — and blocks the PR outright on any regression.</div>
+    </div>
+    <div class="eval-card">
+      <div class="ec-label">Type C</div>
+      <div class="ec-name">Code-based (Lambda)</div>
+      <span class="ec-badge badge-code">structural</span>
+      <div class="ec-desc">Deterministic Lambda functions validate bid JSON schema, required fields, and governance policy adherence. Scores are binary: 1.0 or 0.0. Any non-1.0 triggers an immediate alarm — there is no "partial compliance."</div>
+    </div>
+  </div>
+
+  <h3>Trade-off: the communication tone sampling problem</h3>
+
+  <p>Communication Tone is the most expensive evaluator to run at scale — it fires per supplier message, not per negotiation. A busy auction with 12 suppliers generates 12+ messages, each needing evaluation. Running LLM-as-Judge on all of them at $0.004/eval adds up quickly.</p>
+
+  <p>The solution is a tiered sampling strategy driven by risk, not randomness.</p>
+
+  <p><strong>Always 100% — award notifications.</strong> These are legally binding, and there are far fewer of them than rejections (one per negotiation, versus one per losing supplier). Full coverage here is cheap and non-negotiable.</p>
+
+  <p><strong>Value-threshold 100% — rejections above $50,000.</strong> For negotiations at or above a configurable awarded-price threshold (default $50,000), rejection notifications also get full tone coverage. High-value purchases warrant full scrutiny.</p>
+
+  <p><strong>Sampled (10% default) — rejections below the threshold.</strong> Everything else gets a configurable sampling rate. Both the threshold and the rate are read from the governance config's <code>evaluation</code> block with per-tenant DynamoDB overrides, so an enterprise tenant can set their own risk appetite.</p>
+
+  <p>Two details matter more than the tiers. First, sampling is <em>deterministic</em>, not random: the gate is a SHA-256 hash of the communication ID compared against the rate, so a communication's sampling decision cannot flip when Step Functions retries the node — <code>random.random()</code> would have made replay non-reproducible and quietly double-billed the judge. Second, tone sampling is not the confidentiality control, and it would be a mistake to read it as one. Winner-disclosure protection doesn't depend on sampling at all: rejection notifications are template-rendered from a bounded, winner-free field set, and <code>WinnerDisclosureGuard</code> inspects <em>every</em> rejection render pre-call. The 10% tier risks missing a clumsily-worded rejection, not a leaked winner.</p>
+
+  <hr>
+
+  <!-- ── SECTION 5 ── -->
+  <h2>The quality composite: a 25-point rubric</h2>
+
+  <p>The Negotiation Quality Composite is a 25-point score across six equally-weighted components — an LLM judge scores each 0.0–1.0, and the composite is simply the average of the six, scaled to 25.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Component</th>
+          <th>Weight</th>
+          <th>Max points</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Ranking Accuracy</td><td>16.7%</td><td>4.17</td></tr>
+        <tr><td>Rationale Defensibility</td><td>16.7%</td><td>4.17</td></tr>
+        <tr><td>Risk Detection Accuracy</td><td>16.7%</td><td>4.17</td></tr>
+        <tr><td>Scoring Consistency</td><td>16.7%</td><td>4.17</td></tr>
+        <tr><td>Completeness</td><td>16.7%</td><td>4.17</td></tr>
+        <tr><td>Savings Calculation</td><td>16.7%</td><td>4.17</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>We deliberately kept the weighting flat rather than hand-tuning per-component weights up front — we have no data yet that would justify weighting Ranking Accuracy above Savings Calculation. Differentiated weights are a plausible future iteration once we have enough scored transcripts to validate them against real outcomes, not a decision we wanted to make blind.</p>
+
+  <p>What this composite scores is worth being precise about, because it isn't what the rubric was originally written for. Its first call site was the bid-evaluation agent, which we removed. Rather than delete the rubric, we re-pointed it in August 2026 at <code>negotiations.reasoning</code> — the strategy agents' persisted free-text rationale, written at the strategy-execution node and now the only rationale text on a negotiation. The scoring path is live: Node 7's asynchronous eval branch reads that field post-award and emits the composite, normalized to 0–1 by dividing by the 25-point maximum so the alarm threshold keeps its original semantics.</p>
+
+  <p>The honest caveat isn't that it doesn't run — it's that a six-component rubric written to grade a <em>bid evaluation</em> is now grading <em>strategy reasoning</em>. Components like Ranking Accuracy and Savings Calculation fit that text less naturally than Rationale Defensibility does. It's a deliberate re-purposing that keeps the signal alive, and re-validating those six components against what they now actually read is on the list.</p>
+
+  <hr>
+
+  <!-- ── SECTION 6 ── -->
+  <h2>Alarms that actually do something</h2>
+
+  <p>Most observability implementations stop at "alert the on-call." Our design goal was to go further and map every alarm to a defined automated response — model rollback on a quality drop, auto-send disabled on a tone drop, negotiations halted on a governance breach. For most of this system's life that second half was unbuilt, and earlier versions of this post said so. It closed in August 2026: all five automated responses are now live Lambdas subscribed to the evaluation-alerts SNS topic, each verified end-to-end with a synthetic alarm payload.</p>
+
+  <p>The wiring is deliberately blunt. Every alarm in the repo publishes to the same shared topic, so all five remediation Lambdas receive every alarm notification and each one filters to exactly the alarm name it owns, acting only on the <code>ALARM</code> transition. Every action is a single DynamoDB <code>update_item</code> against the governance config — flip <code>auto_send_communications</code> off, set <code>negotiations_halted</code>, bump <code>cache_epoch</code>, swap the model tier map back to its previous snapshot.</p>
+
+  <p>The most important property is what they <em>don't</em> do: none of them re-enable on the <code>OK</code> transition. Recovery is deliberately manual. An alarm that auto-disables and auto-re-enables would flap a production safety control on a metric's noise floor, and the whole point of these actions is to fail toward caution and make a human look.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Alarm</th>
+          <th>Status</th>
+          <th>Threshold</th>
+          <th>Routes to</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="row-quality">
+          <td>Negotiation Quality Drop</td>
+          <td><span class="pill pill-log">live</span></td>
+          <td><code>avg &lt; 0.60</code></td>
+          <td><span class="pill pill-rollback">model rollback</span></td>
+        </tr>
+        <tr>
+          <td>Communication Tone Drop</td>
+          <td><span class="pill pill-log">live</span></td>
+          <td><code>avg &lt; 0.80</code></td>
+          <td><span class="pill pill-disable">disable auto-send</span></td>
+        </tr>
+        <tr>
+          <td>Rationale Defensibility Drop</td>
+          <td><span class="pill pill-log">live</span></td>
+          <td><code>avg &lt; 0.70</code></td>
+          <td><span class="pill pill-block">block auto-award</span></td>
+        </tr>
+        <tr>
+          <td>Kraljic Accuracy Drop</td>
+          <td><span class="pill pill-log">live</span></td>
+          <td><code>min &lt; 0.90</code>, daily</td>
+          <td><span class="pill pill-modify">invalidate cache</span></td>
+        </tr>
+        <tr>
+          <td>Bid Format / Governance Policy Compliance</td>
+          <td><span class="pill pill-log">live</span></td>
+          <td><code>min &lt; 1.0</code></td>
+          <td><span class="pill pill-halt">halt negotiations</span></td>
+        </tr>
+        <tr class="row-gov">
+          <td>Governance Violation (any type)</td>
+          <td><span class="pill pill-log">live</span></td>
+          <td><code>count ≥ 1</code></td>
+          <td><span class="pill pill-sns">warning tier</span></td>
+        </tr>
+        <tr class="row-gov">
+          <td>Confidentiality / Winner-Disclosure Violation</td>
+          <td><span class="pill pill-log">live</span></td>
+          <td><code>count ≥ 1</code></td>
+          <td><span class="pill pill-sns">critical tier</span></td>
+        </tr>
+        <tr>
+          <td>Token-Volume Spike</td>
+          <td><span class="pill pill-log">live</span></td>
+          <td>≥ 1M tokens/hr, flat</td>
+          <td><span class="pill pill-sns">warning tier</span></td>
+        </tr>
+        <tr>
+          <td>Node / Workflow Errors</td>
+          <td><span class="pill pill-log">live</span></td>
+          <td><code>count ≥ 1</code> per 5 min</td>
+          <td><span class="pill pill-sns">warning tier</span></td>
+        </tr>
+        <tr>
+          <td>DLQ Redrive Exhausted</td>
+          <td><span class="pill pill-log">live</span></td>
+          <td><code>count ≥ 1</code> per 5 min</td>
+          <td><span class="pill pill-sns">warning tier</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>A few things are worth being explicit about, since they don't match what a tidier version of this table would suggest. <strong>Every threshold in the "Threshold" column is a first-pass guess.</strong> None are tuned against real production volume, because we don't have real production volume yet — this is a dev environment with synthetic traffic. A number like 0.80 for tone reads authoritative in a table and is, honestly, a starting point.</p>
+
+  <p>The token-volume spike alarm is a flat threshold across all agents and tenants, not the per-tenant moving-average comparison a real FinOps signal needs, and there's no dedicated FinOps SNS topic — it alarms on raw token counts because a per-token dollar metric doesn't exist. The error alarms are raw counts (any error in a 5-minute window), not percentage rates, which will get noisy the moment volume is real. The Kraljic accuracy alarm evaluates one datapoint per day, emitted by a scheduled harness rather than by production traffic, so it's closer to a daily regression check than a live signal — and it's deliberately configured to stay silent rather than emit a bogus 0.0 when the dev environment is cost-paused, since a spurious 0.0 would invalidate the semantic cache for no reason.</p>
+
+  <p>There's also a routing wrinkle worth naming. Only the confidentiality violation goes to the critical tier; everything else shares one topic. That's not a considered severity taxonomy so much as the fact that both topics currently resolve to the same single email address. And that address only started working recently: the subscription was gated on a Terraform variable set in a gitignored <code>.tfvars</code> file, so CI resolved it to an empty string and <em>actively destroyed</em> any subscriber applied by hand. Alarms fired correctly into a topic nobody was listening to. Detection being correct is not the same as detection reaching a human, and it took an audit rather than an incident to notice.</p>
+
+  <hr>
+
+  <!-- ── SECTION 7 ── -->
+  <h2>The CI/CD pipeline: evaluation at every gate</h2>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">PR</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title"><code>strands-evals</code> + <code>judge-smoke</code> + <code>kraljic-accuracy-gate</code> — every PR</div>
+        <div class="pipe-desc">The offline ground-truth gate (Kraljic, bid-ranking coverage, six Lambda evaluators) asserts 100% pass/fail agreement on fixture rows — no AWS calls. <code>judge-smoke</code> then makes 24 fixed Bedrock judge calls: 12 directional (good/bad transcript pairs across tone, negotiation quality, and the four strategy types) plus 12 consistency runs, because the offline gate only checks structure and would happily merge a prompt edit that keeps every field valid while quietly degrading recommendations. <code>kraljic-accuracy-gate</code> is the only job that exercises the <em>live</em> agent, scoring real classifications against a calibration fixture with a floor of 0.80.</div>
+        <div class="pipe-pass">✓ all pass → mergeable</div>
+        <div class="pipe-fail">✗ any fails → blocked (a cost-paused dev VPC skips, never fails)</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">Weekly (not deploy-triggered)</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Staging eval suite — Monday 13:00 UTC or manual dispatch</div>
+        <div class="pipe-desc">Negotiation Quality + Communication Tone judges against a 10-of-30 fixture panel, then judge consistency (<code>REQ-O220</code>) and human-calibration drift (<code>REQ-O221</code>). This <em>does</em> gate production: <code>prod-deploy.yml</code>'s first job fails closed unless a green run exists for the <em>exact SHA</em> being promoted, within a max age. Because the suite runs weekly and dev deploys continuously, most promotions need a manual dispatch against that SHA first.</div>
+        <div class="pipe-pass">✓ consistent → promotion unblocked for that SHA</div>
+        <div class="pipe-fail">✗ inconsistent → blocks; calibration drift is advisory (see below)</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">Production</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Online evaluation — inline on every bid, async on every award</div>
+        <div class="pipe-desc">Bid Format Compliance and Governance Policy Compliance run inline on every bid, synchronously, in milliseconds. The three LLM judges — Communication Tone, Negotiation Quality, Rationale Defensibility — run in Node 7's async eval branch after the award is committed, so no Bedrock call sits in the PO-issuance path. Every scored metric lands in <code>procurement/evaluation</code> behind an alarm, and each of those alarms now drives a remediation Lambda as well as an email.</div>
+        <div class="pipe-pass">✓ above thresholds → normal operation</div>
+        <div class="pipe-fail">✗ below thresholds → automated action fires + SNS alert; re-enabling is manual</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Trade-off: 100% online evaluation coverage</h3>
+
+  <p>Sampling creates systematic blind spots in an agentic system: a governance violation that happens to land outside a 10% sample is a violation the system never catches. So for the Code-based evaluators — which run inline in milliseconds and cost fractions of a cent — we made 100% online coverage the default, and it's live: Bid Format Compliance and Governance Policy Compliance score every real bid, not a sample. Ground Truth is a different story, and we're not overclaiming it: it needs a known-correct label, which live production requisitions don't have, so it can't run online against real traffic the way the Code-based evaluators do. It's a PR-time gate against a fixture golden set. AgentCore's built-in Evaluations SDK runs a complementary sampled monitor — six configs now (Kraljic Classifier, Award Comms, and the four strategy agents) at 5–10% sampling — but that lives in an isolated Terraform root behind a manual dispatch, deliberately kept out of the automatic deploy because those APIs are still marked preview and a hiccup there must not be able to block a normal deploy. Of the LLM judges, only Communication Tone is sampled; Negotiation Quality and Rationale Defensibility score every award, since there is one of each per negotiation rather than one per supplier.</p>
+
+  <h3>Trade-off: a quality gate we deliberately stopped enforcing</h3>
+
+  <p>The human-calibration check (<code>REQ-O221</code>) compares the judge's scores against human labels and suspends the judge past 0.20 mean absolute deviation. It blocked prod promotion through five consecutive weekly runs, every one failing identically at MAD 0.607 — and the diagnosis was not judge drift. The "human" labels in the fixture panel are a generated placeholder whose own header disclaims any evidentiary weight. The MAD was deterministic, and the gate was structurally unpassable.</p>
+
+  <p>So we downgraded it: while the fixture declares <code>synthetic_scores: true</code>, calibration reports as an advisory warning instead of blocking. Judge <em>consistency</em> still blocks unconditionally, because that measures something real — the same transcript scored repeatedly should land in the same place. The fail-safe direction matters: the downgrade requires the synthetic flag to be present and true, so dropping in real dual-human-scored transcripts restores blocking automatically with no code change. Grading a judge against labels we invented measures nothing, and a gate that cannot pass only teaches people to route around it. But it is still a weakened gate, and calling it anything else would be dishonest.</p>
+
+  <hr>
+
+  <!-- ── SECTION 8 ── -->
+  <h2>Graceful degradation under memory failure</h2>
+
+  <p>Cross-negotiation context — supplier performance history, previous award patterns, category expertise — was specified to come from AgentCore Memory and Mem0. Mem0 is not wired (AD-073); the strategy agents read a DynamoDB-derived supplier history as a substitute, and the Mem0 circuit breaker guards a call path that nothing currently takes. When AgentCore Memory is unavailable, agents don't crash: the breaker catches the failure and the negotiation continues with a <code>memory_degraded</code> boolean persisted on it.</p>
+
+  <p>That flag is the entire observability surface today, and it isn't what we designed. The original design (PRD-014 §5.2) called for relaxed numeric quality thresholds under degradation and a dedicated <code>memory.fallback_activated</code> metric; neither exists in code, and there is no alarm on degraded-state quality. No automatic post-completion re-evaluation, no incident record. The flag is queryable by a human or a future check, but nothing consumes it.</p>
+
+  <p>We're leaving this gap in rather than quietly upgrading the boolean to match the original design, because the honest version is more useful: right now, "the system degraded gracefully" means the negotiation didn't crash and the fact that it ran without memory is recorded — not that quality was measured and compensated for. Closing that gap is on the backlog, not shipped.</p>
+
+  <hr>
+
+  <!-- ── SECTION 9 ── -->
+  <h2>Architectural trade-offs: the summary</h2>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">⊕</div>
+        <div class="tcard-title">Separate observability layers</div>
+      </div>
+      <p>Four distinct metric namespaces instead of one unified pipeline. Added complexity, but gives each audience (SRE, engineering, procurement, FinOps) clean separation without metric cardinality explosions.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⊕</div>
+        <div class="tcard-title">W3C traceparent across all A2A</div>
+      </div>
+      <p>Requires explicit instrumentation at every agent boundary. The overhead is ~2ms per hop. The return: every negotiation appears as a single distributed trace, making cross-agent failures visible instead of invisible.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">⊕</div>
+        <div class="tcard-title">Risk-tiered evaluation sampling</div>
+      </div>
+      <p>Saves ~90% of Communication Tone evaluation cost on routine low-value messages. Accepted risk: 10% of non-critical, below-threshold communications go unevaluated. Mitigated by 100% coverage on legally binding and confidentiality-sensitive messages.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-blue">⊕</div>
+        <div class="tcard-title">Detection first, then actions</div>
+      </div>
+      <p>Alarm-to-action pipelines require threshold calibration to avoid false rollbacks, so we built detection and severity routing first and wired the five automated responses afterward. Both halves are now live, with recovery deliberately left manual — nothing re-enables itself on the OK transition. The remaining weakness is underneath: the thresholds those actions fire on are untuned first-pass guesses, so the loop is closed but not yet calibrated.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ── SECTION 10 ── -->
+  <h2>What we'd do differently</h2>
+
+  <p>The four-layer model is clean, but the span attribute schema grew organically and shows its seams. Attributes were added per node as each one needed them, so coverage is uneven — <code>procurement.negotiation_id</code> and <code>procurement.tenant_id</code> are everywhere, but strategy and model attributes exist only where someone had a reason to add them. Deciding the full attribute set once, up front, and enforcing it in a shared helper would have cost a day and saved the "which spans can I actually filter on?" question that recurs every time someone writes a new Logs Insights query.</p>
+
+  <p>The bigger regret is that we let observability follow the code instead of leading it. The evaluation metrics existed for months behind alarms that had been deleted in a cost trim, then restored, then pointed at a metric whose emitter had been removed by an unrelated PR — each state individually reasonable, and the aggregate quietly meaningless. The alarm-to-nobody SNS bug is the same shape. Nothing in the pipeline tests the pipeline: we have alarms on the agents and no alarm on "this alarm's metric has received no data in 30 days," which is exactly the check that would have caught all three.</p>
+
+  <p>Finally, a naming collision we only caught while writing this piece: the per-tenant governance override called <code>negotiation_quality_composite_minimum</code> sounds like it should gate the LLM-judge Negotiation Quality Composite this post spends a whole section on. It doesn't — it gates a completely different, deterministic bid-ranking composite (price/delivery/quality/compliance weighted, computed at bid-evaluation time) that decides whether an award auto-approves or escalates to a human. Two unrelated scores share adjacent vocabulary in the codebase, and it's the kind of thing that looks fine in a code review and only becomes confusing when someone's trying to explain the system end-to-end, the way we're doing here. Renaming one of them is now on the list.</p>
+
+  <hr>
+
+  <!-- ── CLOSING ── -->
+  <h2>The broader lesson</h2>
+
+  <p>The investment in observability and evaluation is proportional to the autonomy of the system. A traditional CRUD application fails loudly and recovers quickly — you can afford to observe it lightly. An autonomous negotiation agent that makes decisions on behalf of an organization, communicates directly with external suppliers, and recommends contract awards needs to be observed at every layer, evaluated continuously, and designed to roll itself back before a human notices the problem. That last part is now built rather than aspirational — but closing the loop moved the risk rather than removing it. The thresholds those automated actions fire on are untuned guesses against synthetic traffic, and an automated response on a badly-calibrated threshold is a new failure mode, not just a safety net. That is the honest current risk surface, and naming it precisely is more useful than a diagram implying the problem is solved.</p>
+
+  <p>The goal isn't to make the system easier to debug. It's to make it safe to trust — which starts with the observability layer telling the truth about itself.</p>
+
+  <!-- ── FOOTER ── -->
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="durable-orchestration.html" class="related-post-card">
+        <div class="rpc-tag">Durability</div>
+        <div class="rpc-title">Pause for four days, resume in five seconds: durable execution in a multi-agent system</div>
+      </a>
+      <a href="dag-vs-llm-planner.html" class="related-post-card">
+        <div class="rpc-tag">Architecture</div>
+        <div class="rpc-title">Why we chose a deterministic DAG over a pure LLM planner</div>
+      </a>
+      <a href="evaluation.html" class="related-post-card">
+        <div class="rpc-tag">Evaluation</div>
+        <div class="rpc-title">Not a Testing Problem: how a multi-agent system evaluates itself in production</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; May 2026</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> &mdash; an autonomous multi-agent procurement negotiation system. Based on its PRD-004 (Observability &amp; Evaluations, v1.5.7) &middot; updated 2026-08-19.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

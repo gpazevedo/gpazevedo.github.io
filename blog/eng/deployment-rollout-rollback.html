@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Shipping Agents Safely — Gustavo Azevedo</title>
+<meta name="description" content="How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Shipping Agents Safely: deployment, rollout, and rollback"/>
+<meta property="og:description" content="How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-05-31T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Deployment"/>
+<meta property="article:tag" content="GitOps"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Shipping Agents Safely: deployment, rollout, and rollback"/>
+<meta name="twitter:description" content="How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Shipping Agents Safely: deployment, rollout, and rollback","description":"How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback.","datePublished":"2026-05-31","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Shipping Agents Safely","item":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Deployment</span>
+  </div>
+
+  <!-- ── EYEBROW ── -->
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Deployment</span>
+    <span class="dot">·</span>
+    <time datetime="2026-05-31">May 2026</time>
+    <span class="dot">·</span>
+    <span>23 min read</span>
+  </div>
+
+  <!-- ── TITLE ── -->
+  <h1>Shipping agents safely<br>deployment, rollout, and <em>rollback</em></h1>
+  <p class="deck">Deploying a fleet of LLM-driven agents is not the same problem as deploying a stateless web service. When output quality can degrade in ways a health check will never catch, the release pipeline has to treat negotiation quality as a first-class signal — sitting right alongside error rate and latency.</p>
+
+  <hr>
+
+  <p>A conventional canary asks one question: is the new version healthy? For an agent system that question is necessary but nowhere near sufficient. A bad agent deploy can return HTTP 200, respond in under a second, and still negotiate badly — concede too early, leak a competitor's price, misread a Kraljic quadrant. None of that shows up on a liveness probe. So the entire release model is built around a second question the pipeline asks continuously: is the new version <em>good</em>?</p>
+
+  <p>This is how Buyer Team, an autonomous multi-agent procurement negotiation system, handles deployment, gradual rollout, and rollback, and where AWS Bedrock AgentCore fits into each stage.</p>
+
+  <div class="callout">
+    <div class="callout-label">What is actually running, as of August 2026</div>
+    <p>Everything below is built and wired. <strong>Dev is the only environment that has ever been deployed.</strong> The production pipeline exists end to end in <code>prod-deploy.yml</code> but has never run: there is no <code>image_tags.prod.tfvars.json</code>, and the repository carries zero semver release tags. Where a mechanism has only ever been exercised in dev — or not at all — this post says so at the point it matters rather than in a disclaimer you have already skipped.</p>
+  </div>
+
+  <h2>The release model in one sentence</h2>
+
+  <p>Buyer Team is GitOps end-to-end. Git is the single source of truth, container images are built once and promoted — never rebuilt — and production releases are tagged with semver. The principle worth internalising is <strong>rollback-as-forward-deploy</strong>: there is no "undo" button, only a forward deploy back to a previous known-good SHA.</p>
+
+  <div class="callout">
+    <div class="callout-label">Why forward, not back</div>
+    <p>An "undo" implies mutating something in place. This system never mutates a release — it deploys a new one. Because images are immutable and the previous good one is still sitting in ECR, rolling back <em>is</em> just deploying an artifact that already exists and already passed every gate. Same mechanism, opposite direction.</p>
+  </div>
+
+  <h2>The promotion pipeline</h2>
+
+  <p>The design document describes five environments — local, CI, dev, staging, production. The pipeline that actually exists has <strong>two deploy targets and one gate</strong>. Dev deploys automatically on merge to <code>main</code>. Production is a manual dispatch that copies dev's images straight into production ECR. In between sits <code>staging-eval-suite.yml</code>, which is not a deploy at all: it is a weekly evaluation job that runs <em>against dev</em> and whose green run is a required precondition for promoting a given commit.</p>
+
+  <p>This matters more than a naming quibble. "Staging" in this system is a <strong>quality gate, not a tier</strong> — there is no staging AWS account, no staging image promotion, and no staging E2E run. The workflow's own header says it plainly: there is still no automated staging→production promotion pipeline.</p>
+
+  <figure class="bt-figure">
+  <svg xmlns="http://www.w3.org/2000/svg" width="680" viewBox="0 0 680 400" role="img" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <title>Promotion pipeline as built</title>
+  <desc>PR checks feed Dev, which deploys automatically on merge. A weekly staging eval suite runs against dev and gates on the exact commit SHA. Production is a manual dispatch that promotes the same dev-built images unchanged. Each stage lists its real steps.</desc>
+  <defs><marker id="pp-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#73726c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <style>.pp .t{font-size:14px;font-weight:500;fill:#3d3d3a}.pp .s{font-size:11.5px;fill:#73726c}.pp .box{fill:#F1EFE8;stroke:#5F5E5A;stroke-width:.5}.pp .blue{fill:#E6F1FB;stroke:#185FA5;stroke-width:.5}.pp .bt{fill:#0C447C}.pp .bs{fill:#185FA5}.pp .amber{fill:#FAEEDA;stroke:#854F0B;stroke-width:.5}.pp .at{fill:#633806}.pp .asub{fill:#854F0B}.pp .teal{fill:#E1F5EE;stroke:#0F6E56;stroke-width:.5}.pp .tt{fill:#085041}.pp .tsub{fill:#0F6E56}.pp .arr{stroke:#73726c;stroke-width:1.5;fill:none}.pp .leader{stroke:#b0aea4;stroke-width:.5;stroke-dasharray:3 3}.pp .note{font-size:11.5px;fill:#854F0B}</style>
+  <g class="pp">
+  <rect class="box" x="40" y="40" width="160" height="52" rx="8"/>
+  <text class="t" x="120" y="59" text-anchor="middle" dominant-baseline="central">PR checks</text>
+  <text class="s" x="120" y="77" text-anchor="middle" dominant-baseline="central">5 jobs, no AWS deploy</text>
+  <rect class="blue" x="40" y="148" width="160" height="52" rx="8"/>
+  <text class="t bt" x="120" y="167" text-anchor="middle" dominant-baseline="central">Dev</text>
+  <text class="s bs" x="120" y="185" text-anchor="middle" dominant-baseline="central">auto on merge to main</text>
+  <rect class="amber" x="260" y="148" width="160" height="52" rx="8"/>
+  <text class="t at" x="340" y="167" text-anchor="middle" dominant-baseline="central">Eval-suite gate</text>
+  <text class="s asub" x="340" y="185" text-anchor="middle" dominant-baseline="central">weekly, runs on dev</text>
+  <rect class="teal" x="480" y="148" width="160" height="52" rx="8"/>
+  <text class="t tt" x="560" y="167" text-anchor="middle" dominant-baseline="central">Production</text>
+  <text class="s tsub" x="560" y="185" text-anchor="middle" dominant-baseline="central">manual dispatch, SRE</text>
+  <line class="arr" x1="120" y1="92" x2="120" y2="144" marker-end="url(#pp-arrow)"/>
+  <line class="arr" x1="200" y1="174" x2="256" y2="174" marker-end="url(#pp-arrow)"/>
+  <line class="arr" x1="420" y1="174" x2="476" y2="174" marker-end="url(#pp-arrow)"/>
+  <text class="s" x="448" y="162" text-anchor="middle" dominant-baseline="central">exact SHA</text>
+  <rect class="box" x="40" y="236" width="160" height="92" rx="8"/>
+  <text class="s" x="56" y="256" dominant-baseline="central">pre-commit + tflint</text>
+  <text class="s" x="56" y="274" dominant-baseline="central">unit, coverage, pyright</text>
+  <text class="s" x="56" y="292" dominant-baseline="central">offline evals</text>
+  <text class="s" x="56" y="310" dominant-baseline="central">judge smoke, Kraljic</text>
+  <rect class="box" x="260" y="236" width="160" height="92" rx="8"/>
+  <text class="s" x="276" y="256" dominant-baseline="central">build only what</text>
+  <text class="s" x="276" y="274" dominant-baseline="central">changed, tag = SHA</text>
+  <text class="s" x="276" y="292" dominant-baseline="central">terraform apply</text>
+  <text class="s" x="276" y="310" dominant-baseline="central">commit tag map back</text>
+  <rect class="box" x="480" y="236" width="160" height="92" rx="8"/>
+  <text class="s" x="496" y="256" dominant-baseline="central">copy dev ECR &#8594; prod</text>
+  <text class="s" x="496" y="274" dominant-baseline="central">plan, then apply</text>
+  <text class="s" x="496" y="292" dominant-baseline="central">deploy 100%, observe</text>
+  <text class="s" x="496" y="310" dominant-baseline="central">quadrant smoke, confirm</text>
+  <line class="leader" x1="120" y1="200" x2="120" y2="232"/>
+  <line class="leader" x1="340" y1="200" x2="340" y2="232"/>
+  <line class="leader" x1="560" y1="200" x2="560" y2="232"/>
+  <text class="s" x="340" y="120" text-anchor="middle" dominant-baseline="central">the same image dev built is what production runs &mdash; nothing is rebuilt</text>
+  <text class="note" x="340" y="360" text-anchor="middle" dominant-baseline="central">Gate status: red since 2026-07-13 on a calibration fixture, not a regression</text>
+  </g>
+  </svg>
+  <figcaption class="bt-figcaption">PR checks feed Dev, which deploys automatically on merge. The weekly eval-suite gate runs against dev and must be green <b>for the exact commit SHA</b> being promoted. Production is a manual dispatch that copies dev's images unchanged. There is no staging deploy.</figcaption>
+  </figure>
+
+  <p>Four details make this more than a generic CI/CD diagram.</p>
+
+  <p><strong>Immutable promotion, with one asterisk.</strong> Images are built once during the dev deploy and the <em>same</em> artifact is copied into production ECR. Nothing is rebuilt, so what the gate evaluated is bit-for-bit what would serve production traffic. Production repositories are forced to <code>IMMUTABLE</code> regardless of the per-repo default, and a lifecycle policy retains the last ten tagged images so a rollback target stays pullable. The asterisk: <strong>dev repositories are <code>MUTABLE</code></strong>, so within dev the retention window is a floor rather than a guarantee — a re-pushed identical tag overwrites the image it replaces. The promotion step itself is retry-safe by digest comparison: a matching digest is skipped, a mismatched one hard-fails rather than overwriting.</p>
+
+  <p><strong>Evals are a gate, not a report.</strong> PR checks run three separate offline evaluation jobs before merge — the structural and ground-truth suite, a directional LLM-judge smoke check with a per-strategy consistency run, and a live Kraljic accuracy gate with a 0.80 floor. Promotion to production is then blocked unless the weekly judge suite has a green run <em>against the exact SHA being promoted</em>, updated within eight days. Quality is checked before exposure, not discovered after.</p>
+
+  <p><strong>Manual gates where they matter.</strong> Dev auto-deploys on merge so engineers get fast feedback. Production requires a manual dispatch naming both the commit SHA and the semver release. Plan and apply are split into two jobs so a reviewer can open the uploaded plan artifact before apply starts — though nothing currently enforces that they do, because GitHub's required-reviewers rule is a paid-plan feature this private repo does not have. That is a recorded, accepted gap rather than an oversight.</p>
+
+  <p><strong>The gate was deadlocked for a month, and the fix was a decision, not code.</strong> Five consecutive weekly runs, from 2026-07-13 through 2026-08-10, failed with the identical error: <code>negotiation_quality: calibration SUSPENDED (mad=0.607 &gt; 0.20)</code>. The calibration check compares live judge scores against "human" labels in a transcript panel that is still a synthetic placeholder seeded in July. The MAD is therefore deterministic, and the check could not pass until real dual-human-scored transcripts replaced the fixture. The gate was not red because a regression was caught; it was red because the reference data it grades against did not exist yet.</p>
+
+  <p>On 2026-08-19 that was settled explicitly: <strong>calibration is advisory while the panel is synthetic</strong>. The fixture declares <code>synthetic_scores: true</code>, and the suite reads that flag — a SUSPENDED calibration then prints a warning instead of failing the run, while judge <em>consistency</em> keeps blocking as before. The flag is checked as present-<em>and</em>-true, so a panel replaced with real labels re-enables blocking by default rather than needing someone to remember to switch it back on. The measurement still runs and is still reported every week; what changed is that a number measuring the fixture no longer gets a veto over promotion.</p>
+
+  <div class="callout">
+    <div class="callout-label">The honest limit</div>
+    <p>A gate that fails for a reason unrelated to the change under test is worse than no gate, because it trains people to route around it. The fix path was never judge tuning — it was a ground-truth labelling pipeline (built, never run) or an explicit gate-policy decision, and the actual engineering work is naming which of the two you are choosing. The second one is now named and in code. The first is still the way back to a blocking calibration gate, and until it runs this post should not claim the judges are calibrated — only that the suite is honest about not knowing.</p>
+  </div>
+
+  <pre><code>PR   → pre-commit + unit/coverage/pyright + offline evals
+       + judge smoke + live Kraljic accuracy gate → merge to main
+
+Dev  (auto): detect changed components → build + push only those
+       → terraform plan/apply → commit the image-tag map back to main
+
+Gate (weekly, or dispatched against a SHA): Bedrock judges vs the
+       transcript panel → consistency + human calibration
+
+Prod (manual, SRE): verify gate green for this exact SHA
+       → copy dev images to prod ECR → plan → apply
+       → observe → per-quadrant smoke → confirm or roll forward</code></pre>
+
+  <h2>Gradual rollout: the production canary</h2>
+
+  <p>A constraint worth being upfront about: AgentCore Runtimes have no fractional traffic routing — there is no microVM-level traffic split, so a true "send 10% of traffic to the new version" canary can't be built on top of it. Every image is promoted to production ECR and deployed to <em>every</em> Runtime at once. What this system calls the "canary" is therefore a <strong>monitoring-only observation window</strong>, not a traffic slice: it's a structured confirmation gate before rollout is declared complete, not a way to shrink the blast radius of a bad deploy.</p>
+
+  <ol>
+    <li><strong>Deploy to all Runtimes at once.</strong> There is no partial fleet — the new image is live everywhere the moment the apply completes.</li>
+    <li><strong>Observe for fifteen minutes</strong> (the workflow's default; it is a dispatch input, so an operator can widen it), polling twenty CloudWatch alarms once a minute and failing the moment any one of them is in <code>ALARM</code>.</li>
+    <li><strong>Smoke test one negotiation per quadrant.</strong> The strategies fall into four Kraljic quadrants, so one representative negotiation is driven through each to confirm the real path works end-to-end — not just that the process boots.</li>
+    <li><strong>All pass and no alarms fire → rollout is confirmed</strong>, the image-tag map is committed and the semver tag is pushed. Any failure rolls forward instead (next section).</li>
+  </ol>
+
+  <p>The twenty alarms are six evaluation-quality alarms plus an error alarm and a latency alarm for each of the seven Runtimes (six agents and the Skill Runtime). Three details are worth stating precisely rather than rounding off:</p>
+
+  <ul>
+    <li><strong>It is not a p99 gate.</strong> The design document says "p99 latency" and so did earlier versions of this post. The alarm is <code>Maximum</code> over a five-minute period with a 60-second threshold, and that threshold is a first pass that has never been tuned against real traffic. No p99 statistic is wired anywhere. The observation window inherits that imprecision.</li>
+    <li><strong>It used to watch four of the six evaluation alarms.</strong> Rationale Defensibility and Kraljic Accuracy were added to Terraform later and never added to the workflow's hand-maintained list, so a regression on either would have passed the window unnoticed. Fixed on 2026-08-19 by deleting the list: eval alarms are now <em>discovered</em> by name prefix, so the watch set equals what Terraform actually provisions. Discovery fails closed — fewer than six matches aborts the promotion rather than looping vacuously over an empty set, which matters because these exact alarms were once deleted wholesale in a cost trim. That is a fix to the class of bug, not the instance.</li>
+    <li><strong>One of the six is not live protection in production.</strong> <code>eval-kraljic-accuracy</code> is fed by a daily accuracy harness pinned to the <code>dev</code> environment — nothing emits that metric in prod. There it sits at <code>INSUFFICIENT_DATA</code>, so the window watches it for a carried-over <code>ALARM</code> state rather than for anything happening during the window itself. Pointing the harness at prod is what would make it protective.</li>
+  </ul>
+
+  <p>The inclusion of eval quality in the observation window is still the important idea. By scoring negotiation quality <em>during</em> the window, a regression that a conventional health check would wave straight through gets caught fast — but it's caught while live on 100% of production traffic, not a contained slice. Detection-and-rollback speed is the safety lever here, not reduced exposure.</p>
+
+  <div class="callout">
+    <div class="callout-label">Scope boundary — the smoke test still needs data prod does not have</div>
+    <p>The per-quadrant smoke job runs a real all-four-quadrant negotiation test. It used to be built around a fixed dev fixture tenant with a <em>pre-seeded</em> non-critical item, which made it structurally unable to pass anywhere else; all four quadrants now seed and tear down their own items, so the suite is environment-portable. The sharper problem was the failure <em>mode</em>: on an unseeded environment the job failed like a quadrant regression, and in this pipeline a smoke failure fires the roll-forward path — so an environment that was merely empty would have presented as a bad release and triggered a rollback. A preflight fixture now checks the tenant row and the four categories' suppliers up front and fails with <code>SMOKE FIXTURE MISSING … NOT a quadrant regression</code> plus the exact seeding command.</p>
+    <p>What is left is genuine provisioning, and it stays manual on purpose: one-time tenant config rows plus category and supplier master data for the four quadrants. Seeding is <em>not</em> a pipeline step because the seed script writes the whole <code>governance</code> and <code>model</code> config groups — running it on every promotion would overwrite prod governance and clobber <code>model/default</code> and <code>model/previous</code>, the exact rows the model-rollback action below restores from. A provisioning step that silently disarms a rollback mechanism does not belong in the deploy path.</p>
+  </div>
+
+  <p>Getting real exposure control for a <em>behavioral</em> change — a model swap, a prompt rewrite, a threshold tweak — against real tenant traffic takes a different mechanism, covered next.</p>
+
+  <figure class="bt-figure">
+  <svg xmlns="http://www.w3.org/2000/svg" width="680" viewBox="0 0 680 400" role="img" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <title>Deploy-time confirmation gate and the separate runtime quality loop</title>
+  <desc>A production deploy ships to all AgentCore Runtimes at once, observes twenty alarms for fifteen minutes, then smoke tests one negotiation per quadrant. If both pass, rollout is confirmed; any failure rolls forward to the last known-good image within five minutes. Separately and independently of any deploy, an evaluation alarm triggers a remediation Lambda that flips a DynamoDB config flag, which warm agents pick up within about thirty seconds.</desc>
+  <defs><marker id="cr-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#73726c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <style>.cr .s{font-size:11.5px;fill:#73726c}.cr .t{font-size:14px;font-weight:500}.cr .blue{fill:#E6F1FB;stroke:#185FA5;stroke-width:.5}.cr .bt{fill:#0C447C}.cr .bs{fill:#185FA5}.cr .teal{fill:#E1F5EE;stroke:#0F6E56;stroke-width:.5}.cr .tt{fill:#085041}.cr .tsub{fill:#0F6E56}.cr .red{fill:#FCEBEB;stroke:#A32D2D;stroke-width:.5}.cr .rt{fill:#791F1F}.cr .rs{fill:#A32D2D}.cr .amber{fill:#FAEEDA;stroke:#854F0B;stroke-width:.5}.cr .at{fill:#633806}.cr .asub{fill:#854F0B}.cr .arr{stroke:#73726c;stroke-width:1.5;fill:none}.cr .div{stroke:#c9c7bd;stroke-width:1;stroke-dasharray:5 4}.cr .lbl{font-size:11px;fill:#8a8880;letter-spacing:.08em}</style>
+  <g class="cr">
+  <rect class="blue" x="40" y="34" width="180" height="52" rx="8"/>
+  <text class="t bt" x="130" y="53" text-anchor="middle" dominant-baseline="central">Deploy to 100%</text>
+  <text class="s bs" x="130" y="71" text-anchor="middle" dominant-baseline="central">every Runtime, at once</text>
+  <rect class="blue" x="40" y="114" width="180" height="52" rx="8"/>
+  <text class="t bt" x="130" y="133" text-anchor="middle" dominant-baseline="central">Observe 15 min</text>
+  <text class="s bs" x="130" y="151" text-anchor="middle" dominant-baseline="central">20 alarms, polled 1/min</text>
+  <rect class="blue" x="40" y="194" width="180" height="52" rx="8"/>
+  <text class="t bt" x="130" y="213" text-anchor="middle" dominant-baseline="central">Quadrant smoke</text>
+  <text class="s bs" x="130" y="231" text-anchor="middle" dominant-baseline="central">1 negotiation per quadrant</text>
+  <line class="arr" x1="130" y1="86" x2="130" y2="110" marker-end="url(#cr-arrow)"/>
+  <line class="arr" x1="130" y1="166" x2="130" y2="190" marker-end="url(#cr-arrow)"/>
+  <rect class="teal" x="320" y="194" width="160" height="52" rx="8"/>
+  <text class="t tt" x="400" y="213" text-anchor="middle" dominant-baseline="central">Confirm rollout</text>
+  <text class="s tsub" x="400" y="231" text-anchor="middle" dominant-baseline="central">commit map, push tag</text>
+  <line class="arr" x1="220" y1="220" x2="316" y2="220" marker-end="url(#cr-arrow)"/>
+  <text class="s" x="268" y="208" text-anchor="middle" dominant-baseline="central">both pass</text>
+  <rect class="red" x="320" y="114" width="160" height="52" rx="8"/>
+  <text class="t rt" x="400" y="133" text-anchor="middle" dominant-baseline="central">Roll forward</text>
+  <text class="s rs" x="400" y="151" text-anchor="middle" dominant-baseline="central">&#8804; 5 min to recover</text>
+  <path class="arr" d="M240 206 L280 206 L280 140 L316 140" marker-end="url(#cr-arrow)"/>
+  <text class="s" x="292" y="182" text-anchor="middle" dominant-baseline="central">either fails</text>
+  <rect class="teal" x="520" y="114" width="120" height="52" rx="8"/>
+  <text class="t tt" x="580" y="133" text-anchor="middle" dominant-baseline="central">Last good</text>
+  <text class="s tsub" x="580" y="151" text-anchor="middle" dominant-baseline="central">image in ECR</text>
+  <line class="arr" x1="480" y1="140" x2="516" y2="140" marker-end="url(#cr-arrow)"/>
+  <line class="div" x1="40" y1="278" x2="640" y2="278"/>
+  <text class="lbl" x="40" y="296" dominant-baseline="central">A SEPARATE MECHANISM &mdash; RUNS WITHOUT ANY DEPLOY, AND DOES NOT TOUCH AN IMAGE</text>
+  <rect class="amber" x="40" y="316" width="170" height="52" rx="8"/>
+  <text class="t at" x="125" y="335" text-anchor="middle" dominant-baseline="central">Eval alarm</text>
+  <text class="s asub" x="125" y="353" text-anchor="middle" dominant-baseline="central">6 thresholds, live metrics</text>
+  <rect class="amber" x="250" y="316" width="180" height="52" rx="8"/>
+  <text class="t at" x="340" y="335" text-anchor="middle" dominant-baseline="central">Remediation Lambda</text>
+  <text class="s asub" x="340" y="353" text-anchor="middle" dominant-baseline="central">one per action, via SNS</text>
+  <rect class="amber" x="470" y="316" width="170" height="52" rx="8"/>
+  <text class="t at" x="555" y="335" text-anchor="middle" dominant-baseline="central">Config flip</text>
+  <text class="s asub" x="555" y="353" text-anchor="middle" dominant-baseline="central">DynamoDB, ~30s to warm</text>
+  <line class="arr" x1="210" y1="342" x2="246" y2="342" marker-end="url(#cr-arrow)"/>
+  <line class="arr" x1="430" y1="342" x2="466" y2="342" marker-end="url(#cr-arrow)"/>
+  </g>
+  </svg>
+  <figcaption class="bt-figcaption">Top: the deploy-time confirmation gate, which ends in either a confirmed rollout or a roll-forward to the last good image. Bottom: the runtime quality loop, which fires <b>without a deploy</b> and changes configuration rather than images. Two different mechanisms that both get called "rollback".</figcaption>
+  </figure>
+
+  <h2>Real exposure control: tenant-scoped variant routing</h2>
+
+  <p>The observation window catches operational regressions fast, but it can't answer a different question: does a <em>behavioral</em> change — a model swap, a rewritten prompt, a new threshold — actually negotiate better for real tenants, without exposing every tenant to it at once? That needs exposure control, and since AgentCore won't give it at the traffic layer, this is built one layer up: in the same config-driven registry (<code>{env}-system-config</code>) that already resolves which runtime serves each agent invocation. Each agent has a real sibling <em>canary</em> Runtime in Terraform, deployable independently, that these mechanisms route to.</p>
+
+  <p>The resolver that maps a logical agent name to a runtime ARN layers three additive mechanisms on top of that base lookup:</p>
+
+  <ol>
+    <li><strong>Tenant pin.</strong> An operator pins one chosen tenant — an internal or design-partner account — to a named variant. Naming an undefined variant raises rather than silently falling back to the base runtime.</li>
+    <li><strong>Shadow testing.</strong> The live path fires an async, fire-and-forget replay of the same request against the variant runtime and records agreement — with zero effect on the response the tenant actually receives. It's a safety check with no tenant-visible risk.</li>
+    <li><strong>Deterministic population split.</strong> A tenant's bucket is a SHA-256 hash of the logical agent name <em>and</em> the tenant ID, so the same tenant lands in the same variant across its own repeat requests, while its bucket for one agent tells you nothing about its bucket for another. That is a real, statistically legible percentage rollout, which is exactly what the deploy-time observation window can't do.</li>
+  </ol>
+
+  <p>Precedence runs env override &gt; tenant pin &gt; population split &gt; base runtime — a deliberate single-tenant override always wins over an experiment running underneath it. The whole path was verified end-to-end on dev in July, including a 30% split across 2,000 synthetic tenants and the fail-fast behaviour on an unseeded variant.</p>
+
+  <div class="callout">
+    <div class="callout-label">The honest limit</div>
+    <p>This is an <strong>operator-driven</strong> mechanism. There is no automatic analysis of the shadow agreement rate and no automatic promotion or rollback of a variant — a human reads the comparison and decides. It buys real exposure control on a platform that offers none; it does not buy an automated experiment pipeline. It is also a second thing called "canary", which is why this post keeps the two apart: the deploy-time observation window confirms a build is safe to run at all; variant routing confirms a specific behavioral change is actually good, against real tenant traffic, before every tenant sees it.</p>
+  </div>
+
+  <h2>Rollback: two mechanisms, one word</h2>
+
+  <p>If either confirmation gate fails — the observation window or the quadrant smoke — the pipeline rolls <em>forward</em> to the previous known-good SHA, with a target of completing within <strong>five minutes</strong> of failure detection. Mechanically it is unglamorous, which is the point: the <code>plan</code> job snapshotted the previous image-tag map before overwriting it, so recovery is restoring that snapshot and running <code>terraform apply</code> against images already sitting in ECR. No separate rollback artifact, no new variables on the recovery path.</p>
+
+  <p>The mechanism has one cold-start hole, and it is why "cut one release" is still on this post's to-do list. The snapshot only exists if there was a previous deploy. On production's <em>first</em> promotion there is nothing to restore, and the workflow says so plainly instead of failing obscurely — it errors with "there is no previous prod deploy to roll forward to" and stops for manual intervention. The first release is the one that runs without a net; every release after it inherits one.</p>
+
+  <p>One deliberate asymmetry: the roll-forward step runs on the <em>unprotected</em> GitHub environment rather than the branch-restricted production one. Gating automatic recovery behind a second human approval would blow the five-minute bound — so the deploy is protected and the recovery is not.</p>
+
+  <p>There is a second, quieter mechanism that also gets called rollback, and it is <strong>not the same thing</strong>. Each evaluator is bound to a threshold, an alarm, and an automated action; when the negotiation-quality composite drops below 0.60, an alarm fires a remediation Lambda that restores the previous model-tier mapping in DynamoDB and bumps a <code>model_epoch</code> counter. Agents re-check that counter on a 30-second TTL, so already-warm execution environments pick up the change in about half a minute instead of never. No image moves. No deploy happens. It can fire on a completely stable codebase — model drift, a bad config change, an upstream data issue — which is exactly the class of problem it exists for.</p>
+
+  <div class="callout">
+    <div class="callout-label">A naming wrinkle, now settled</div>
+    <p>The evaluation threshold table labels this action <code>Model rollback</code>; the operational runbook calls it <code>Configuration rollback</code>. Earlier versions of this post said the two names described one forward-deploy mechanism. They don't. As built, the runbook is right: it is a <strong>configuration</strong> rollback of the model-tier map, with no relationship to the deploy pipeline's roll-forward beyond sharing a word. Rolling the <em>image</em> back is still a manual dispatch.</p>
+  </div>
+
+  <p>That closed loop now has all five of its actions built, deployed to dev, and verified end-to-end against synthetic alarm events — a state it reached only in mid-August 2026, after more than a month during which the alarms existed but drove nothing, and a stretch where they were deleted outright as an unsubscribed cost line:</p>
+
+  <div class="layer-stack">
+    <div class="layer l1">
+      <div class="layer-meta"><div class="layer-num">&lt; 0.60</div><div class="layer-name">Negotiation Quality</div><div class="layer-src">model tier rollback</div></div>
+      <p>Restores the previous tier map and bumps <code>model_epoch</code>; warm agents re-resolve within ~30s.</p>
+    </div>
+    <div class="layer l2">
+      <div class="layer-meta"><div class="layer-num">&lt; 0.80</div><div class="layer-name">Communication Tone</div><div class="layer-src">disable auto-send</div></div>
+      <p>Flips <code>auto_send_communications</code> off. Node 7 sends before the async judge scores, so this protects the <em>next</em> message, never the one that tripped the alarm.</p>
+    </div>
+    <div class="layer l3">
+      <div class="layer-meta"><div class="layer-num">&lt; 0.70</div><div class="layer-name">Rationale Defensibility</div><div class="layer-src">block auto-award</div></div>
+      <p>The approval gate returns <code>PENDING_APPROVAL</code> with an explicit block reason instead of auto-awarding.</p>
+    </div>
+    <div class="layer l4">
+      <div class="layer-meta"><div class="layer-num">&lt; 0.90</div><div class="layer-name">Kraljic Accuracy</div><div class="layer-src">invalidate cache</div></div>
+      <p>Bumps a <code>cache_epoch</code> threaded into the cache-key hash — an epoch, not a scan-and-delete, so there's no repopulation race.</p>
+    </div>
+    <div class="layer l1">
+      <div class="layer-meta"><div class="layer-num">&lt; 1.00</div><div class="layer-name">Format / Governance</div><div class="layer-src">halt new negotiations</div></div>
+      <p>Node 1 returns <code>CANCELLED</code> instead of creating a negotiation. In-flight work is untouched; the source request stays validated and resumes when cleared.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">The part that looked configured and wasn't</div>
+    <p>Those five actions fire automatically, which is what let the next problem hide for so long: <strong>until 2026-08-19, every alarm in this system notified an SNS topic with no subscriber</strong>. The automated remediations ran; no human was ever told that one had. The cause is worth naming because it generalises — the alert email lived in a <code>.tfvars</code> file that <code>.gitignore</code> excluded, so it reached a local apply but never reached CI. In CI the address resolved empty, the subscription's <code>count</code> evaluated to zero, and Terraform <em>destroyed</em> the subscription someone had added by hand. Every manual fix worked, and every subsequent pipeline run silently undid it.</p>
+    <p>The lesson is not "remember to subscribe to the topic." It is that a value which is invisible to the automated path will be reverted by the automated path, on a schedule, forever — and that the alerting channel is exactly the component whose failure suppresses its own alarm. It has to be verified by observation, not by reading the config that claims it.</p>
+  </div>
+
+  <p>Two design choices run through all five. <strong>None of them auto-re-enables</strong> — a human clears each flag through a dedicated script, so the system can protect itself but cannot quietly decide it has recovered. And all five reach already-running agents through a <strong>30-second TTL re-read</strong> rather than a restart, because agents resolve config once at container boot and a flag nothing re-reads is a flag that takes effect never.</p>
+
+  <h2>Where AgentCore participates</h2>
+
+  <p>AWS Bedrock AgentCore is the managed runtime the agents and the Skill actually run on, and it shapes each stage of the release lifecycle. Six agents and the Integration Skill run on it — and four distinct consequences follow from that single fact.</p>
+
+  <figure class="bt-figure">
+  <svg xmlns="http://www.w3.org/2000/svg" width="680" viewBox="0 0 680 400" role="img" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+  <title>How AgentCore participates in the release lifecycle</title>
+  <desc>AgentCore is the managed runtime hosting six agents and the Skill Runtime. Four consequences branch from it: it is the deployment target and every update is a full replace, it replaces instance fleets with a session quota, traceability comes from the image tag rather than an injected environment variable, and its evaluations engine provides sampled alert-only monitoring. A separate box notes that this system's own Bedrock judges, not AgentCore Evaluations, produce the scores that gate and remediate.</desc>
+  <defs><marker id="ac-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#73726c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <style>.ac .s{font-size:11px;fill:#73726c}.ac .t{font-size:13px;font-weight:500}.ac .purple{fill:#EEEDFE;stroke:#534AB7;stroke-width:.5}.ac .pt{fill:#3C3489}.ac .ps{fill:#534AB7}.ac .blue{fill:#E6F1FB;stroke:#185FA5;stroke-width:.5}.ac .bt{fill:#0C447C}.ac .bs{fill:#185FA5}.ac .amber{fill:#FAEEDA;stroke:#854F0B;stroke-width:.5}.ac .at{fill:#633806}.ac .asub{fill:#854F0B}.ac .teal{fill:#E1F5EE;stroke:#0F6E56;stroke-width:.5}.ac .tt{fill:#085041}.ac .tsub{fill:#0F6E56}.ac .arr{stroke:#73726c;stroke-width:1.5;fill:none}.ac .dash{stroke:#b0aea4;stroke-width:1;stroke-dasharray:4 4;fill:none}</style>
+  <g class="ac">
+  <rect class="purple" x="240" y="30" width="200" height="52" rx="8"/>
+  <text class="t pt" x="340" y="48" text-anchor="middle" dominant-baseline="central">AWS Bedrock AgentCore</text>
+  <text class="s ps" x="340" y="66" text-anchor="middle" dominant-baseline="central">6 agents + 1 Skill Runtime</text>
+  <rect class="blue" x="36" y="150" width="140" height="86" rx="8"/>
+  <text class="t bt" x="106" y="170" text-anchor="middle" dominant-baseline="central">Deploy target</text>
+  <text class="s bs" x="106" y="190" text-anchor="middle" dominant-baseline="central">A2A :9000, MCP :8000</text>
+  <text class="s bs" x="106" y="207" text-anchor="middle" dominant-baseline="central">update = full replace</text>
+  <text class="s bs" x="106" y="224" text-anchor="middle" dominant-baseline="central">omitted fields reset</text>
+  <rect class="blue" x="200" y="150" width="140" height="86" rx="8"/>
+  <text class="t bt" x="270" y="170" text-anchor="middle" dominant-baseline="central">No instance fleet</text>
+  <text class="s bs" x="270" y="190" text-anchor="middle" dominant-baseline="central">microVM per session</text>
+  <text class="s bs" x="270" y="207" text-anchor="middle" dominant-baseline="central">quota 1,000 default</text>
+  <text class="s bs" x="270" y="224" text-anchor="middle" dominant-baseline="central">no traffic dial</text>
+  <rect class="blue" x="364" y="150" width="140" height="86" rx="8"/>
+  <text class="t bt" x="434" y="170" text-anchor="middle" dominant-baseline="central">Traceability</text>
+  <text class="s bs" x="434" y="190" text-anchor="middle" dominant-baseline="central">image tag = git SHA</text>
+  <text class="s bs" x="434" y="207" text-anchor="middle" dominant-baseline="central">GitSHA resource tag</text>
+  <text class="s bs" x="434" y="224" text-anchor="middle" dominant-baseline="central">no GIT_SHA env var</text>
+  <rect class="amber" x="528" y="150" width="140" height="86" rx="8"/>
+  <text class="t at" x="598" y="170" text-anchor="middle" dominant-baseline="central">Evaluations</text>
+  <text class="s asub" x="598" y="190" text-anchor="middle" dominant-baseline="central">sampled online eval</text>
+  <text class="s asub" x="598" y="207" text-anchor="middle" dominant-baseline="central">6 configs, alert-only</text>
+  <text class="s asub" x="598" y="224" text-anchor="middle" dominant-baseline="central">not the release gate</text>
+  <path class="arr" d="M300 82 L106 118 L106 146" marker-end="url(#ac-arrow)"/>
+  <path class="arr" d="M322 82 L270 118 L270 146" marker-end="url(#ac-arrow)"/>
+  <path class="arr" d="M358 82 L434 118 L434 146" marker-end="url(#ac-arrow)"/>
+  <path class="arr" d="M380 82 L598 118 L598 146" marker-end="url(#ac-arrow)"/>
+  <rect class="teal" x="364" y="300" width="304" height="62" rx="8"/>
+  <text class="t tt" x="516" y="320" text-anchor="middle" dominant-baseline="central">This system&#8217;s own Bedrock judges</text>
+  <text class="s tsub" x="516" y="339" text-anchor="middle" dominant-baseline="central">procurement/evaluation metrics &#8594; the 6 alarms</text>
+  <text class="s tsub" x="516" y="355" text-anchor="middle" dominant-baseline="central">this is what gates and remediates</text>
+  <path class="dash" d="M598 236 L598 296"/>
+  <text class="s" x="612" y="266" text-anchor="start" dominant-baseline="central">distinct from</text>
+  </g>
+  </svg>
+  <figcaption class="bt-figcaption">Four consequences branch from AgentCore being the runtime. The one worth correcting loudest: AgentCore Evaluations provides <b>sampled, alert-only</b> monitoring — the scores that actually gate a release and drive remediation come from this system's own Bedrock judges.</figcaption>
+  </figure>
+
+  <h3>It is the deployment target — and every update is a full replace</h3>
+
+  <p>Each of the six agents is deployed as an <strong>independent AgentCore Runtime</strong> speaking the A2A protocol on port 9000, and the Integration Skill is deployed as a <strong>separate AgentCore Runtime</strong> speaking MCP on port 8000. (The design calls for one Skill Runtime per tenant; as built there is exactly one, serving the test tenant.) The pipeline's deploy step is, mechanically, a set of AgentCore Runtime deployments.</p>
+
+  <p>The sharp edge here is one this post previously got backwards. The original design asserted that a Runtime's protocol type is <strong>immutable after creation</strong> and that a Terraform plan-time check was a sufficient guard. Both premises turned out to be false in production use. <code>update_agent_runtime</code> is a <strong>full-replace control-plane call</strong>: it flips <code>serverProtocol</code> in place, same runtime id, no destroy-and-recreate. Worse, because the call replaces the entire definition, <strong>any field omitted from it silently resets to a default</strong> — omit <code>protocolConfiguration</code> and the runtime reverts to A2A; omit <code>environmentVariables</code> and the environment is simply gone.</p>
+
+  <p>The failure mode this produced was genuinely misleading. A hand-written boto3 call copied the six agents' <code>A2A</code> protocol onto the one MCP Skill Runtime. The Skill serves MCP on :8000; once reset to A2A, the platform routed gateway invokes to the :9000 contract where nothing listens, so every invoke returned 424 — but only after the ~130-second microVM provision, which made it present as a cold-start problem and cost an entire investigation cycle to a wrong diagnosis.</p>
+
+  <p>The real guard is not a plan-time check — the Skill Runtime is updated out-of-band via boto3, precisely the path Terraform never sees. It is a <strong>guarded helper that re-asserts the full definition every time</strong>: the protocol is hardcoded, not a parameter; the IAM role and VPC config are re-read live; the environment is rebuilt to the Terraform canonical rather than carried forward. Hand-writing a bare update call is prohibited. The invariant generalises — full-replace semantics apply to every AgentCore Runtime and Gateway, not just the Skill.</p>
+
+  <h3>It removes the "instances" you would normally roll out — and the traffic split with them</h3>
+
+  <p>In a traditional canary you shift traffic across a pool of instances you sized yourself. AgentCore has no instances to size, and no fractional traffic routing at the microVM level. It provisions a <strong>dedicated microVM per session</strong> and scales horizontally as a fully managed service; there is no per-instance concurrency to tune and no fleet to drain, but also no traffic-layer dial to turn. That's why the production "canary" is a monitoring window rather than an exposure slice, and why real exposure control had to be built one layer up.</p>
+
+  <p>Capacity is governed instead by an account-level <strong>active-session quota</strong> — 1,000 in us-east-1 and us-west-2, 500 elsewhere. At the planned ceiling of ~100 concurrent negotiations consuming roughly ten sessions each, the default is exactly consumed at full load with zero headroom, so the production runbook calls for requesting an increase to <strong>&ge;1,500</strong>. That is a documented recommendation, not a quota that has been raised. Per-tenant fairness is enforced upstream by the Step Functions orchestrator's admission control, not by the runtime scheduler, which does not partition slots by tenant.</p>
+
+  <h3>Traceability comes from the image tag, not an injected variable</h3>
+
+  <p>Earlier versions of this post claimed every Runtime is launched with <code>DEPLOY_VERSION</code>, <code>ENVIRONMENT</code> and <code>GIT_SHA</code> injected. Only <code>ENVIRONMENT</code> is real (the Skill Runtime also gets its state-machine ARN); there is no <code>GIT_SHA</code> or <code>DEPLOY_VERSION</code> environment variable anywhere in the infrastructure.</p>
+
+  <p>The traceability guarantee still holds — it is just delivered differently, and arguably better. <strong>Every image tag is the commit SHA</strong>, so a Runtime's container URI <em>is</em> its provenance, and the committed tag map records which SHA every component is pinned to. Separately, <code>GitSHA</code> is set in Terraform's <code>default_tags</code>, so every managed AWS resource carries the commit it was applied from. Rollback stays auditable because the artifact identity and the commit identity are the same string, not because a process announces its own version.</p>
+
+  <h3>Its evaluations are sampled monitoring — not the gate, and not the trigger</h3>
+
+  <p>This is the correction that matters most, because the previous version of this post inverted it. AgentCore Evaluations is real and running: six online-evaluation configs, one per agent, are ACTIVE, scoring <code>Builtin.Helpfulness</code> and <code>Builtin.ToolSelectionAccuracy</code> on a <em>sampled</em> slice of live sessions, with two alert-only alarms watching the aggregate. <code>Builtin.Correctness</code> can't run on that path at all — the online-sampling API has no per-invocation reference-inputs field.</p>
+
+  <p>But the scores that gate a promotion and drive every remediation action do <strong>not</strong> come from it. They come from this system's own harness: LLM-as-Judge evaluators calling Bedrock <code>converse()</code> directly, plus code-based and ground-truth evaluators running as plain Python inside the orchestrator's Lambdas, all emitting <code>procurement/evaluation</code> metrics that the six alarms watch. Only the Kraljic Classifier and Award Comms agents are registered with AgentCore Evaluations for on-demand runs; the judges are not registered with it at all.</p>
+
+  <div class="callout">
+    <div class="callout-label">The honest limit</div>
+    <p>At last check the AgentCore online-eval namespace had seen <strong>zero sampled sessions</strong>, and the exact metric name remains unconfirmed until real traffic flows — both alarms sit on <code>treat_missing_data = notBreaching</code> so they stay inert rather than firing on absence. It is provisioned, not yet proven. The custom <code>evals/</code> package is the real harness today, and saying otherwise would credit a managed service for work the codebase is doing itself.</p>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">Operational prerequisite</div>
+    <p>CloudWatch Transaction Search must be enabled on the account, because AgentCore Evaluations reads agent traces to score sessions. Without it, neither on-demand nor online evaluations can run — and that half of the quality picture goes blind. It is also, at 100% sampling, dev's single largest CloudWatch cost line, billed even while the environment sits idle — so the dev VPC pause script deliberately withdraws it and the restore script puts it back. A scoped exception, safe only because nothing that depends on it runs during the pause.</p>
+  </div>
+
+  <h3>It even constrains where you can deploy</h3>
+
+  <p>Because the quality strategy depends on AgentCore Evaluations, every non-local environment must run in a region where Evaluations is generally available — nine of sixteen regions as of May 2026. This system standardises on <code>us-east-1</code>, which carries the higher session quota and full feature coverage, with <code>us-west-2</code> as the secondary option. The release strategy literally pins the deployment region.</p>
+
+  <h2>The shape of it</h2>
+
+  <p>Pulling the threads together, release safety here rests on three ideas — and one honest caveat about how much of it has been proven.</p>
+
+  <div class="layer-stack">
+    <div class="layer l1">
+      <div class="layer-meta"><div class="layer-num">01</div><div class="layer-name">Build once, promote immutably</div><div class="layer-src">ECR &middot; semver</div></div>
+      <p>The artifact dev built is the artifact production would run, untouched, so rollback is redeploying a known-good image that already exists. Production repositories are forced immutable and retain the last ten tags; dev's are mutable, which is a real caveat on dev rollback targets rather than a footnote.</p>
+    </div>
+    <div class="layer l2">
+      <div class="layer-meta"><div class="layer-num">02</div><div class="layer-name">Gate on quality, not just liveness</div><div class="layer-src">custom judges + ground truth</div></div>
+      <p>Evaluation scores act before exposure (PR checks and the weekly suite), during exposure (the observation window), and after exposure (six alarms bound to five automated remediations). The scoring is this system's own, not the platform's — and one of those gates is currently red on a fixture problem, which is exactly the kind of thing a gate is supposed to make impossible to ignore.</p>
+    </div>
+    <div class="layer l3">
+      <div class="layer-meta"><div class="layer-num">03</div><div class="layer-name">Detect fast, expose deliberately</div><div class="layer-src">observation window + tenant variants</div></div>
+      <p>AgentCore gives no traffic-layer exposure control, so operational regressions are caught by a fast observation window with a five-minute roll-forward instead of a smaller blast radius — and real gradual exposure for behavioral changes runs through operator-driven tenant-scoped variant routing, one layer up.</p>
+    </div>
+  </div>
+
+  <p>AgentCore is woven through all three, though not always in the role you would expect. It is the target the pipeline deploys to; the managed runtime whose absent fractional routing is precisely why the deploy-time canary is a monitoring window rather than an exposure slice; the platform whose full-replace update semantics turn "I'll just patch one field" into an outage; and a sampled evaluation service that is genuinely useful and genuinely <em>not</em> the thing holding the release gate. The scores that gate and remediate are the ones this codebase computes itself.</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">&#10003;</div>
+        <div class="tcard-title">Deterministic release plumbing</div>
+      </div>
+      <p>Immutable images, semver tags, SHA-as-artifact-identity, split plan/apply, and forward-only rollback — the parts that must be boring and reproducible are exactly that, and the recovery path deliberately reuses the deploy path so it introduces no new variables.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">&#9889;</div>
+        <div class="tcard-title">Quality as a live signal</div>
+      </div>
+      <p>Evaluation scores treated as a first-class release signal at every stage, so the failure mode unique to agents — healthy but wrong — is caught fast, with five automated responses that change behaviour in ~30s and none that quietly re-enable themselves.</p>
+    </div>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">What would make this real</div>
+    <p>Three things were on this list. One is now done: the gate decision is made and in code — calibration is advisory while the panel is synthetic, judge consistency still blocks, and the labelling pipeline became an upgrade path rather than a blocker.</p>
+    <p>Two remain. <strong>Seed a production smoke tenant</strong> — tenant config rows plus category and supplier master data for the four quadrants — so the quadrant test fails for regressions rather than for emptiness. Then <strong>cut one release</strong>, because a promotion path with zero runs is a design, not a pipeline, and because the first release is the one that establishes the rollback target every later release depends on.</p>
+    <p>Both are blocked on the same unglamorous fact, and it is worth saying out loud rather than filing under "zero runs": as of 2026-08-19 there is no production environment to seed. No production Terraform state, no production tables, no production image repositories. The pipeline's first run would also be production's first apply. Everything in this post is built and most of it is now verified in dev; none of it has been proven under the conditions it was built for.</p>
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="dag-vs-llm-planner.html" class="related-post-card">
+        <div class="rpc-tag">Architecture</div>
+        <div class="rpc-title">Why we chose a deterministic DAG over a pure LLM planner</div>
+      </a>
+      <a href="why-we-chose-agentcore.html" class="related-post-card">
+        <div class="rpc-tag">Infrastructure</div>
+        <div class="rpc-title">Why we chose Bedrock AgentCore — and what we turned down to get there</div>
+      </a>
+      <a href="failure-handling.html" class="related-post-card">
+        <div class="rpc-tag">Reliability</div>
+        <div class="rpc-title">Designing for failure in a multi-agent procurement system</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; May 2026</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> &mdash; an autonomous multi-agent procurement negotiation system. Reconciled against the implementation repository &mdash; workflows, Terraform, and the decision record, not the design documents &mdash; updated 2026-08-19.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

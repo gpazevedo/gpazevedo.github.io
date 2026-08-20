@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>One microkernel, six plug-ins: the patterns behind Buyer Team — Gustavo Azevedo</title>
+<meta name="description" content="A named-patterns tour of the Buyer Team agent runtime: a microkernel core with per-agent plug-ins, held together by Factory Method, two-phase Builder, Strategy, load shedding, and graceful drain — and an honest split between the guarantees the code enforces and the ones a CI test stands in for."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/architecture-and-design-patterns.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/architecture-and-design-patterns.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="One microkernel, six plug-ins: the patterns behind Buyer Team"/>
+<meta property="og:description" content="A named-patterns tour of the Buyer Team agent runtime: a microkernel core with per-agent plug-ins, held together by Factory Method, two-phase Builder, Strategy, load shedding, and graceful drain — and an honest split between the guarantees the code enforces and the ones a CI test stands in for."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Architecture"/>
+<meta property="article:tag" content="Design Patterns"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="One microkernel, six plug-ins: the patterns behind Buyer Team"/>
+<meta name="twitter:description" content="A named-patterns tour of the Buyer Team agent runtime: a microkernel core with per-agent plug-ins, held together by Factory Method, two-phase Builder, Strategy, load shedding, and graceful drain — and an honest split between the guarantees the code enforces and the ones a CI test stands in for."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"One microkernel, six plug-ins: the patterns behind Buyer Team","description":"A named-patterns tour of the Buyer Team agent runtime: a microkernel core with per-agent plug-ins, held together by Factory Method, two-phase Builder, Strategy, load shedding, and graceful drain — and an honest split between the guarantees the code enforces and the ones a CI test stands in for.","datePublished":"2026-08-19","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/architecture-and-design-patterns.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/architecture-and-design-patterns.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"One microkernel, six plug-ins: the patterns behind Buyer Team","item":"https://gpazevedo.github.io/blog/eng/architecture-and-design-patterns.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Architecture &amp; Design Patterns</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <time datetime="2026-08-19">August 2026</time>
+    <span class="dot">·</span>
+    <span>12 min read</span>
+  </div>
+
+  <h1>One microkernel, six plug-ins: <em>the patterns behind Buyer Team</em></h1>
+
+  <p class="deck">Buyer Team runs six LLM agents. Each one boots in about forty-five lines — import a spec, hand it to a factory, serve — and everything that makes it a running <em>service</em> lives once, in a runtime none of them can override. That's not an accident of refactoring — it's a <strong>microkernel</strong>, and once you name the governing pattern, a couple of dozen classical design and architectural patterns fall out of it in order. This post walks the whole set, from Factory Method to graceful drain, and is honest about the one thing pattern catalogues usually hide: which guarantees the code actually enforces, and which are just a CI test standing in for a promise the runtime can't make.</p>
+
+  <p>The shared runtime, <code>buyer_agent_core</code>, is the machinery underneath every agent. This post reads that same system through a different lens — not "what does the runtime guarantee," but "what are the named shapes it's built from, and why those." Patterns are a vocabulary, not a scorecard; the value here is that naming them exposes <em>where the design is load-bearing</em> and where it's leaning on convention.</p>
+
+  <hr>
+
+  <h2>The governing pattern: microkernel / plug-in</h2>
+
+  <p>Everything starts here. <code>buyer_agent_core</code> is the <strong>core</strong> — the invariant runtime baked into the <code>agent-base</code> Docker image. Each of the six agents is a <strong>plug-in</strong> that contributes exactly one thing: a declaration. The kernel supplies model resolution, serving, prompt caching, guardrails, admission control, and drain. The plug-in supplies a name, a tier, a prompt, some tools, and a schema — and nothing else.</p>
+
+  <div class="layer-stack">
+    <div class="layer l1">
+      <div class="layer-meta">
+        <span class="layer-num">Plug-in</span>
+        <span class="layer-name">AgentSpec — the contract</span>
+        <span class="layer-src">per-agent, 67–143 lines</span>
+      </div>
+      <div class="chips">
+        <span class="chip">14 required fields</span>
+        <span class="chip">6 optional fields</span>
+        <span class="chip">name · tier · prompt · tools · schema</span>
+      </div>
+    </div>
+    <div class="layer l2">
+      <div class="layer-meta">
+        <span class="layer-num">Boundary</span>
+        <span class="layer-name">DynamicAgentFactory.build(spec)</span>
+        <span class="layer-src">one call, six callers</span>
+      </div>
+      <div class="chips">
+        <span class="chip">spec goes up, never subclassed down</span>
+      </div>
+    </div>
+    <div class="layer l3">
+      <div class="layer-meta">
+        <span class="layer-num">Core</span>
+        <span class="layer-name">buyer_agent_core — the invariant runtime</span>
+        <span class="layer-src">shared, lives once</span>
+      </div>
+      <div class="chips">
+        <span class="chip">model ladder</span>
+        <span class="chip">serving</span>
+        <span class="chip">caching</span>
+        <span class="chip">guardrails</span>
+        <span class="chip">admission</span>
+        <span class="chip">drain</span>
+      </div>
+    </div>
+  </div>
+
+  <p>The line between the top row and the bottom two is the whole design. Everything below it is <em>100% fixed across all six agents</em>. That single boundary is what makes the rest of the pattern list possible — and a plug-in author genuinely cannot <em>override</em> it, because there is no base agent class to subclass and the code they'd need to replace doesn't exist in their module. It exists once, in the base image.</p>
+
+  <p>What they can still do is go <em>around</em> it — import <code>boto3</code> or <code>strands</code> directly and talk to the platform without the kernel's knowledge. Nothing in the runtime prevents that, and it isn't hypothetical: six copies of the same <code>boto3.resource(...)</code> construction had already accumulated across the agents' <code>tools.py</code> files, and steering decisions were being imported straight from <code>strands.vended_plugins</code>, before anything was watching. What watches now is a test. Hold that thought — it's the subject of the last section.</p>
+
+  <blockquote>
+    <p>"Things the architecture makes it impossible to get wrong, because that logic lives once."</p>
+  </blockquote>
+
+  <p>That sentence is the design's north star. The word for it is <strong>poka-yoke</strong> — mistake-proofing; design-by-constraint. The reason the runtime owns model selection, guardrail wiring, and the drain sequence isn't tidiness. It's that an agent author can't misconfigure what they're never handed. Every pattern below is in service of that one idea, and the honest ones among them admit exactly how far the mistake-proofing reaches.</p>
+
+  <div class="callout">
+    <div class="callout-label">Not the only shared kernel in this codebase</div>
+    <p>The same instinct shows up twice more outside the agent fleet, at a smaller scale. <code>lambda_core</code> is a shared Lambda Layer — cached boto3/DynamoDB clients, structured logging, metric emission, and the <code>guarded()</code> / <code>http_error_response()</code> failure-handling primitives — attached to all twelve Lambda handlers, with a shared DLQ wired for eight of them. <code>mcp_servers/shared</code> plays the same role for the three MCP servers: one <code>build_mcp_app()</code> factory, one opaque-error decorator, one tenant-trust check, imported instead of reimplemented per server. Both are <strong>Shared Kernel</strong> in the same DDD sense as <code>buyer_agent_core</code> — one implementation instead of N copies — but neither is a microkernel in the fuller sense this post uses for the agent fleet: there's no <code>AgentSpec</code>-style declarative contract, just functions and decorators imported piecemeal rather than a spec handed over for a blueprint back.</p>
+    <p>Both now have the agent fleet's own reach-around guarantee, not just its aspiration: an AST-walk boundary test per area, added after the fact, the same way the agent-layer test was. Writing the Lambda one reran the agent fleet's origin story in miniature — two handlers were already importing <code>Key</code>/<code>TypeDeserializer</code> straight from <code>boto3.dynamodb</code>, so the test would have gone red on day one. Both now import them from <code>lambda_core</code> instead, which re-exports them the way <code>buyer_agent_core</code> re-exports <code>Attr</code>, and the test that would have caught the old version is what's running now. The MCP test stops one check short of parity, honestly: <code>mcp_servers/shared</code> has no top-level <code>__all__</code> to check membership against, so every server still builds its own boto3 client — approved in that test's allow-list, and named as a real gap rather than quietly closed.</p>
+  </div>
+
+  <hr>
+
+  <h2>Design patterns — the object level</h2>
+
+  <p>Zoom into the boundary and the classical Gang-of-Four vocabulary shows up almost one-to-one. None of these were reached for by name; they're what you get when you insist that per-agent behaviour be <em>data the kernel consumes</em> rather than <em>code the agent overrides</em>.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Pattern</th>
+          <th>Where it lives</th>
+          <th>What it buys</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pat">Factory Method</span></td>
+          <td><code>DynamicAgentFactory.build(spec)</code> → <code>AgentBlueprint</code>; <code>make_runner</code>, <code>build_app</code> as factory functions.</td>
+          <td>The agent never <code>new</code>s its own runtime. It hands over a spec and gets a fully wired object back.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Builder (two-phase)</span></td>
+          <td>"Build once, mint per request." <code>AgentBlueprint</code> assembles the expensive shared parts once; <code>new_agent(req)</code> mints a fresh instance per request.</td>
+          <td>The standout of the set — the cost of construction is paid at boot; the isolation of statelessness is paid per call.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Strategy</span></td>
+          <td>Injected callables on the spec: <code>prompt_builder</code>, <code>response_builder</code>, <code>context_builder</code>, <code>summary</code>, <code>plugins</code>.</td>
+          <td>Pluggable per-agent behaviour over a fixed runtime — swap the algorithm, keep the machine.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Template Method</span></td>
+          <td><code>make_runner</code>'s fixed two-step skeleton: analysis → coercion, with the coercion step overridable via <code>response_builder</code> vs. <code>structured_output()</code>.</td>
+          <td>The shape of a run is fixed; only the marked step varies.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Specification / Parameter Object</span></td>
+          <td><code>AgentSpec</code> itself — a frozen, declarative data object the rest of the system reads.</td>
+          <td>Behaviour becomes inspectable data. You can print an agent's whole identity.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Chain of Responsibility</span></td>
+          <td>The model-resolution precedence ladder: live config → env var → seed mirror.</td>
+          <td>Each link answers or defers; boot never depends on any one source being up.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Interceptor / Middleware</span></td>
+          <td><code>AdmissionControl</code> ASGI middleware; Strands hooks <code>log_tool_call</code> / <code>compact_tool_output</code>; steering plug-ins like <code>WinnerDisclosureGuard</code>.</td>
+          <td>Cross-cutting behaviour wraps the request path without any agent knowing it's there.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Null Object</span></td>
+          <td><code>plugins</code> defaulting to <code>lambda req: []</code>; the <code>_unknown</code> tenant bucket; an absent trace-carrier yielding the root context as a safe no-op; a <em>partially</em>-configured guardrail collapsed to a clean unset rather than a malformed Converse call.</td>
+          <td>The "nothing configured" path is a real, tested object — not a branch someone forgot to write.</td>
+        </tr>
+        <tr class="row-quality">
+          <td><span class="pat">Decorator (fail-closed)</span></td>
+          <td><code>GuardHandler</code> wrapping Strands' <code>SteeringHandler</code>: the framework's own <code>steer_before_tool</code> swallows a guard's exception at DEBUG and returns <em>without</em> setting <code>cancel_tool</code>, so a guard that trips on a malformed payload silently lets its tool run unguarded. The subclass catches anything escaping <code>check()</code> and converts it into a <code>Guide</code> that cancels the call.</td>
+          <td>A confidentiality guard fails <em>closed</em> — the one moment it's most likely to break is the one moment it must not disappear.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Adapter</span></td>
+          <td><code>_remote_context</code> adapting A2A <code>message.metadata</code> into an OTEL parent span; <code>guardrail_kwargs()</code> adapting env vars into Converse kwargs.</td>
+          <td>Two vocabularies that shouldn't know about each other meet at a translation seam.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Dependency Injection / IoC</span></td>
+          <td>Agents inject their spec <em>up</em> into the shared runtime rather than subclassing <em>down</em>.</td>
+          <td>"You never subclass a base agent class." Inversion is the whole point — the kernel calls you.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">The one to remember</div>
+    <p>If you take a single pattern from this section, take the <strong>two-phase Builder</strong>. "Build once, mint per request" is where the cost model and the isolation model meet: the expensive, shared, read-only scaffolding is constructed a single time at boot, and every incoming request gets a fresh, disposable <code>Agent</code> minted from it. That one split is simultaneously a performance decision and a security decision, which is why it recurs in the architectural section below as <em>stateless worker</em>.</p>
+  </div>
+
+  <hr>
+
+  <h2>Architectural patterns — the system level</h2>
+
+  <p>Step back from the object graph to the running service and a second, mostly-disjoint vocabulary appears — the resilience and operability patterns. These aren't about how the code is shaped; they're about how the process behaves when config tables blink, when a tenant floods it, and when the orchestrator sends <code>SIGTERM</code>.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Pattern</th>
+          <th>Where it lives</th>
+          <th>What it buys</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="pat">Shared Kernel (DDD)</span></td>
+          <td><code>buyer_agent_core</code> baked into <code>agent-base</code> — "the only place this logic physically exists, so there's no local copy of it to drift."</td>
+          <td>Reuse without a versioning treadmill; drift is prevented by physics, not policy.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Load shedding / backpressure</span></td>
+          <td>Fast-reject with <code>503 + Retry-After: 1</code> instead of unbounded queuing.</td>
+          <td>An overloaded worker fails fast and cheap rather than degrading everyone behind a growing queue.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Graceful degradation / fallback</span></td>
+          <td>A config-table outage degrades model selection but never fails boot; an unparseable guardrail assessment is read as a block, not a pass.</td>
+          <td>The dependency being down costs you the <em>best</em> answer, not the <em>service</em>.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Health check / readiness probe</span></td>
+          <td><code>/ping</code> as <em>readiness</em> (not liveness), gating rotation.</td>
+          <td>A draining or warming instance is pulled from rotation without being killed.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Graceful shutdown (drain)</span></td>
+          <td><code>SIGTERM</code> → flip readiness → drain in-flight runs within a bounded timeout.</td>
+          <td>Deploys and scale-downs don't sever active negotiations mid-run.</td>
+        </tr>
+        <tr class="row-quality">
+          <td><span class="pat">Stateless worker / share-nothing</span></td>
+          <td>Per-request <code>Agent</code> minting as the isolation mechanism — "tenant isolation is per-request, not per-tenant."</td>
+          <td>No cross-request state means no cross-tenant leakage; isolation is structural.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Pipeline</span></td>
+          <td>The two-step analysis → coercion run; the executor's streaming tool-status artifacts.</td>
+          <td>Each stage has one job; the seams are observable.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Distributed tracing / context propagation</span></td>
+          <td>A W3C trace carrier smuggled through the A2A message body because AgentCore strips HTTP headers.</td>
+          <td>A single trace survives the hop even when the transport won't carry the headers.</td>
+        </tr>
+        <tr>
+          <td><span class="pat">Twelve-factor config</span></td>
+          <td>Behaviour tuned entirely through env vars — prompt-cache toggles, tool-output caps, per-tenant concurrency limits.</td>
+          <td>Tuning is a deploy variable, not a code change; the same image behaves differently per environment.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⊕</div>
+        <div class="tcard-title">Load shedding</div>
+      </div>
+      <p><strong>Chose:</strong> cap concurrent in-flight runs and reject overflow fast with <code>503</code>. <strong>Trade-off:</strong> a burst is shed even though the work would eventually fit if it queued. <strong>Gain:</strong> an overloaded replica fails fast and cheap instead of degrading everyone behind a growing queue.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⊕</div>
+        <div class="tcard-title">Stateless worker</div>
+      </div>
+      <p><strong>Chose:</strong> mint a fresh <code>Agent</code> per request. <strong>Trade-off:</strong> you pay per-request construction instead of reusing a warm object. <strong>Gain:</strong> tenant isolation you can't accidentally break, because there's nothing shared to leak.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <h2>The nuance worth calling out</h2>
+
+  <p>Here's where a pattern catalogue usually lies by omission. Naming a pattern is not the same as enforcing it, and this design is unusually candid about the difference. There are three rungs a guarantee can sit on, not two. Some are <strong>structurally enforced</strong> — the code physically cannot do the wrong thing. Some are <strong>conventionally enforced</strong> — the wrong thing is possible, and a test, or a fatal exception on a misconfigured deploy, is what keeps it from shipping. And the lowest rung is merely <strong>observed</strong> — the wrong thing is possible, nothing stops it, and an alarm tells you afterwards. One row below used to sit there; it's since climbed to conventional, and how it got there is worth watching closely.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Guarantee</th>
+          <th>How it's held</th>
+          <th>What could still break it</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="row-quality">
+          <td>No agent <em>overrides</em> the runtime</td>
+          <td><strong>Structural.</strong> There is no base agent class to subclass; the overridable code doesn't exist in the agent module.</td>
+          <td>Nothing at the agent level — you'd have to edit the base image.</td>
+        </tr>
+        <tr class="row-gov">
+          <td>No agent reaches <em>around</em> the runtime</td>
+          <td><strong>Conventional.</strong> An AST test walks every agent module and rejects any import root outside the stdlib, its flat siblings, and three approved packages — plus a ban on dynamic-import machinery to keep the first check sound, and an <code>__all__</code> membership check so a re-export is distinguishable from an import artifact that merely happens to be reachable.</td>
+          <td>Nothing at runtime. This one had already been breached before the test existed, which is why the test exists.</td>
+        </tr>
+        <tr class="row-quality">
+          <td>Per-request statelessness</td>
+          <td><strong>Structural.</strong> A new instance is minted per request; there's no shared object to reuse.</td>
+          <td>Nothing on the normal path — isolation is a property of the object graph.</td>
+        </tr>
+        <tr class="row-quality">
+          <td>Guardrail block short-circuit</td>
+          <td><strong>Structural.</strong> Only an affirmatively anonymize-only intervention is allowed through; an empty or unparseable assessment, or any <code>BLOCKED</code> action anywhere in it, is treated as a real block — and that block is re-raised past the retry loop rather than retried.</td>
+          <td>Nothing — the secure reading <em>is</em> the default branch.</td>
+        </tr>
+        <tr class="row-quality">
+          <td>Cache byte-identity</td>
+          <td><strong>Structural.</strong> The prefix is assembled once per blueprint; a spec's per-request <code>context_builder</code> block is appended <em>after</em> the cachePoint, so variable data can't move the cached bytes.</td>
+          <td>Nothing a spec author writes — the breakpoint is upstream of anything they control.</td>
+        </tr>
+        <tr class="row-gov">
+          <td>Guardrails are actually attached</td>
+          <td><strong>Conventional.</strong> <code>guardrail_kwargs()</code> raises a required-config error when guardrails are mandated but the guardrail ID/version are unset; since every agent's entrypoint calls <code>DynamicAgentFactory.build()</code> at module import time, the raise crashes the process before it ever binds its port. The Terraform for the primary and canary runtimes sets the guardrail-required flag, and it's live — confirmed in Terraform state on both, with a targeted plan showing no drift. Local runs and tests still leave it unset by design, so unset stays legitimate off the deployed path. A CloudWatch alarm and a live SNS email subscriber also make an unconfigured deploy pageable, not just fatal.</td>
+          <td>The flag is hand-set on two runtime blocks; a new runtime added later without it silently reverts to fail-open, and nothing would catch that but a reviewer. The check only fires at process boot, too — it can't catch a guardrail that goes missing from under an agent already serving. This was proven fail-open live once, before the fix — an adversarial replay scored 0/60 blocked because no agent was passing the guardrail config.</td>
+        </tr>
+        <tr class="row-gov">
+          <td>Seed-mirror invariant (the model ladder)</td>
+          <td><strong>Conventional.</strong> A CI drift test parses the seeding script and asserts the in-image mirror matches its tier map literal.</td>
+          <td>The test locks the mirror to the <em>seed script</em>, not to live config — both can drift away from what's actually in the config table, and nothing checks that.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The amber rows are the honest part, and note where they fall. The seam that the whole microkernel story rests on is one of them: an agent <em>can</em> reach past the kernel to <code>boto3</code> or <code>strands</code>, and what stops it is a test in CI, not the shape of the code. The guardrail-attachment guarantee used to be the extreme case — merely observed, nothing stopping a deploy from serving unprotected but an alarm after the fact. It isn't anymore: a fix now makes an unconfigured guardrail crash the process at boot, and the terraform that arms it on the deployed runtimes has actually been applied, not just merged — checked directly against Terraform state, not assumed from the commit. It's still only conventional, not structural — a new runtime block that forgets the flag reverts to fail-open with nothing to catch it but review — but that's a real rung climbed, not a promise of one. These are patterns the design <em>aspires</em> to make mistake-proof; some have arrived, some are a test or an alarm standing in for a guarantee the code can't fully make yet.</p>
+
+  <p>That's worth sitting with, because the temptation is to describe the boundary as physics and move on. It isn't physics. It's a very good habit, written down as an assertion, that had already been broken once before anyone wrote the assertion. Poka-yoke is the goal everywhere; the design earns its credibility by saying plainly where it's still only convention with a safety net.</p>
+
+  <div class="callout">
+    <div class="callout-label">Why the candor matters</div>
+    <p>The failure mode of pattern-driven design is treating the pattern as the guarantee — assuming that because a thing has a <em>pattern name</em>, it's <em>enforced</em> like one. Every entry above is paired with its cost rather than presented as a free win, and the conventional-vs-structural split tells you exactly which patterns you can lean your weight on and which ones want a green CI run before you trust them. That pairing — guarantee with its price, pattern with its enforcement level — is itself the most transferable thing in the design.</p>
+  </div>
+
+  <div class="verdict">
+    <div class="verdict-badge">The takeaway</div>
+    <div class="verdict-text"><strong>One pattern governs; the rest are consequences.</strong> Commit to a microkernel where per-agent behaviour is data the core consumes, add a poka-yoke rule that shared logic lives exactly once, and the Factory Method, two-phase Builder, Strategy, load-shedding, and graceful-drain patterns aren't decisions you make separately — they're the shape the constraint forces. The craft is in knowing, and saying, which of them the code enforces and which a test merely watches.</div>
+  </div>
+
+  <hr>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="dag-vs-llm-planner.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Why we chose a deterministic DAG over a pure LLM planner</div>
+      </a>
+      <a href="tenant-isolation-agent-attack-vector.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">When the agent is the attack vector: extending tenant isolation beyond partition keys</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; August 2026</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> &mdash; an autonomous multi-agent procurement negotiation system.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

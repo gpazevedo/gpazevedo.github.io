@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Five tools, no silent failures: where Buyer Team handles failure — Gustavo Azevedo</title>
+<meta name="description" content="Buyer Team handles failure in exactly five places: the agent microkernel, a shared Lambda layer, a shared MCP base, the orchestrator resilience layer, and the AWS alarms. A mechanism-by-mechanism tour — and the silent failures that proved each tool necessary."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/no-silent-failures.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/no-silent-failures.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Five tools, no silent failures: where Buyer Team handles failure"/>
+<meta property="og:description" content="Buyer Team handles failure in exactly five places: the agent microkernel, a shared Lambda layer, a shared MCP base, the orchestrator resilience layer, and the AWS alarms. A mechanism-by-mechanism tour — and the silent failures that proved each tool necessary."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Reliability"/>
+<meta property="article:tag" content="Architecture"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Five tools, no silent failures: where Buyer Team handles failure"/>
+<meta name="twitter:description" content="Buyer Team handles failure in exactly five places: the agent microkernel, a shared Lambda layer, a shared MCP base, the orchestrator resilience layer, and the AWS alarms. A mechanism-by-mechanism tour — and the silent failures that proved each tool necessary."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Five tools, no silent failures: where Buyer Team handles failure","description":"Buyer Team handles failure in exactly five places: the agent microkernel, a shared Lambda layer, a shared MCP base, the orchestrator resilience layer, and the AWS alarms. A mechanism-by-mechanism tour — and the silent failures that proved each tool necessary.","datePublished":"2026-08-19","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/no-silent-failures.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/no-silent-failures.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Five tools, no silent failures: where Buyer Team handles failure","item":"https://gpazevedo.github.io/blog/eng/no-silent-failures.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">No Silent Failures</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <time datetime="2026-08-19">August 2026</time>
+    <span class="dot">·</span>
+    <span>21 min read</span>
+  </div>
+
+  <h1>Five tools, no silent failures: <em>where Buyer Team handles failure</em></h1>
+
+  <p class="deck">Buyer Team doesn't scatter failure handling across six LLM agents, thirteen Lambdas, three MCP servers, and a Step Functions orchestrator. It's centralized in five shared tools — one per boundary — so that every failure is detected, categorized, made observable, and recovered or escalated. Each tool exists because a failure once went silent. This is the mechanism tour: what each of the five catches, and the incident that proved it necessary.</p>
+
+  <p>Somewhere in Buyer Team, every failure is supposed to be caught: a throttled agent call, a Lambda that dies on its own schedule, an MCP server returning a raw exception to an LLM caller, a checkpoint that was never written. When we swept the codebase for where that detection and handling actually lives, the answer was satisfying in a way code audits rarely are. It is not spread thinly across the six agents and thirteen Lambdas and three MCP servers. It lives in <strong>five shared tools</strong> — two shared Python packages, one shared Layer, one resilience module, and one alarm surface in Terraform.</p>
+
+  <p>That concentration is the point. Buyer Team's resilience history is a series of silent failures — failures that happened, kept happening, and were indistinguishable from health. A Lambda failed 44 of 44 scheduled invocations for 30 days while its business alarms read <code>OK</code>. Another ran 12 days with an <code>AccessDenied</code> on every call. A missing module in a deploy zip took the terminal node of the whole purchase chain down for three days while the rest of the system returned plausible fallback results. None of these were survivable without an observability story, and all of them were fixed the same way: by concentrating the handling in one place where it could not be skipped, and by standing an alarm behind it so even the handling layer can fail loudly.</p>
+
+  <p>The five tools, from the innermost boundary to the outermost:</p>
+
+  <div class="layer-stack">
+    <div class="layer l1">
+      <div class="layer-meta">
+        <span class="layer-num">Tool 1</span>
+        <span class="layer-name">Agent MicroKernel</span>
+        <span class="layer-src">packages/buyer_agent_core · the 6 LLM agents</span>
+      </div>
+      <div class="chips">
+        <span class="chip">fail-closed guardrails</span>
+        <span class="chip">steering guards</span>
+        <span class="chip">admission control</span>
+        <span class="chip">one AWS client</span>
+        <span class="chip">EMF metrics</span>
+      </div>
+    </div>
+    <div class="layer l2">
+      <div class="layer-meta">
+        <span class="layer-num">Tool 2</span>
+        <span class="layer-name">lambda-core</span>
+        <span class="layer-src">packages/lambda_core · all 13 Lambdas</span>
+      </div>
+      <div class="chips">
+        <span class="chip">guarded / http_error_response</span>
+        <span class="chip">failure metrics</span>
+        <span class="chip">cached clients</span>
+        <span class="chip">shared Layer + DLQ</span>
+      </div>
+    </div>
+    <div class="layer l3">
+      <div class="layer-meta">
+        <span class="layer-num">Tool 3</span>
+        <span class="layer-name">mcp-core</span>
+        <span class="layer-src">mcp_servers/shared · the 3 MCP servers</span>
+      </div>
+      <div class="chips">
+        <span class="chip">safe_tool</span>
+        <span class="chip">require_tenant</span>
+        <span class="chip">traced_tool</span>
+        <span class="chip">/ping + build_mcp_app</span>
+      </div>
+    </div>
+    <div class="layer l4">
+      <div class="layer-meta">
+        <span class="layer-num">Tool 4</span>
+        <span class="layer-name">Orchestrator-resilience</span>
+        <span class="layer-src">orchestrator/resilience · the SFN node executors</span>
+      </div>
+      <div class="chips">
+        <span class="chip">retry</span>
+        <span class="chip">circuit breakers</span>
+        <span class="chip">timeouts</span>
+        <span class="chip">idempotency</span>
+        <span class="chip">DLQ + outbox</span>
+        <span class="chip">fallback + compensation</span>
+      </div>
+    </div>
+    <div class="layer l5">
+      <div class="layer-meta">
+        <span class="layer-num">Tool 5</span>
+        <span class="layer-name">AWS metrics &amp; alarms</span>
+        <span class="layer-src">infra/ · CloudWatch, SNS, DLQ, dashboards</span>
+      </div>
+      <div class="chips">
+        <span class="chip">scheduled-Lambda error alarms</span>
+        <span class="chip">agent-runtime alarms</span>
+        <span class="chip">SFN alarms</span>
+        <span class="chip">cost metrics</span>
+      </div>
+    </div>
+  </div>
+
+  <p>Each section below is mechanism-first: what the tool is, what it catches, how. The incidents that forced the tool into existence appear as <span style="color:var(--coral)">evidence callouts</span> — they are not the argument, they are the proof. The last section walks one failure through all five tools to show how they compose.</p>
+
+  <hr>
+
+  <h2>Tool 1 — The Agent MicroKernel</h2>
+
+  <div class="tool-head">
+    <span class="tool-num">packages/buyer_agent_core</span>
+    <span class="tool-code">one shared package under all six LLM agents</span>
+  </div>
+
+  <p>Buyer Team's six LLM agents — Kraljic classifier, spot bidding, leverage auction, bottleneck negotiation, strategic partnership, award comms — each run in their own AgentCore runtime microVM. Each <code>agent.py</code> is a thin declaration: a prompt builder, a request/response schema, a list of tools, a steering guard. Everything that is <em>not</em> the agent's specific business logic lives in one shared package, <code>buyer_agent_core</code>, which we call the microkernel. It owns the serving loop, the safety layer, and the admission boundary — the three places an agent can hurt the system without meaning to.</p>
+
+  <h3>Fail-closed guardrails</h3>
+
+  <p>Every deployed agent runtime sets <code>GUARDRAIL_REQUIRED=true</code>. When that flag is set and <code>GUARDRAIL_ID</code>/<code>GUARDRAIL_VERSION</code> are unset, the guardrail wiring raises <code>GuardrailRequiredError</code> instead of returning an empty config. Because each agent constructs its model at module import time, that raise crashes the process <em>before it binds a port</em>. A deploy that loses its Guardrail doesn't serve a single unprotected request — it just doesn't come up. An unprotected state is also alarmable on its own: unconfigured wiring emits a <code>guardrail.unconfigured</code> metric, so the condition is visible even before it crashes anything.</p>
+
+  <p>The microkernel also draws the line between a real guardrail block and a masking-only intervention. Buyer Team's Guardrail anonymizes EMAIL/NAME/PHONE/ADDRESS by design — the agents pass supplier contact details into the model, which echoes them back and trips output PII masking. A masking-only intervention leaves the content usable; a genuine <code>BLOCKED</code> action (content filter incl. <code>PROMPT_ATTACK</code>, topic DENY, blocked PII/regex) must stop the run. <code>is_masking_only_intervention()</code> makes that distinction, and a genuine block raises <code>GuardrailBlocked</code> — which is deliberately <em>not</em> retried. Proven live: retrying a blocked prompt can come back clean, because the PROMPT_ATTACK filter is confidence-scored rather than deterministic, and running step 2's structured-output coercion on top of a blocked step 1 makes the model fabricate a plausible-looking response from nothing. The block gets silently discarded. Blocking is terminal, and a <code>security.guardrail.triggered</code> metric fires on the way out.</p>
+
+  <h3>Steering guards fail closed</h3>
+
+  <p>Every agent's tools are gated by steering hooks — governance checks that can refuse a tool call (a TCO guard that demands every candidate be priced, a rank-only integrity guard on auction bids). A <code>GuardHandler</code> base class wraps all of them. Any exception escaping a hook's <code>check()</code> cancels the tool call and emits a <code>governance.hook_error</code> metric — deliberately distinct from the metric fired when a hook <em>works</em> and blocks something, so an alarm can tell "the guard broke" from "the guard is doing its job." A guard that <em>hangs</em> fails closed the same way a raise does: <code>check()</code> runs under <code>asyncio.wait_for</code> (10s default).</p>
+
+  <p>The fail-closed guarantee is enforced by tests, not convention. A static test asserts every <code>GuardHandler</code> subclass overrides only <code>check()</code> — never <code>steer_before_tool</code> directly, which is the sibling escape route — and that none subclass Strands' <code>SteeringHandler</code> directly. Every one of the eight real guard instances across the agents has a test that drives a genuine failure through its own <code>check()</code>, and every agent's spec has a test asserting the guard is actually registered. The guarantee covers a guard that's wired in; the tests confirm each one is.</p>
+
+  <h3>Inbound admission control</h3>
+
+  <p>An LLM agent's unit of work is a multi-second two-step run, so the resource to bound is <em>in-flight count</em>, not requests per second. Each agent runs ASGI middleware (<code>AdmissionControl</code>) that caps concurrent task POSTs — globally and per tenant — and fast-rejects with <code>HTTP 503</code> plus a <code>Retry-After: 1</code> hint when saturated, instead of letting requests queue under a burst. Health probes and GETs always pass through, so a saturated agent never looks unhealthy to the platform. The body is bounded at 1&nbsp;MiB, checked as chunks arrive so an oversized body is never fully buffered before rejection. Per-tenant bucketing means one tenant's burst can't starve another's admission slots on a shared warm replica — fairness among tenants that are already trusted equally, not a new authorization boundary.</p>
+
+  <p>Shedding early beats queueing: a rejected request gets rescheduled against a less-loaded replica immediately by the caller's retry, rather than piling onto one that's already struggling.</p>
+
+  <h3>One AWS client, one metric path</h3>
+
+  <p>Every agent's <code>tools.py</code> used to build its own DynamoDB resource, botocore <code>Config</code>, and region lookup — six copies of one retry policy, so a timeout change had to be made six times and could drift silently. The microkernel's <code>aws.py</code> is now the single construction site: <code>Config(connect_timeout=10, read_timeout=30, retries={"max_attempts": 3, "mode": "adaptive"})</code>, region read lazily on first use, every client/table cached for the life of the warm container. A static boundary test enforces per-agent that no agent imports boto3 directly.</p>
+
+  <p>Metrics go out through an EMF implementation — a structured JSON line to stdout that CloudWatch Logs extracts into a datapoint, with no CloudWatch API call on the instrumented path. The previous implementation was a synchronous <code>put_metric_data</code> sitting in the per-step usage-logging hot path with a 5s connect + 5s read timeout, retried once: in the failure case, up to ~20s of blocking network I/O <em>per LLM step</em>. EMF removes the remote call entirely, so the metric can't fail independently of the code it instruments.</p>
+
+  <h3>Model ladder and readiness</h3>
+
+  <p>The model each agent uses is resolved from a tier at initialization, not hardcoded. A config-read failure is distinguishable from a legitimate fresh-environment fallback by a <code>tier_fallback</code> metric and a <code>/ping</code> <code>tier_source</code> field — a genuinely broken config and a benign default look different to an operator. The <code>/ping</code> health check is a real readiness gate: unhealthy until startup — including model and prompt configuration loading — genuinely completes, healthy after; a replica never takes traffic before it's ready, and it flips unhealthy the moment shutdown begins so in-flight work drains within a bounded window.</p>
+
+  <div class="evidence">
+    <div class="evidence-badge">Evidence — a week of masked crashloops</div>
+    <p>Every one of the six agent Dockerfiles once omitted <code>response_builder.py</code> from its explicit <code>COPY</code> list. Every deployed runtime crash-looped on container startup with <code>ModuleNotFoundError</code>, and <code>invoke_agent_runtime</code> returned 424 on every real call — <strong>for a week</strong> — before anyone noticed. It stayed invisible because the orchestrator's node executors degrade gracefully to fallback-stub pricing on <em>any</em> agent failure, so what was actually a total outage looked like ordinary fallback traffic. The fix was one line in six Dockerfiles; the lesson was that graceful degradation without an error-rate alarm is a silent-failure engine. That is why the microkernel's metric path and the alarm layer (Tool 5) are not optional extras — they are the only thing that makes degradation legible.</p>
+    <p>The other founding incident: an adversarial replay of 60 attacks scored <strong>0/60 blocked</strong> because no agent's Bedrock call carried <code>guardrailConfig</code> at all — the Guardrail resource was provisioned in Terraform but never attached to any model call. The microkernel's guardrail wiring exists because provisioning a Guardrail has no effect until the code actually passes it.</p>
+  </div>
+
+  <hr>
+
+  <h2>Tool 2 — lambda-core</h2>
+
+  <div class="tool-head">
+    <span class="tool-num">packages/lambda_core</span>
+    <span class="tool-code">a shared Layer under all 12 Lambdas</span>
+  </div>
+
+  <p>One layer below the agents, the same drift the microkernel fixed for the agent fleet was unfixed for the Lambdas: six-plus independent <code>boto3.client(...)</code> sites with no shared retry config, seven copy-pasted logger blocks, five-plus hand-rolled <code>put_metric_data</code> sites — and, worst, two handlers with <em>no exception handling at all</em>. <code>lambda_core</code> is the same cure for the Lambda layer: one package, shipped as a real <code>aws_lambda_layer_version</code>, that every handler imports.</p>
+
+  <h3>Two failure primitives for two trigger shapes</h3>
+
+  <p>Every Lambda trigger needs the same two things when its body raises: log the exception with enough context to find it, and emit a CloudWatch metric so it's alarmable. What differs per trigger shape is what happens <em>after</em> that. lambda-core splits the difference with two primitives:</p>
+
+  <ul>
+    <li><code>guarded(logger, source)</code> — a context manager that logs, emits a <code>&lt;source&gt;.failure</code> metric, and <strong>re-raises</strong>. This is for SNS/EventBridge-shaped handlers, where re-raising lets Lambda's async-invoke retry — and, once configured, the DLQ — still fire. It only adds observability; it never changes control flow.</li>
+    <li><code>http_error_response(...)</code> — a decorator for API-Gateway-shaped handlers (e.g. <code>token_exchange_broker</code>): catch, log, emit the failure metric, and return a structured <code>{statusCode, body}</code> JSON error instead of letting the exception surface as a raw Lambda 502.</li>
+  </ul>
+
+  <p>The failure metric is dimensioned by exception class, so an alarm can tell <em>what</em> failed apart from <em>how often</em>. Emission is EMF — best-effort by construction, so a broken metrics call can never mask the real exception it was reporting.</p>
+
+  <h3>Shared clients, shared logging</h3>
+
+  <p><code>aws.py</code> is the one place a handler's <code>boto3.client(...)</code> gets built, with the same retry/timeout policy the agent fleet uses (10s connect / 30s read / adaptive retries) and caching per warm environment. <code>logging_setup.py</code> gives every handler one consistent logger at <code>LOG_LEVEL</code> (default INFO, overridable per environment). Both replaced N copies of the same thing, so a tuning change is now one edit and one deploy instead of a silent per-handler drift.</p>
+
+  <h3>The infra half: a DLQ where there was none</h3>
+
+  <p>Observability primitives don't fix a missing DLQ — that's infrastructure. Before this work, no Lambda in the repo had a dead-letter queue or on-failure destination: an unhandled exception silently vanished after Lambda's default two async-invoke retries. lambda-core ships with the infra half as well: a shared SQS DLQ, plus event-invoke config and the IAM grant on all eight async-invoke Lambdas that had no prior handling.</p>
+
+  <p>The IAM detail here is the kind that silently breaks: the <strong>invoked Lambda's own execution role</strong> — not the SNS/EventBridge principal — needs <code>sqs:SendMessage</code> on the destination, or DLQ delivery fails silently. The precedent comment calls it out explicitly, because it is the second-silentest failure mode in the file.</p>
+
+  <div class="evidence">
+    <div class="evidence-badge">Evidence — failures that simply vanished</div>
+    <p>Two of the automated remediation Lambdas had <strong>zero exception handling and no DLQ or on-failure destination anywhere in Terraform</strong>. An unhandled DynamoDB throttle during a live governance alarm would raise, exhaust Lambda's two default async retries, and then disappear. Nothing logged, nothing emitted, nothing escalated.</p>
+    <p>One security-metric Lambda's failure handling was worse than nothing: a bare <code>except: pass</code> that swallowed the exception. A GuardDuty finding that failed to publish simply vanished — a security signal eaten by the very Lambda that exists to surface it. That swallow was deliberately changed to a re-raise when lambda-core landed: a finding is never silently lost, even if publishing fails loudly.</p>
+  </div>
+
+  <hr>
+
+  <h2>Tool 3 — mcp-core</h2>
+
+  <div class="tool-head">
+    <span class="tool-num">mcp_servers/shared</span>
+    <span class="tool-code">a shared base for the three AgentCore-hosted MCP servers</span>
+  </div>
+
+  <p>The three MCP servers that expose tools to the agent fleet over MCP each hand-rolled (or skipped) their own tenant check, error handling, tracing, and health check before this package existed. mcp-core is the same cure the microkernel and lambda-core each provide, applied to the server layer: one shared base every MCP server imports, so a server's resilience stops being a per-server judgment call.</p>
+
+  <h3>safe_tool: a tool never leaks a raw exception</h3>
+
+  <p><code>@safe_tool(logger)</code> is the MCP analogue of lambda-core's <code>guarded</code>. It lets <code>ToolError</code> and <code>PermissionError</code> through — those are already-shaped, expected failures — but catches anything else and rewraps it as an opaque <code>ToolError</code> carrying a logged <code>error_id</code>. The calling agent gets a tool-shaped error instead of a raw stack trace leaking across the tool boundary; the <code>error_id</code> lets an operator correlate the opaque failure back to the real log line. Same shape as lambda-core's <code>http_error_response</code>: the boundary controls what the outside sees, and the inside is preserved for the operator.</p>
+
+  <h3>require_tenant: fail fast on a missing boundary</h3>
+
+  <p><code>@require_tenant()</code> rejects a tool call with no <code>tenant_id</code> before the handler runs. Its default resolver trusts the <code>tenant_id</code> from the call — because no verified identity reaches these servers today: they're invoked directly, not through an AgentCore Gateway, so a JWT claim never reaches this path. The point isn't to verify identity that can't be verified; it's to make the boundary <em>explicit and consistent</em> instead of ad hoc per server — and to fail fast, loudly, the moment a tool is called without the one field everything downstream keys on.</p>
+
+  <h3>traced_tool, /ping, and one-line wiring</h3>
+
+  <p><code>@traced_tool(name, ...)</code> tags the current span with <code>tool.name</code> and <code>tenant_id</code>, so a failed tool call is attributable to the tenant and the tool that failed. <code>build_mcp_app(server)</code> replaces the three-line app-plus-middleware-plus-<code>/ping</code> wiring with a single call — a health check that, like the microkernel's, only reports healthy once the app is genuinely serving. Decorator order matters and is documented: <code>require_tenant</code> (outermost, fail fast) → <code>safe_tool</code> (catches everything below it) → <code>traced_tool</code> (wraps the actual call).</p>
+
+  <div class="evidence">
+    <div class="evidence-badge">Evidence — three servers, three ways to get it wrong</div>
+    <p>Three servers, three ad hoc (or absent) failure modes. One server checked <strong>no tenant at all</strong>. Another compared <code>tenant_id</code> against a second argument nothing in the codebase ever populated — a check that was theoretically strict and actually a no-op. None of the three had a <code>/ping</code> route or wrapped exceptions before they reached the caller: a raw exception from an MCP tool surfaces to the calling agent as an opaque failure, and a broken server gave no signal about whether it was up. mcp-core exists because three hand-rolled implementations are three different ways to get the same thing wrong.</p>
+  </div>
+
+  <hr>
+
+  <h2>Tool 4 — orchestrator-resilience</h2>
+
+  <div class="tool-head">
+    <span class="tool-num">orchestrator/resilience</span>
+    <span class="tool-code">the Step Functions orchestrator's recovery machinery</span>
+  </div>
+
+  <p>Tools 1–3 make each layer's failure handling consistent and observable. Tool 4 is where the machinery actually lives: six orchestrator node Lambdas (ingest/validate, Kraljic classify, strategy execute, bid evaluation, approval gate, award comms) run a procurement negotiation through a Step Functions state machine, and the <code>resilience</code> package is where the real retry-and-recover work happens — retries, circuit breakers, idempotency, a dead-letter queue, fallback classification, saga compensation, and state recovery.</p>
+
+  <h3>A chokepoint you can't opt out of</h3>
+
+  <p><code>invoke_agent_runtime</code> is the single function every agent call in the orchestrator goes through. It composes the retry decorator, the per-agent circuit breaker, and an explicit timeout in one place — and it's also the instrumentation point: token ceilings (200K/100K), a hook-rejection-loop guard (five consecutive rejections and it stops), and the cost/health metrics (<code>cost.usd</code>, <code>cost.unpriced_model_invocation</code>, <code>agentcore.invocation_success</code> 0-or-1, and <code>agentcore.session_seconds</code> in a <code>finally</code>). One chokepoint means no agent call can skip the resilience stack by forgetting to wire it in.</p>
+
+  <h3>Retry, circuit breakers, and timeouts — all config-driven</h3>
+
+  <p>Retry uses tenacity's exponential backoff with jitter, built from a config block in system-config — tunable without a redeploy. Each attempt emits an OTEL span event; on exhaustion the failure is published to the DLQ. Circuit breakers are one per external-dependency type (supplier MCP, Bedrock per failure-correlation scope, A2A agents, memory), with <code>fail_max</code>/<code>reset_timeout</code> from the same config source, and every state transition emits a resilience metric. Every external call carries an explicit timeout from config — and boto3 retries are deliberately disabled on those clients, so the resilience layer owns retry and the underlying call owns exactly one timeout, instead of the two fighting each other.</p>
+
+  <h3>Idempotency and the transactional outbox</h3>
+
+  <p>Side-effecting operations derive a deterministic key from <code>(negotiation_id, supplier_id, action, round_number)</code>, check a DynamoDB table, and return the cached result on a hit — stored with a 14-day TTL, deliberately longer than the 7-day negotiation ceiling so a redrive never expires its own records mid-flight. System-level fallback decisions use a reserved supplier id and get the same treatment. Escalations and DLQ sends go through a transactional outbox: the event is written in the same DynamoDB transaction as the status it accompanies, and a poller delivers it — so a crash between the status write and the SQS send no longer drops the escalation.</p>
+
+  <h3>The DLQ: a 12-field message, two destinations</h3>
+
+  <p>When retries exhaust on a non-idempotent operation, the failure context — all 12 fields: negotiation, tenant, failed node and agent, error type and message, last checkpoint, trace ID, attempt count, breaker state, timestamp, graph-state snapshot — is recorded as an outbox event. It's delivered to the shared SQS DLQ <em>and</em> tee'd to an S3 archive with Object Lock GOVERNANCE and a 7-year retention: immutable retention well past the 14-day DLQ window, so an auditable record survives even after the queue's messages expire.</p>
+
+  <h3>Fallback that knows it's a fallback</h3>
+
+  <p>When the Kraljic Classifier agent is unavailable or returns a schema-invalid response after all retries, the orchestrator classifies deterministically from the same profit-impact/supply-risk axes and thresholds — and then applies rejection criteria: a rejected fallback must escalate to REQUIRES_ATTENTION rather than auto-award. The fallback carries a per-quadrant confidence (0.75–0.90) and an explicit "agent unavailable" reason, so a downstream consumer always knows a classification is a fallback and never mistakes it for the real thing.</p>
+
+  <h3>Sagas, checkpoints, and recovery locks</h3>
+
+  <p>Forward recovery resumes a negotiation from its last checkpoint. Each node checkpoints after completing, to a table keyed <code>(tenant#negotiation, checkpoint#version)</code> with a 30-day TTL and optimistic concurrency (write only if no prior row or a strictly-greater version). On restart, recovery enumerates non-terminal negotiations via a GSI, acquires a per-negotiation lock whose deterministic <code>expires_at</code> (600s) is checked in the ConditionExpression — so a crashed holder is reliably taken over — enforces the 168h total timeout, and resumes from the checkpoint. Backward recovery is the saga complement: each side-effecting step records an undo entry to a saga log, and on terminal failure those entries replay newest-first to idempotent compensation handlers. Recording is best-effort (a missing entry degrades to no-undo, never a failed PO issuance), and every handler is idempotent, so the whole flow is safe to retry.</p>
+
+  <div class="evidence">
+    <div class="evidence-badge">Evidence — recovery code that silently no-op'd</div>
+    <p><code>save_checkpoint()</code> had <strong>zero callers anywhere in the repo</strong>. Every recovery and DLQ-redrive path read a checkpoint that was never written: recovery never resumed a negotiation, and DLQ redrive escalated every message straight to REQUIRES_ATTENTION with a <code>no_checkpoint</code> marker. A fully-built resilience mechanism was dead code — not broken, not deleted, just never wired in. The fix wired checkpointing into all six node handlers through one shared helper, and exposed a Decimal-JSON-serialization crash along the way (a Decimal budget value in the graph state crashed a bare <code>json.dumps</code>). That is the class of failure this whole post is about: machinery that exists but was never connected produces exactly the silent no-op that a "tool" is supposed to prevent.</p>
+    <p>The other failure was a dependency that wasn't there: the orchestrator's Lambda build script never copied a supplier-communications module into the build dir, though the award-comms and delivery handlers imported it. Every deploy since that import landed shipped a zip that failed to import at cold start on both handlers — blocking every negotiation from reaching AWARDED — for three days before the missing copy step was found. And the delivery handler was missing its X-Ray IAM grant, so every invocation that did start hung the full 30s retrying the span export and timed out. Two deployment-time gaps that no amount of in-process resilience could catch — the kind the alarm layer (Tool 5) exists to make visible.</p>
+  </div>
+
+  <hr>
+
+  <h2>Tool 5 — AWS metrics &amp; alarms</h2>
+
+  <div class="tool-head">
+    <span class="tool-num">infra/*.tf</span>
+    <span class="tool-code">the layer that turns silence into a page</span>
+  </div>
+
+  <p>Tools 1–4 make failure handling consistent and recoverable, but they can't make a failure <em>loud</em>. That's the alarm layer's job: the CloudWatch alarms in <code>infra/</code> that watch the Lambdas, the state machine, and the agent runtimes, and page on the metrics every other tool emits. This is the tool that closes the loop — the one that would have caught every incident in this post if it had existed at the time.</p>
+
+  <h3>The alarm catalog</h3>
+
+  <p>The set of error alarms, by what they watch:</p>
+
+  <ul>
+    <li><strong>Six node-Lambda error alarms</strong> — one per orchestrator node, <code>AWS/Lambda</code> <code>Errors</code> &ge; 1 over 5 minutes.</li>
+    <li><strong>Nine scheduled-Lambda error alarms</strong> — for every EventBridge-scheduled Lambda: outbox poller, DLQ redrive, runtime warmer, heartbeat, adversarial-robustness, supplier-skew, approval-sweep, plus the KPI rollup and FinOps cost poller.</li>
+    <li><strong>Three state-machine alarms</strong> — executions failed, executions timed out, and execution time approaching 80% of the 7-day workflow ceiling.</li>
+    <li><strong>One Metrics Insights alarm</strong> — a fallback-quality alarm summing fallback-rejection count over a 1-hour window, aggregating across dimension values in a single series.</li>
+    <li><strong>Fourteen agent-runtime alarms</strong> — <code>Errors</code> and <code>Latency</code> for each of the seven runtimes (six agents + one skill runtime), dimensioned on the full <code>{Name, Operation, Resource}</code> set with the endpoint-qualified runtime name.</li>
+  </ul>
+
+  <h3>Error alarms on the Lambda, not business alarms on its output</h3>
+
+  <p>The design rule behind the scheduled-Lambda set is the subtle one: an error alarm watches the Lambda's <code>AWS/Lambda</code> <code>Errors</code> metric, <em>not</em> the business metrics it publishes. A Lambda that dies on its own schedule has no other error signal — nothing calls it, so nothing fails at it — and the business alarms reading its <em>output</em> metrics all sit at OK under <code>treat_missing_data = "notBreaching"</code> the moment publication stops. The KPI rollup Lambda proved this: it failed 44 of 44 scheduled invocations for 30 days while all four of its business alarms read fine. The lesson is that missing data looks like health, so the thing you alarm on must be the thing that exists when the system is alive — the invocation itself.</p>
+
+  <h3>An alarm that matches nothing looks healthy</h3>
+
+  <p>CloudWatch matches an alarm's dimension set <em>exactly</em>, so an alarm keyed on a dimension <em>subset</em> matches zero series. With <code>treat_missing_data = notBreaching</code>, it then sits at OK forever and looks like healthy coverage. That's what happened to all 14 agent-runtime alarms: they were keyed on <code>{Resource, Operation}</code>, but every live series carries <code>{Name, Operation, Resource}</code> where <code>Name</code> is the endpoint-qualified runtime name. Seven runtimes had no error or latency coverage since the alarms were added, and the console showed green the whole time. The fix re-keyed on the full set — and the lesson is tombstoned in the file: re-verify the full dimension set, not just the values, whenever these are re-pointed.</p>
+
+  <h3>Cost discipline is part of the design</h3>
+
+  <p>Alarms bill $0.10 per alarm-month prorated hourly, regardless of state — so <em>disabling</em> alarm actions saves exactly $0, and only deleting alarms reduces the bill. CloudWatch alarms were 87% of the CloudWatch bill ($4.16 of $4.77 over 30 days), and $1.40/month of that bought nothing. The cleanup followed from that one fact: ten alarms that billed for zero coverage were deleted (four evaluation alarms on an unsubscribed topic, six per-node duration alarms whose signal already surfaces through the error and executions-failed alarms), and four KPI alarms were deliberately <em>kept</em> — they were the ones that matched nothing during the KPI-rollup outage, and their metrics are live again. Cost trimming is treated as a resilience decision, not a budget one: an alarm is kept when it's the only thing that would notice a silent failure.</p>
+
+  <div class="evidence">
+    <div class="evidence-badge">Evidence — two outages the alarm layer now covers</div>
+    <p>The approval-sweep Lambda failed every 30-minute scheduled invocation for <strong>12 days</strong> with an access-denied error on its GSI query — silently, because no Lambda-error alarm existed for it. It's a compliance function (timeout/cancel escalations); its job is to enforce governance, and it was down for twelve days without anyone noticing. Its alarm was added as a one-off, then generalized to every scheduled Lambda.</p>
+    <p>The KPI rollup Lambda failed 44 of 44 scheduled invocations over <strong>30 days</strong> while its four business alarms — reading the very KPIs it publishes — sat OK under missing-data-as-health. The Lambda dying was invisible because the only alarms that existed watched its output, and no output looks exactly like healthy output.</p>
+  </div>
+
+  <hr>
+
+  <h2>A failure's journey through the five tools</h2>
+
+  <p>The five tools aren't five answers to five different questions — they're five layers of the same answer, and a single failure passes through all of them. Here's one concrete path: an A2A call from the orchestrator to an agent that's throttling.</p>
+
+  <ol>
+    <li><strong>The microkernel admits it.</strong> Inbound admission control sheds load with a 503 + <code>Retry-After</code> before the runtime ever reaches the model, so the throttled dependency isn't hit by more than it can take. The agent's steering guards and guardrail are fail-closed: a misconfigured guardrail means no call, not an unguarded one.</li>
+    <li><strong>The chokepoint retries it.</strong> <code>invoke_agent_runtime</code> applies tenacity retry with backoff and jitter, counts the attempt against the per-agent circuit breaker, and enforces the call timeout — while emitting <code>agentcore.invocation_success</code> and <code>cost.usd</code> regardless of the outcome.</li>
+    <li><strong>mcp-core and lambda-core shape the failure.</strong> If the agent's own MCP tool fails, <code>safe_tool</code> rewraps it as an opaque, traceable <code>ToolError</code> instead of a raw exception leaking back. If the node Lambda's body raises, <code>guarded</code> logs it, emits a <code>&lt;source&gt;.failure</code> metric dimensioned by exception class, and re-raises for the built-in async retry.</li>
+    <li><strong>The orchestrator recovers or escalates.</strong> If the call is a side effect, the idempotency key dedupes a retried attempt. If retries exhaust, the 12-field DLQ message goes through the outbox to both the queue and the immutable archive. If it's a classification step, the rule-based fallback runs — and rejects itself upward if it can't be trusted. If a negotiation is truly abandoned, saga compensation undoes what already committed.</li>
+    <li><strong>The alarm layer makes it loud.</strong> The node's <code>AWS/Lambda</code> <code>Errors</code> alarm fires on the topic, the fallback rejection count trips the quality alarm if fallbacks are happening too often, and the agent runtime's own error alarm catches the throttle at the source — because the metric that exists only when the system is alive is the thing being watched.</li>
+  </ol>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Layer</th><th>What it owns</th><th>What it does when something fails</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Agent MicroKernel</td>
+          <td>Guardrails, steering guards, admission control, the agent's own metrics path</td>
+          <td>Fails closed (no unguarded call), sheds load before the dependency, reports its own health</td>
+        </tr>
+        <tr>
+          <td>lambda-core</td>
+          <td>Handler failure primitives, shared clients, shared logging, the Layer's DLQ</td>
+          <td>Logs, emits a failure metric, re-raises or returns a structured error — never silently swallows</td>
+        </tr>
+        <tr>
+          <td>mcp-core</td>
+          <td>Tool boundaries, tenant checks, tracing, health</td>
+          <td>Fails fast on a missing tenant, rewraps unknown exceptions as traceable tool errors</td>
+        </tr>
+        <tr>
+          <td>Orchestrator-resilience</td>
+          <td>Retry, circuit breakers, idempotency, outbox, DLQ, fallback, compensation, recovery</td>
+          <td>Retries, then recovers forward from a checkpoint or backward via saga — or escalates with a full context record</td>
+        </tr>
+        <tr>
+          <td>AWS metrics &amp; alarms</td>
+          <td>Error/latency alarms on Lambdas, the state machine, and agent runtimes</td>
+          <td>Fires on the invocation's own health — the only signal that exists when the system is alive</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The throughline across all five layers is the same principle, applied at five different scopes: <strong>a failure must not be silent.</strong> Each tool exists because a failure once went silent at that scope — a crashlooping agent masked as fallback traffic, a handler with no exception handling at all, an MCP server whose check was a no-op, recovery machinery that was never wired in, a Lambda dying on its own schedule with no one watching. The tools are the mechanism; the incidents are the proof of what happens without them.</p>
+
+  <hr>
+
+  <h2>What we've learned</h2>
+
+  <ul>
+    <li><strong>Resilience is a shared library, not a team culture.</strong> Every one of these tools replaced N hand-rolled, drifting, or missing implementations with one package. Culture tells people to handle failures; a shared tool makes it the default they can't accidentally skip.</li>
+    <li><strong>Graceful degradation without an alarm is a silent-failure engine.</strong> The microkernel's model ladder and the orchestrator's fallback are good — but the week of masked crashloops proved that when degradation looks like normal traffic, only an error-rate alarm tells the truth.</li>
+    <li><strong>An alarm that matches nothing looks healthy.</strong> The dimension-subset bug and the KPI Lambda's business alarms both sat at OK while covering nothing. The thing you watch must be the signal that exists when the system is alive — the invocation, not its output.</li>
+    <li><strong>Missing data is not health.</strong> <code>treat_missing_data = notBreaching</code> is a footgun: the moment publication stops, every business alarm reads fine. That's why the scheduled-Lambda alarms watch the Lambda's own errors.</li>
+    <li><strong>Machinery that isn't wired in is the same as machinery that doesn't exist.</strong> A zero-caller checkpoint function, a tenant check nobody populated, a zip that never bundled the module it imported — the failure modes that hurt most are the ones where the defense was built but never connected.</li>
+  </ul>
+
+  <p>None of this makes failures disappear. What it makes them is <em>visible, categorized, and recoverable</em> — so that when one happens, it's an incident we can see and act on, not a silent divergence that compounds.</p>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="failure-handling.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Designing for failure in a multi-agent procurement system</div>
+      </a>
+      <a href="durable-orchestration.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Pause for four days, resume in five seconds: durable execution in a multi-agent system</div>
+      </a>
+      <a href="dag-vs-llm-planner.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Why we chose a deterministic DAG over a pure LLM planner</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; August 2026</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> &mdash; an autonomous multi-agent procurement negotiation system.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>
