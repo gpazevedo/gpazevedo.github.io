@@ -2,6 +2,78 @@
    Add one entry per file in this folder. Ties keep the order listed here. */
 window.engPosts = [
   {
+    "slug": "oauth-resource-server-pattern",
+    "file": "oauth-resource-server-pattern.html",
+    "title": "No users table: the OAuth 2.0 resource server pattern, adapted",
+    "description": "How a multi-agent AI procurement system became an OAuth 2.0 resource server — Cognito as OIDC relying party and federation hub, two principal types, two authorisation planes, and the architectural trade-offs along the way.",
+    "tags": ["OAuth", "Identity", "Multi-tenancy"],
+    "date": "2026-08-19",
+    "readingTime": 14
+  },
+  {
+    "slug": "deployment-rollout-rollback",
+    "file": "deployment-rollout-rollback.html",
+    "title": "Shipping Agents Safely: deployment, rollout, and rollback",
+    "description": "How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback.",
+    "tags": ["Deployment", "GitOps"],
+    "date": "2026-08-19",
+    "readingTime": 23
+  },
+  {
+    "slug": "evaluation",
+    "file": "evaluation.html",
+    "title": "Not a Testing Problem: how a multi-agent system evaluates itself in production",
+    "description": "The evaluation architecture behind an autonomous multi-agent procurement system: three evaluator types, a 25-point quality composite, risk-tiered sampling, and alarms wired to five automated remediations — plus the gaps still open.",
+    "tags": ["Evaluation", "Quality"],
+    "date": "2026-08-19",
+    "readingTime": 15
+  },
+  {
+    "slug": "security-without-trust",
+    "file": "security-without-trust.html",
+    "title": "Security Without Trust: defending an autonomous negotiation agent",
+    "description": "Six independent layers of deterministic, infrastructure-level control around an autonomous procurement agent \u2014 and an honest audit of which ones are as strong as they sound.",
+    "tags": ["Security", "MITRE ATLAS", "Architecture"],
+    "date": "2026-08-19",
+    "readingTime": 28
+  },
+  {
+    "slug": "no-silent-failures",
+    "file": "no-silent-failures.html",
+    "title": "Five tools, no silent failures: where Buyer Team handles failure",
+    "description": "Buyer Team handles failure in exactly five places: the agent microkernel, a shared Lambda layer, a shared MCP base, the orchestrator resilience layer, and the AWS alarms. A mechanism-by-mechanism tour — and the silent failures that proved each tool necessary.",
+    "tags": ["Reliability", "Architecture"],
+    "date": "2026-08-19",
+    "readingTime": 21
+  },
+  {
+    "slug": "cost-architecture",
+    "file": "cost-architecture.html",
+    "title": "The cost architecture of an autonomous procurement agent",
+    "description": "How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured.",
+    "tags": ["Cost Architecture", "FinOps"],
+    "date": "2026-08-19",
+    "readingTime": 18
+  },
+  {
+    "slug": "architecture-and-design-patterns",
+    "file": "architecture-and-design-patterns.html",
+    "title": "One microkernel, six plug-ins: the patterns behind Buyer Team",
+    "description": "A named-patterns tour of the Buyer Team agent runtime: a microkernel core with per-agent plug-ins, held together by Factory Method, two-phase Builder, Strategy, load shedding, and graceful drain — and an honest split between the guarantees the code enforces and the ones a CI test stands in for.",
+    "tags": ["Architecture", "Design Patterns"],
+    "date": "2026-08-19",
+    "readingTime": 12
+  },
+  {
+    "slug": "tenant-isolation-agent-attack-vector",
+    "file": "tenant-isolation-agent-attack-vector.html",
+    "title": "When the agent is the attack vector: extending tenant isolation beyond partition keys",
+    "description": "How Buyer Team extended multi-tenant isolation when prompt injection became an active threat — JWT claim normalisation, a Gateway request interceptor, per-request ABAC, and a SQL rewriter that doesn't trust the agent.",
+    "tags": ["Security", "Multi-tenancy"],
+    "date": "2026-08-19",
+    "readingTime": 15
+  },
+  {
     "slug": "scalable-mcp",
     "file": "scalable-mcp.html",
     "title": "scalable-mcp: a reusable base for MCP servers and clients, grown out of ATLAS Counsel",
@@ -18,6 +90,15 @@ window.engPosts = [
     "tags": ["MCP", "OAuth", "Multi-tenancy"],
     "date": "2026-08-07",
     "readingTime": 14
+  },
+  {
+    "slug": "observability",
+    "file": "observability.html",
+    "title": "Observing the Unobservable: how a multi-agent system watches itself think",
+    "description": "Agentic systems fail silently — they don't crash, they drift. The four-layer metric model, distributed tracing, three evaluator types, and alarm-to-action loop built to catch quality degradation before it costs a contract.",
+    "tags": ["Observability", "Evaluation"],
+    "date": "2026-08-19",
+    "readingTime": 19
   },
   {
     "slug": "failure-handling",

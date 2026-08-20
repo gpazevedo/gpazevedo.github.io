@@ -57,6 +57,42 @@
       <!-- badge variants: badge-llm (coral), badge-ground (teal), badge-code (blue) -->
     </div>
 
+  PATTERN CARDS (3-column option-comparison cards, top border accent)
+    <div class="pattern-cards">
+      <div class="pattern-card pc-1"> <!-- top-border variants: pc-1 (blue), pc-2 (teal), pc-3 (coral) -->
+        <div class="pc-label">Pattern 1</div>
+        <div class="pc-title">Option title</div>
+        <div class="pc-summary">One-sentence summary.</div>
+        <div class="pc-meta">
+          <span class="pc-meta-label">When to use</span>
+          Condition text.
+          <span class="pc-meta-label">Trade-off</span>
+          Trade-off text.
+        </div>
+      </div>
+    </div>
+
+  EVIDENCE CALLOUT (coral, an incident that motivated a tool)
+    <div class="evidence">
+      <div class="evidence-badge">Evidence — short label</div>
+      <p>Body text. <strong>Highlighted phrase.</strong></p>
+    </div>
+
+  TOOL HEAD (section opener before a mechanism's h2 body)
+    <div class="tool-head">
+      <span class="tool-num">packages/some_shared_pkg</span>
+      <span class="tool-code">one-line scope description</span>
+    </div>
+
+  VERDICT BANNER (teal, single takeaway callout)
+    <div class="verdict">
+      <div class="verdict-badge">The takeaway</div>
+      <div class="verdict-text"><strong>Bolded lead-in.</strong> Rest of the takeaway.</div>
+    </div>
+
+  PAT (inline monospace pattern name, for table cells and prose)
+    <span class="pat">Factory Method</span>
+
   TABLE (wrapped for overflow)
     <div class="table-wrap">
       <table>
@@ -158,6 +194,9 @@
   --green:           #3B6D11;
   --green-light:     #EAF3DE;
 
+  --purple:          #5B2D8E;
+  --purple-light:    #F0EAF9;
+
   --serif:           'DM Serif Display', Georgia, serif;
   --sans:            'Sora', system-ui, sans-serif;
   --mono:            'DM Mono', 'Courier New', monospace;
@@ -186,6 +225,9 @@
 
     --green:       #97C459;
     --green-light: #173404;
+
+    --purple:      #C49FE8;
+    --purple-light:#2A1540;
   }
 }
 
@@ -225,6 +267,14 @@ body {
 .tag {
   background: var(--amber-light);
   color: var(--amber);
+  padding: 3px 10px;
+  border-radius: 3px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+.tag-atlas {
+  background: var(--purple-light);
+  color: var(--purple);
   padding: 3px 10px;
   border-radius: 3px;
   font-size: 10px;
@@ -337,6 +387,29 @@ blockquote p {
 .callout p { font-size: 14px; font-weight: 400; margin: 0; }
 .callout strong { color: var(--amber); }
 
+/* ── CALLOUT VARIANTS (blue = informational, atlas = threat-model specific) ── */
+.callout-blue {
+  background: var(--blue-light);
+  border: 1px solid rgba(24,95,165,0.18);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  margin: 2rem 0;
+}
+.callout-blue .callout-label { color: var(--blue); }
+.callout-blue p { font-size: 14px; font-weight: 400; margin: 0; }
+.callout-blue strong { color: var(--blue); }
+
+.callout-atlas {
+  background: var(--purple-light);
+  border: 1px solid rgba(91,45,142,0.18);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  margin: 2rem 0;
+}
+.callout-atlas .callout-label { color: var(--purple); }
+.callout-atlas p { font-size: 14px; font-weight: 400; margin: 0; }
+.callout-atlas strong { color: var(--purple); }
+
 /* ── LAYER STACK ── */
 .layer-stack {
   margin: 1.75rem 0;
@@ -356,6 +429,7 @@ blockquote p {
 .l1 { background: var(--teal-light); }
 .l2 { background: var(--blue-light); }
 .l3 { background: var(--amber-light); }
+.l4 { background: var(--green-light); }
 .layer-meta { display: flex; flex-direction: column; gap: 3px; }
 .layer-num {
   font-family: var(--mono);
@@ -376,6 +450,15 @@ blockquote p {
   background: rgba(255,255,255,0.55);
   border: 1px solid rgba(0,0,0,0.08);
   color: var(--ink);
+}
+.chip-atlas {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: var(--purple-light);
+  border: 1px solid rgba(91,45,142,0.15);
+  color: var(--purple);
 }
 
 /* ── TABLES ── */
@@ -411,6 +494,9 @@ td {
 td:first-child { font-weight: 500; }
 .row-quality { background: var(--coral-light) !important; }
 .row-gov     { background: var(--amber-light) !important; }
+.row-critical { background: var(--coral-light)  !important; }
+.row-warn     { background: var(--amber-light)  !important; }
+.row-atlas    { background: var(--purple-light) !important; }
 
 /* ── ACTION PILLS ── */
 .pill {
@@ -426,6 +512,16 @@ td:first-child { font-weight: 500; }
 .pill-disable  { background: var(--teal-light);   color: var(--teal); }
 .pill-halt     { background: var(--amber-light);  color: var(--amber); }
 .pill-sns      { background: var(--blue-light);   color: var(--blue); }
+.pill-block    { background: var(--coral-light);  color: var(--coral); }
+.pill-deny     { background: var(--amber-light);  color: var(--amber); }
+.pill-anon     { background: var(--blue-light);   color: var(--blue); }
+.pill-modify   { background: var(--teal-light);   color: var(--teal); }
+.pill-log      { background: var(--green-light);  color: var(--green); }
+.pill-atlas    { background: var(--purple-light); color: var(--purple); }
+.pill-none     { background: transparent; color: var(--ink-faint); border: 1px solid var(--ink-faint); }
+/* ATLAS Navigator coverage rating (used with .pill) */
+.coverage-full    { background: var(--teal-light);  color: var(--teal); }
+.coverage-partial { background: var(--amber-light); color: var(--amber); }
 
 /* ── EVAL GRID ── */
 .eval-grid {
@@ -463,6 +559,78 @@ td:first-child { font-weight: 500; }
 .badge-code   { background: var(--blue-light);  color: var(--blue); }
 .ec-desc { font-size: 12px; font-weight: 300; color: var(--ink-muted); line-height: 1.55; }
 
+/* ── EVIDENCE CALLOUT ── */
+.evidence { background: var(--coral-light); border: 1px solid var(--coral); border-radius: 10px; padding: 1.5rem 1.75rem; margin: 1.75rem 0; }
+.evidence-badge { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; background: var(--coral); color: #fff; padding: 4px 10px; border-radius: 4px; display: inline-block; margin-bottom: 0.85rem; }
+.evidence p { font-size: 14px; margin: 0.6rem 0; }
+.evidence p:first-of-type { margin-top: 0; }
+.evidence p:last-child { margin-bottom: 0; }
+.evidence strong { font-weight: 600; }
+@media (max-width: 600px) {
+  .evidence { padding: 1.15rem 1.25rem; }
+}
+
+/* ── TOOL HEAD ── */
+.tool-head { display: flex; align-items: baseline; gap: 0.9rem; flex-wrap: wrap; margin-bottom: 0.35rem; }
+.tool-num { font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: 0.08em; color: var(--amber); }
+.tool-code { font-family: var(--mono); font-size: 13px; color: var(--ink-muted); }
+
+/* ── VERDICT BANNER ── */
+.verdict { background: var(--teal-light); border: 1px solid var(--teal); border-radius: 10px; padding: 1.5rem 1.75rem; margin: 1.75rem 0; display: flex; align-items: center; gap: 1.25rem; }
+.verdict-badge { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; background: var(--teal); color: var(--teal-light); padding: 4px 10px; border-radius: 4px; flex-shrink: 0; }
+.verdict-text { font-size: 14px; font-weight: 300; color: var(--ink); line-height: 1.55; }
+.verdict-text strong { font-weight: 600; }
+@media (max-width: 600px) {
+  .verdict { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+}
+
+/* ── PAT (inline pattern name) ── */
+.pat { font-family: var(--mono); font-size: 0.82em; font-weight: 500; color: var(--blue); white-space: nowrap; }
+
+/* ── PATTERN CARDS (3-column option-comparison cards) ── */
+.pattern-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--rule);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  margin: 1.75rem 0;
+}
+.pattern-card {
+  background: var(--surface);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  border-top: 3px solid var(--ink-faint);
+}
+.pattern-card.pc-1 { border-top-color: var(--blue); }
+.pattern-card.pc-2 { border-top-color: var(--teal); }
+.pattern-card.pc-3 { border-top-color: var(--coral); }
+.pc-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 5px;
+}
+.pc-title { font-family: var(--serif); font-size: 1.1rem; line-height: 1.25; color: var(--ink); margin-bottom: 8px; }
+.pc-summary { font-size: 12.5px; font-weight: 300; color: var(--ink-muted); line-height: 1.5; margin-bottom: 12px; }
+.pc-meta { font-size: 12px; font-weight: 300; line-height: 1.55; color: var(--ink-muted); margin-top: auto; }
+.pc-meta-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: 8px;
+  margin-bottom: 2px;
+}
+
 /* ── PIPELINE ── */
 .pipeline { margin: 1.75rem 0; display: flex; flex-direction: column; }
 .pipe-stage { display: flex; gap: 0; align-items: stretch; }
@@ -489,6 +657,7 @@ td:first-child { font-weight: 500; }
   padding-top: 16px;
 }
 .pipe-dot  { width: 10px; height: 10px; border-radius: 50%; background: var(--amber); flex-shrink: 0; }
+.pipe-dot-atlas { width: 10px; height: 10px; border-radius: 50%; background: var(--purple); flex-shrink: 0; }
 .pipe-bar  { flex: 1; width: 2px; background: var(--rule); min-height: 16px; }
 .pipe-body { flex: 1; padding: 12px 0 20px 18px; }
 .pipe-title { font-size: 0.9rem; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
@@ -535,10 +704,12 @@ pre code {
   font-size: 15px;
   flex-shrink: 0;
 }
-.icon-amber { background: var(--amber-light); color: var(--amber); }
-.icon-teal  { background: var(--teal-light);  color: var(--teal); }
-.icon-coral { background: var(--coral-light); color: var(--coral); }
-.icon-blue  { background: var(--blue-light);  color: var(--blue); }
+.icon-amber  { background: var(--amber-light);  color: var(--amber); }
+.icon-teal   { background: var(--teal-light);   color: var(--teal); }
+.icon-coral  { background: var(--coral-light);  color: var(--coral); }
+.icon-blue   { background: var(--blue-light);   color: var(--blue); }
+.icon-green  { background: var(--green-light);  color: var(--green); }
+.icon-purple { background: var(--purple-light); color: var(--purple); }
 .tcard-title { font-size: 0.9rem; font-weight: 600; color: var(--ink); line-height: 1.3; }
 .tcard p { font-size: 13px; font-weight: 300; color: var(--ink-muted); line-height: 1.6; margin: 0; }
 
@@ -660,17 +831,225 @@ pre code {
   line-height: 1.4;
 }
 
+/* ── FRAMEWORK COMPARISON STRIP (2-col cards, e.g. OWASP vs ATLAS) ──
+  <div class="framework-split">
+    <div class="fw-card">
+      <div class="fw-card-head">
+        <span class="fw-badge fw-owasp">OWASP ASI</span>
+        <span class="fw-title">What can go wrong</span>
+      </div>
+      <p>Card body.</p>
+    </div>
+    <!-- badge variants: fw-owasp (coral), fw-atlas (purple) -->
+  </div>
+*/
+.framework-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 1.75rem 0;
+}
+.fw-card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+.fw-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.fw-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+.fw-owasp { background: var(--coral-light);  color: var(--coral); }
+.fw-atlas { background: var(--purple-light); color: var(--purple); }
+.fw-title { font-size: 0.95rem; font-weight: 600; color: var(--ink); }
+.fw-card p { font-size: 13px; font-weight: 300; color: var(--ink-muted); line-height: 1.6; margin: 0; }
+
+/* ── TACTIC BADGE (inline, e.g. ATLAS tactic name on a table/chain) ──
+  <span class="tactic-badge">Reconnaissance</span>
+*/
+.tactic-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: var(--purple-light);
+  color: var(--purple);
+  white-space: nowrap;
+}
+
+/* ── HOOK GRID (2-col cards describing a set of controls/guards) ──
+  <div class="hook-grid">
+    <div class="hook-card">
+      <div class="hc-prop">Category</div>
+      <div class="hc-name">GuardName</div>
+      <div class="hc-desc">What it does.</div>
+    </div>
+  </div>
+*/
+.hook-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--rule);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  margin: 1.75rem 0;
+}
+.hook-card { background: var(--surface); padding: 1.1rem 1.25rem; }
+.hc-name { font-size: 0.88rem; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+.hc-prop {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 7px;
+}
+.hc-desc { font-size: 12px; font-weight: 300; color: var(--ink-muted); line-height: 1.5; }
+
+/* ── ATTACK CHAIN VISUALISATION (multi-stage adversary sequences) ──
+  <div class="chain-grid">
+    <div class="chain-card">
+      <div class="chain-header">
+        <div class="chain-name">Chain name</div>
+        <div class="chain-tactics"><span class="tactic-badge">Tactic</span></div>
+      </div>
+      <div class="chain-body">Steps and description.</div>
+      <div class="chain-outcome">→ Outcome.</div>
+    </div>
+  </div>
+*/
+.chain-grid {
+  margin: 1.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.chain-card {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.chain-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--purple-light);
+  border-bottom: 1px solid rgba(91,45,142,0.15);
+}
+.chain-name { font-size: 0.88rem; font-weight: 600; color: var(--purple); flex: 1; }
+.chain-tactics { display: flex; gap: 4px; flex-wrap: wrap; }
+.chain-body {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--ink-muted);
+  line-height: 1.55;
+}
+.chain-outcome {
+  padding: 8px 16px 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--teal);
+}
+
+/* ── VERSION BUMP BADGE (inline, e.g. in the eyebrow) ──
+  <span class="version-bump">↑ Updated Month YYYY</span>
+*/
+.version-bump {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  background: var(--purple-light);
+  color: var(--purple);
+  padding: 3px 10px;
+  border-radius: 3px;
+}
+
+/* ── NUMBERED LAYER STACK (defense-in-depth stack with a leading numeral/code column) ──
+  <div class="numbered-layers">
+    <div class="nlayer nl1">
+      <div class="nlayer-num">1</div>
+      <div class="nlayer-meta">
+        <div class="nlayer-label">Infrastructure</div>
+        <div class="nlayer-name">Infra Security</div>
+      </div>
+      <div class="chips"><span class="chip">IAM least-privilege</span></div>
+    </div>
+    <!-- tints: nl1 teal … nl6 surface; third column can be .chips or freeform content -->
+  </div>
+*/
+.numbered-layers {
+  margin: 1.75rem 0;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.nlayer {
+  display: grid;
+  grid-template-columns: 50px 160px 1fr;
+  gap: 1rem;
+  align-items: start;
+  padding: 1.1rem 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+.nlayer:last-child { border-bottom: none; }
+.nl1 { background: var(--teal-light); }
+.nl2 { background: var(--blue-light); }
+.nl3 { background: var(--green-light); }
+.nl4 { background: var(--amber-light); }
+.nl5 { background: var(--coral-light); }
+.nl6 { background: var(--surface); }
+.nlayer-num {
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--ink-faint);
+  line-height: 1;
+  padding-top: 4px;
+}
+.nlayer-meta { display: flex; flex-direction: column; gap: 3px; }
+.nlayer-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.nlayer-name { font-size: 0.95rem; font-weight: 600; color: var(--ink); }
+
 /* ── RESPONSIVE ── */
 @media (max-width: 600px) {
   .page { padding: 2.5rem 1.25rem 5rem; }
   .layer { grid-template-columns: 1fr; }
   .eval-grid { grid-template-columns: 1fr; }
+  .pattern-cards { grid-template-columns: 1fr; }
   .tradeoff-grid { grid-template-columns: 1fr; }
   .pipe-aside { display: none; }
   .sbar-row { grid-template-columns: 1fr 1fr; }
   .sbar-val, .sbar-action { display: none; }
   h1 { font-size: 1.9rem; }
   .related-posts-grid { grid-template-columns: 1fr; }
+  .framework-split { grid-template-columns: 1fr; }
+  .hook-grid { grid-template-columns: 1fr; }
+  .nlayer { grid-template-columns: 40px 1fr; }
+  .nlayer-meta { grid-column: 2; }
+  .numbered-layers .chips { grid-column: 2; }
 }
 
 /* ── BLOG NAV ── */

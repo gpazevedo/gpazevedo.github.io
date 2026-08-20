@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>The cost architecture of an autonomous procurement agent — Gustavo Azevedo</title>
+<meta name="description" content="How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/cost-architecture.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/cost-architecture.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="The cost architecture of an autonomous procurement agent"/>
+<meta property="og:description" content="How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Cost Architecture"/>
+<meta property="article:tag" content="FinOps"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="The cost architecture of an autonomous procurement agent"/>
+<meta name="twitter:description" content="How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"The cost architecture of an autonomous procurement agent","description":"How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured.","datePublished":"2026-08-19","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/cost-architecture.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/cost-architecture.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"The cost architecture of an autonomous procurement agent","item":"https://gpazevedo.github.io/blog/eng/cost-architecture.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+  figure.diagram { margin: 2rem 0; padding: 0; }
+  figure.diagram svg { display: block; width: 100%; height: auto; }
+  figure.diagram figcaption {
+    margin-top: 0.75rem; font-size: 0.85rem; line-height: 1.5;
+    color: #64748B; text-align: center; font-style: italic;
+  }
+  @media (prefers-color-scheme: dark) {
+    figure.diagram figcaption { color: #94A3B8; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Cost Architecture</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <time datetime="2026-08-19">August 2026</time>
+    <span class="dot">·</span>
+    <span>18 min read</span>
+  </div>
+
+  <h1>The cost architecture of an autonomous procurement agent</h1>
+
+  <p class="deck">
+    Our target is a weighted-average negotiation cost under $0.10. What's actually deployed to get there is a 3-tier Amazon Nova model ladder, partial prompt caching, a Kraljic classifier that mostly never runs at all, and a context-compaction hook — four real, shipped mechanisms, each one shaped by live evidence and each built around a specific trade-off: how much of the request to cache versus keep fresh, how much classification to skip versus recompute, how much context to keep versus discard. This post covers how the mechanisms work, the trade-off behind each one, and what a full live negotiation suite actually costs today — plus two newer capabilities that have quietly made the whole thing more self-correcting: an automated tier-rollback safety net and a quality-driven cache invalidation, both from a closed-loop evaluation system.
+  </p>
+
+  <hr>
+
+  <p>
+    An earlier version of this post described a broader cost architecture: two model-family scenarios, a five-layer optimization stack including nightly Bedrock Batch inference, and an hourly CUR/Athena pipeline joining AWS's actual bill to per-tenant token counts. A repo audit reconciled that description against what's actually running — a second model family, batch inference, and CUR attribution were never built, and we've deferred them deliberately rather than build them now. That deferral is itself a mitigation, not a gap: building an attribution layer on top of a cost number nobody had verified would have turned an honest absence into a confidently wrong chargeback figure.
+  </p>
+
+  <p>
+    This is the corrected version. It covers the four mechanisms that are actually shipped, the trade-off behind each one, and what the metrics they emit — including <code>negotiation.total_cost_usd</code> and the newer, finer-grained <code>cost.usd</code> — actually show today.
+  </p>
+
+  <h2>What's actually deployed</h2>
+
+  <p>
+    Buyer Team turns a Purchase Requisition into a negotiated Purchase Order across a seven-node Step Functions DAG. Four mechanisms currently work to keep that cheap:
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Mechanism</th>
+          <th>What it does</th>
+          <th>Where</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Model tiering</td>
+          <td>3-tier Amazon Nova ladder (Micro / Lite / Pro), resolved per agent at build time</td>
+          <td><code>DynamicAgentFactory</code> + <code>model_resolver.py</code></td>
+        </tr>
+        <tr>
+          <td>Prompt caching</td>
+          <td>Bedrock <code>cachePoint</code> on the system prompt only — tool-schema caching exists in code but is dormant on Nova</td>
+          <td><code>buyer_agent_core/cache.py</code></td>
+        </tr>
+        <tr>
+          <td>Kraljic short-circuiting</td>
+          <td>Manual override → seeded quadrant → semantic cache → live agent → rule-based fallback, in that order — the LLM is the last resort, not the default path</td>
+          <td><code>orchestrator/node_kraljic_classify.py</code></td>
+        </tr>
+        <tr>
+          <td>Context compaction</td>
+          <td>Truncates oversized tool results (head + tail elision) before they re-enter the conversation on multi-round agents</td>
+          <td><code>buyer_agent_core/compaction.py</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Two things that were part of the original cost story are not on this list because they don't exist: nightly Bedrock Batch inference for supplier KPIs, and a second, Claude-based model-tiering scenario. Neither has a line of code anywhere in the repo. We come back to what <em>is</em> missing, and why we're not building it yet, further down.
+  </p>
+
+  <h2>Layer one: a Nova ladder that keeps getting pruned toward "don't call a model at all"</h2>
+
+  <p>
+    Model selection resolves an abstract tier label — <code>SimpleLLM</code>, <code>DefaultLLM</code>, <code>StrategyLLM</code> — to a concrete Bedrock model ID at agent build time via <code>DynamicAgentFactory</code>, reading system-config's <code>model/default.tiers</code> map with an environment-variable override and an in-image seed as fallbacks that never raise. Every tier-resolved agent on the negotiation path runs on Amazon Nova — Claude Haiku 4.5 is also live in the stack now, but deliberately outside this system: it powers the post-award LLM-judge evaluators (rationale defensibility, tone, negotiation quality) via a direct <code>bedrock-runtime.converse()</code> call, not through <code>DynamicAgentFactory</code>. Keeping judges off the tier ladder is itself a design choice — it means judge quality is never coupled to a cost-tiering decision, at the cost of those calls not going through the tier system's caching or accounting (more on that trade-off below).
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Tier</th>
+          <th>Model</th>
+          <th>$ per 1K tokens (in / out)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>SimpleLLM</code></td>
+          <td>Nova Micro</td>
+          <td>$0.000035 / $0.00014</td>
+        </tr>
+        <tr>
+          <td><code>DefaultLLM</code></td>
+          <td>Nova Lite</td>
+          <td>$0.00006 / $0.00024</td>
+        </tr>
+        <tr>
+          <td><code>StrategyLLM</code></td>
+          <td>Nova Pro</td>
+          <td>$0.0008 / $0.0032</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    An <code>EvalLLM</code> tier (Llama 3.1 8B) is seeded in the tier map but still unused for that purpose — the LLM-as-judge path that's actually live runs on Claude Haiku 4.5, configured independently rather than through this tier system, for the reason above. Rates for the tier-resolved models are baked into <code>orchestrator/resilience/pricing.py</code>, keyed by the literal resolved model ID rather than the tier label, because the tier→model mapping can drift live via system-config and pricing by what was actually invoked is more accurate than pricing by tier name.
+  </p>
+
+  <p>
+    The interesting part isn't the ladder — it's that a tier assignment is treated as a hypothesis to keep checking against eval-harness scores, not a decision made once and left alone. That checking loop has driven every production change to the ladder so far, and it recently closed all the way: a bad tier assignment can now roll itself back without anyone paging in.
+  </p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">⊙</div>
+        <div class="tcard-title">Config-driven promotion, not a redeploy</div>
+      </div>
+      <p>Because the tier→model mapping lives in system-config rather than in code, moving an agent to a stronger tier when eval scores call for it is a config change, not a build-and-ship cycle. Two agents have been promoted this way so far — Bid Evaluation and the Kraljic Classifier both moved up a tier after eval-harness scores made the case, each a same-day config edit.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">◎</div>
+        <div class="tcard-title">The cheapest tier is sometimes no model call</div>
+      </div>
+      <p>The <code>bid_evaluation_llm</code> runtime was retired outright and replaced with deterministic inline scoring — composite cost/delivery/quality/ESG/history math with no A2A agent, no Strands, no token cost, and none of the ~25–58s AgentCore session overhead an LLM call carries on every award decision. The trade-off: less flexible than a model reading the bid narrative, but a materially faster and cheaper award path for a scoring function that's fully specifiable in code. Spot Bidding and Leverage Auction both price deterministically below a $5K threshold for the same reason, reserving the LLM call for negotiations where the reasoning is worth the cost.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-blue">⊙</div>
+        <div class="tcard-title">An automated rollback safety net</div>
+      </div>
+      <p>Every human tier promotion is now snapshotted to a previous-tier record in system-config before it takes effect. If the live Negotiation Quality eval score later drops under 0.60, a remediation Lambda restores the prior tier map automatically — and every warm agent picks up the change within 30 seconds via a config-epoch watch in <code>DynamicAgentFactory</code>, no container restart required. The tier ladder now tunes itself upward on evidence and reverts itself downward on regression, both without a deploy.</p>
+    </div>
+  </div>
+
+  <p>
+    Award &amp; Communications tells the same story from a different angle: it's configured on <code>SimpleLLM</code> and the runtime is deployed and kept warm, but the synchronous PR→PO path never invokes it. Both the winner notification and every rejection notification render from deterministic Python f-string templates — 0 LLM tokens on the notification content itself, and it removes the ~25–32s A2A round-trip from every award. The winner notification uses a standard "refer to your contract for execution" line rather than LLM-generated rationale. The Award node does make a real Bedrock call now, just not on this path: an async, post-award self-invoke feeds the negotiation's reasoning to the Claude Haiku judges described above, entirely off the synchronous award critical path.
+  </p>
+
+  <p>
+    Put together, the current agent-to-tier picture is much leaner than a seven-agent fan-out:
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Node</th>
+          <th>Tier</th>
+          <th>Tokens on the live path</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Kraljic Classifier</td>
+          <td><code>DefaultLLM</code></td>
+          <td>Usually 0 — short-circuited by seeded quadrant or semantic cache (see below)</td>
+        </tr>
+        <tr>
+          <td>Spot Bidding</td>
+          <td><code>DefaultLLM</code></td>
+          <td>0 below $5K (deterministic pricing); LLM call above it</td>
+        </tr>
+        <tr>
+          <td>Leverage Auction</td>
+          <td><code>StrategyLLM</code></td>
+          <td>0 below $5K (deterministic pricing, same bypass as Spot Bidding); LLM call above it</td>
+        </tr>
+        <tr>
+          <td>Bottleneck Negotiation / Strategic Partnership</td>
+          <td><code>StrategyLLM</code></td>
+          <td>Always an LLM call — no deterministic bypass on either path. Exactly one of these three strategy nodes fires per negotiation; Kraljic quadrant routing is exclusive</td>
+        </tr>
+        <tr>
+          <td>Bid Evaluation</td>
+          <td><em>(none)</em></td>
+          <td>0 — deterministic scoring, no LLM agent exists</td>
+        </tr>
+        <tr>
+          <td>Award &amp; Communications</td>
+          <td><code>SimpleLLM</code> (configured, unused)</td>
+          <td>0 — deterministic templates, runtime never invoked live</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    That's a materially different shape than "every negotiation fans out across a graph of LLM agents." For a Non-Critical spot bid under $5K with an already-classified category, the live path may not call an LLM at all. The shape didn't come from designing a leaner architecture up front — it came from evidence pushing two agents toward stronger tiers and one toward no model call at all, and from now checking that decision continuously instead of once. Cognitive-demand tiering only holds if you keep checking whether the demand was real.
+  </p>
+
+  <h2>Layer two: prompt caching, with cross-tenant leakage designed out</h2>
+
+  <p>
+    Bedrock prompt caching stores the request prefix — normally the system prompt <em>and</em> tool schemas — so a byte-identical prefix on a later call reads at roughly a tenth of standard input cost. Live testing against Bedrock Converse found this splits by cache-point location, not uniformly by model family: the full Nova family (Micro/Lite/Pro) accepts a <code>cachePoint</code> in the <code>system</code> block, but Nova rejects one inside <code>toolConfig.tools</code> outright. Claude accepts both. <code>cache.py</code> gates the two independently as a deliberate trade-off — full tool-schema caching stays Claude-only code, ready but unused, rather than special-casing Nova's narrower support at every call site. On the live negotiation-path fleet, which runs entirely on Nova, only the system-prompt half of the discount is real:
+  </p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 760 260" role="img" aria-labelledby="pc-title pc-desc" font-family="'Sora', system-ui, sans-serif">
+      <title id="pc-title">What's actually cached today</title>
+      <desc id="pc-desc">Of the three parts of a request, only the system prompt is cached on the live Nova fleet. The tool schema is a capability the code supports for Claude but goes unused on the Nova negotiation fleet, since Nova rejects a cache point there. The per-invocation payload is never cached by design — it changes every call.</desc>
+      <style>
+        .pc-pre   { fill: #E2F6F1; stroke: #2A8579; stroke-width: 1.5; }
+        .pc-dorm  { fill: #F1F5F9; stroke: #94A3B8; stroke-width: 1.5; stroke-dasharray: 5 3; }
+        .pc-post  { fill: #FCF3E3; stroke: #B07D2A; stroke-width: 1.5; }
+        .pc-cp    { stroke: #0F172A; stroke-width: 1.5; stroke-dasharray: 4 3; }
+        .pc-zone  { font: 500 13px 'Sora', sans-serif; }
+        .pc-zone-pre  { fill: #0B5048; }
+        .pc-zone-dorm { fill: #475569; }
+        .pc-zone-post { fill: #7C4A06; }
+        .pc-item  { font: 400 11.5px 'DM Mono', ui-monospace, monospace; fill: #475569; }
+        .pc-cost-pre  { font: 500 12px 'DM Mono', ui-monospace, monospace; fill: #0F766E; }
+        .pc-cost-dorm { font: 500 12px 'DM Mono', ui-monospace, monospace; fill: #64748B; }
+        .pc-cost-post { font: 500 12px 'DM Mono', ui-monospace, monospace; fill: #92600C; }
+        .pc-cp-l  { font: 500 11px 'DM Mono', ui-monospace, monospace; fill: #0F172A; }
+        @media (prefers-color-scheme: dark) {
+          .pc-pre   { fill: #103D38; stroke: #2A8579; }
+          .pc-dorm  { fill: #1E293B; stroke: #64748B; }
+          .pc-post  { fill: #422C0A; stroke: #B07D2A; }
+          .pc-cp    { stroke: #E2E8F0; }
+          .pc-zone-pre  { fill: #8DD9C8; }
+          .pc-zone-dorm { fill: #94A3B8; }
+          .pc-zone-post { fill: #FBCF86; }
+          .pc-item  { fill: #CBD5E1; }
+          .pc-cost-pre  { fill: #5EEAD4; }
+          .pc-cost-dorm { fill: #94A3B8; }
+          .pc-cost-post { fill: #FBCF86; }
+          .pc-cp-l  { fill: #E2E8F0; }
+        }
+      </style>
+      <rect class="pc-pre"  x="20"  y="56" width="215" height="150" rx="10"/>
+      <rect class="pc-dorm" x="255" y="56" width="215" height="150" rx="10"/>
+      <line class="pc-cp" x1="490" y1="32" x2="490" y2="222"/>
+      <text class="pc-cp-l" x="490" y="22" text-anchor="middle">payload begins</text>
+      <rect class="pc-post" x="510" y="56" width="230" height="150" rx="10"/>
+      <text class="pc-zone pc-zone-pre"  x="35"  y="86">System prompt</text>
+      <text class="pc-item" x="35" y="108">cachePoint accepted</text>
+      <text class="pc-item" x="35" y="126">by Nova + Claude</text>
+      <text class="pc-cost-pre" x="35" y="152">read at ~10% of input cost</text>
+      <text class="pc-cost-pre" x="35" y="170">— live today</text>
+      <text class="pc-zone pc-zone-dorm" x="270"  y="86">Tool schema</text>
+      <text class="pc-item" x="270" y="108">cachePoint rejected</text>
+      <text class="pc-item" x="270" y="126">by Nova (ValidationException)</text>
+      <text class="pc-cost-dorm" x="270" y="152">Claude-only capability —</text>
+      <text class="pc-cost-dorm" x="270" y="170">unused on the Nova negotiation fleet</text>
+      <text class="pc-zone pc-zone-post" x="525" y="86">Per-invocation payload</text>
+      <text class="pc-item" x="525" y="108">bid/round state · retrieved</text>
+      <text class="pc-item" x="525" y="126">memory · resolved thresholds</text>
+      <text class="pc-cost-post" x="525" y="152">always full cost —</text>
+      <text class="pc-cost-post" x="525" y="170">by design, changes every call</text>
+      <text class="pc-item" x="380" y="240" text-anchor="middle">5-minute TTL only — Nova's sole option. Cache hit rate now tracked; alarm still pending.</text>
+    </svg>
+    <figcaption>Live-verified against Bedrock Converse. Only the system-prompt box is a real saving on the Nova negotiation fleet; the tool-schema box is code that's ready for Claude's broader caching support, which the negotiation path doesn't use.</figcaption>
+  </figure>
+
+  <p>
+    Caching by definition means reusing something written for one call on a later, different call — which is exactly the shape of a cross-tenant data leak if the cached prefix ever contains anything tenant-specific. That's the risk a shared prompt cache carries by construction, and it's mitigated at the build boundary, not at request time: <code>DynamicAgentFactory</code> is the single assembly point, and a test fails the build if any per-invocation value — supplier data, round state, resolved tenant thresholds — lands before the cache checkpoint. That's what makes the cached system prompt identical across every tenant, negotiation, and round sharing an agent's build config, and it's why a cross-tenant cache hit is safe rather than a data leak: the only thing before the checkpoint is public boilerplate, never tenant data.
+  </p>
+
+  <p>
+    What we didn't have for a while was visibility into whether the caching was paying off at all. A <code>cache.hit</code> metric closed that gap — 1 or 0 per invocation, emitted whenever Bedrock reports either cache-usage key, so <code>Average</code> over a window is directly the hit rate, live on the FinOps dashboard. Nearly a month of data now says the system-prompt cache is actually working, not just correctly configured: 28 of 29 recorded invocations for the Kraljic Classifier — the one agent generating enough dev traffic to measure — hit the cache, a ~97% rate against the 5-minute TTL. The first fully-green live end-to-end suite confirms the same thing at larger scale, with token counts read straight off OTLP trace spans: 116.1K cache-read tokens against 275.5K uncached input tokens across the run, each cache-read token priced at roughly a tenth of standard input — a real, measured discount, not a theoretical one.
+  </p>
+
+  <p>
+    Extending caching from the system prompt to Strands' message-level cache config for Nova was evaluated and deliberately left off. Nova only accepts a <code>cachePoint</code> on a text-only user turn, and Strands always places the cache point on the last user message — which in a multi-round tool loop is a <code>toolResult</code> turn from round two onward, exactly the shape every <code>StrategyLLM</code> agent runs (Leverage Auction, Bottleneck Negotiation, Strategic Partnership). For those agents the feature would cost a request failure, not save anything, so the extended cache config stays Claude-only for both tool- and message-level caching, and the finding is recorded in <code>cache.py</code>'s docstring so the trade-off doesn't need re-evaluating. The practice worth keeping: test a caching extension against the model's actual accepted request shape before turning it on, not just against the API's documented surface.
+  </p>
+
+  <h2>Layer three: the classifier that mostly never runs</h2>
+
+  <p>
+    The Kraljic Classifier assigns a procurement category to one of four quadrants. <code>orchestrator/node_kraljic_classify.py</code> resolves it in priority order, and the LLM is the fallback of last resort, not step one:
+  </p>
+
+  <ol>
+    <li><strong>Manual override</strong> — operator-pinned quadrant, feature-flagged off by default; highest precedence when enabled.</li>
+    <li><strong>Seeded short-circuit</strong> — the category's row already carries a <code>kraljic_quadrant</code>; return it directly.</li>
+    <li><strong>Semantic cache</strong> — a prior classification for the same category, thresholds, and cache epoch, keyed on tenant, category, and a hash of the thresholds, 24h TTL.</li>
+    <li><strong>Live agent</strong> — invokes the Kraljic Classifier runtime (<code>DefaultLLM</code>/Nova Lite); persists and caches the result.</li>
+    <li><strong>Rule-based fallback</strong> — deterministic axis rule if the agent is unavailable or returns a malformed response.</li>
+  </ol>
+
+  <p>
+    A cache keyed only on category would carry a staleness trade-off: if profit-impact or supply-risk thresholds change, a cached classification computed under the old thresholds would keep being served as if nothing changed. That's handled by folding the thresholds into the cache key itself — any threshold change produces a new key automatically, no separate invalidation step to remember. The same self-invalidation mechanism also responds to classification quality rather than just threshold changes: if the live Kraljic Accuracy eval score drops under 0.90, a remediation Lambda bumps a governance cache-epoch counter, which folds into every future key and makes the entire cache miss and repopulate on next read — no scan, no delete, existing rows simply age out on their unchanged 24h TTL. Because most live categories are pre-classified and the cache now invalidates itself on both dimensions, step 4 is rare in practice. The dollar saving from a cache hit here is genuinely small — on the order of a fraction of a cent per classification, once you're already avoiding full input-token price via prompt caching — but that's not really the point. The bigger saving is upstream of caching entirely: most categories never reach the agent at all.
+  </p>
+
+  <h2>Layer four: context compaction</h2>
+
+  <p>
+    Multi-round agents (Leverage Auction, Bottleneck Negotiation, Strategic Partnership) accumulate tool results across rounds, and an unbounded tool output re-enters every subsequent LLM call in that conversation — the risk being both runaway token cost and, eventually, a context window that can't fit the negotiation's own history. A Strands <code>AfterToolCallEvent</code> hook mitigates it by truncating any tool result whose serialized size exceeds a configured character cap (default 4000). A second, narrower risk sits inside that fix: truncating naively from the head alone would silently drop the thing that usually matters most in a long tool output — a running total, a final status — from the tail. The hook avoids that by keeping both ends, splitting the budget two-thirds to the head and one-third to the tail. This is the one piece of the original cost story that was accurate the whole time; it shipped correctly and hasn't needed correcting.
+  </p>
+
+  <h2>What we haven't built, and why that's not an oversight</h2>
+
+  <p>
+    Three things from the earlier version of this post don't exist, and we're not building them next:
+  </p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">✗</div>
+        <div class="tcard-title">Batch inference for supplier KPIs</div>
+      </div>
+      <p>No Bedrock Batch job, no feature flag, no nightly schedule, no savings metric. Supplier KPIs used by negotiation agents are read as static/seeded data today, not recomputed by any inference job — on-demand or batch.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">✗</div>
+        <div class="tcard-title">Per-tenant CUR/Athena cost attribution</div>
+      </div>
+      <p>A tenant-cost-attribution DynamoDB table is provisioned in Terraform, but nothing populates it — no Lambda, no Athena query, no CUR join. It's orphaned infrastructure, not a partial implementation. (A narrower, aggregate-only sibling now exists — see the FinOps dashboard's AWS-cost-by-service widget below — but it carries no tenant dimension and doesn't touch this table.)</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-coral">✗</div>
+        <div class="tcard-title">Cost alarms of any kind</div>
+      </div>
+      <p>Two token-volume spike alarms exist as an untuned first pass — the code's own comment calls them "first-pass guesses only, no real dev volume data exists yet to tune against." No dollar-denominated alarm, no per-tenant anomaly detector, no budget near-breach warning, and no retry-overhead tracking exist anywhere.</p>
+    </div>
+  </div>
+
+  <p>
+    The honest reason to leave these alone isn't bandwidth — it's that all three are second-order systems built on top of a first-order signal, <code>negotiation.total_cost_usd</code>. That signal is now verified against the real table and backed by a companion success-rate metric (below), but it's still a low-volume number: dev hasn't run enough live negotiations yet to give an attribution pipeline or a dollar-denominated alarm anything meaningful to key off. An attribution pipeline built ahead of that volume would produce a confidently precise-looking chargeback figure on a thin sample, which is worse than an honestly absent one. The trade-off is deliberate: build the second-order systems once the first-order signal has the volume to support them, not before.
+  </p>
+
+  <hr>
+
+  <h2>Verifying the number the rest of this depends on</h2>
+
+  <p>
+    Every mechanism above is only as trustworthy as the number that's supposed to prove it's saving money. That number is <code>negotiation.total_cost_usd</code>, dimensioned by <code>tenant_id</code>, <code>negotiation_id</code>, <code>strategy</code>, and <code>kraljic_quadrant</code>. The mechanism behind it is straightforward and, on its own, well designed:
+  </p>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">Step 1</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Price each completed agent call</div>
+        <div class="pipe-desc">Every A2A call in <code>invoke_agent_runtime()</code> that returns both a resolved <code>model_id</code> and a <code>negotiation_id</code> is priced via <code>pricing.estimate_cost_usd(model_id, usage)</code>, against the baked-in per-model rate table — the same one behind the tier prices above.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">Step 2</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Accumulate atomically per negotiation</div>
+        <div class="pipe-desc">The priced delta is added into a DynamoDB negotiations-table item via an atomic increment update expression, since a negotiation's cost is built up one agent call at a time across multiple node Lambdas.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">Step 3</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Read once, at whichever terminal node ends the negotiation</div>
+        <div class="pipe-desc">Three Step Functions terminal nodes — Bid Evaluation's no-qualifying-bids cancellation, Award &amp; Comms' commit, Approval Gate's rejection resume — each independently re-read the accumulator fresh and emit <code>negotiation.total_cost_usd</code> once, degrading to 0 on a read failure so cost tracking can never block an already-committed transition.</div>
+      </div>
+    </div>
+  </div>
+
+  <p>
+    Accumulation deliberately sits behind a broad exception handler that logs and moves on — the same graceful-degradation posture this system applies everywhere else (Kraljic's rule-based fallback, memory's degraded-boolean-OR, terminal nodes reading 0 on a DynamoDB failure), on the principle that cost tracking must never be the thing that gates a negotiation. Every value in the update's expression values is <code>Decimal</code>-typed end to end, matching DynamoDB's resource-API contract, and the unit test for the accumulator asserts that type directly rather than just a captured value — the standard for tests touching this write path. The design leans on a second practice alongside the handler itself: verify the accumulator against the real negotiations table directly on anything that touches this pipeline, rather than trusting the dashboard alone — the same habit that keeps every mechanism in this post honest.
+  </p>
+
+  <p>
+    Two companion metrics now sit alongside the accumulator itself. An invocation-success metric and an unpriced-model-invocation metric (with its own CloudWatch alarm) give a success-rate signal on the agent calls this pipeline prices and flag any model that's configured but has no entry in the pricing rate table — previously priced at $0 with no trace. And a newer <code>cost.usd</code> metric emits a per-call dollar figure dimensioned by <code>tenant_id</code>, <code>agent_name</code>, and <code>model_id</code> — a finer-grained view underneath the per-negotiation total, useful for spotting which agent or tenant is driving spend without waiting for a negotiation to complete. One boundary worth stating plainly: the Claude Haiku judge calls from Layer one run through a raw <code>bedrock-runtime.converse()</code> call, not <code>invoke_agent_runtime()</code>, so they sit outside all three of these signals by design — they're evaluation-only, off the negotiation critical path, and not billed to a negotiation's total.
+  </p>
+
+  <h2>Where the target actually stands</h2>
+
+  <p>
+    We're not going to publish an invented per-negotiation dollar figure. What we have instead is the first fully-green live end-to-end run across all integration files, covering every major strategy path with real Bedrock calls, real DynamoDB writes, and token counts read directly off OTLP trace spans — the richest real sample this metric has had yet:
+  </p>
+
+  <div class="bt-stat-band">
+    <div class="bt-stat">
+      <div class="n green">$0.60</div>
+      <div class="l">whole live E2E suite, Bedrock ≈ $0.57 + infra ≈ $0.03</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n cyan">116.1K / 275.5K</div>
+      <div class="l">cache-read vs. uncached input tokens — the caching discount, measured</div>
+    </div>
+    <div class="bt-stat">
+      <div class="n">142 / 40 / 23</div>
+      <div class="l">Nova Pro / Nova Lite / Claude Haiku 4.5 calls (judges) across the run</div>
+    </div>
+  </div>
+
+  <p>
+    That aggregate figure spans many negotiations across the full strategy space, not one, so it isn't a like-for-like replacement for a per-negotiation p50 or p90 — dev still hasn't accumulated enough live negotiation volume for that distribution. But it's real, dated, and multi-model evidence in a way a single sample can't be: it confirms the caching discount at scale (116.1K cache-read tokens priced at roughly a tenth of the 275.5K uncached-input tokens they'd otherwise cost), it shows the tier ladder holding its shape under load (142 Nova Pro calls against 40 Nova Lite, consistent with strategy agents dominating token spend), and it gives a first real anchor for the Claude judge calls (23, roughly one per award on the async path). The FinOps dashboard — now ten widgets, covering token usage by agent/tier, cache read/write counts, agent-session duration by tenant, cost per negotiation, real AWS-billed cost by service from a daily Cost Explorer poll, cache hit rate, agent invocation success rate, unpriced-model-invocation count, invocation count by tenant, and the per-call <code>cost.usd</code> widget — is wired to the right metrics and ready to plot a real distribution the moment negotiation volume gives it one. The service-level cost widget is real data today; it's just account-wide, not attributable to a tenant or negotiation.
+  </p>
+
+  <h2>Practices worth carrying into the next mechanism</h2>
+
+  <p>
+    <strong>Assert the contract, not just the current behavior.</strong> A test that only checks a captured value can encode an accident as the expected shape, silently, forever. Where a test can check a type invariant instead — a DynamoDB-compatible numeric type, in this case — it should, and that's now the standard for tests touching the cost-write path.
+  </p>
+
+  <p>
+    <strong>Pair "never block the critical path" handlers with a success-rate signal.</strong> Broad exception handling around a non-critical side effect is the right call and should stay — the failure mode it protects against, a dependency outage taking down a negotiation, is real and worth guarding against unconditionally. On its own, though, it can't distinguish occasional failure from total failure, since both look identical from inside a try/except that logs and moves on. The invocation-success and unpriced-model-invocation metrics now give that signal for the agent-invocation and pricing-coverage side of this pipeline; the accumulator write itself is the one piece still relying on table-checks rather than an always-on success metric.
+  </p>
+
+  <p>
+    <strong>Don't build the attribution layer before the number underneath it has volume.</strong> The CUR/Athena pipeline from an earlier draft of this post was never actually built, and holding off was the right call — a per-tenant chargeback built on a thin sample reads as more precise than it is. It stays deferred until <code>negotiation.total_cost_usd</code> has the live volume to be worth attributing.
+  </p>
+
+  <p>
+    <strong>Treat tier assignments as a hypothesis, not a one-time decision.</strong> Every real change to the model ladder — promoting an agent to a stronger tier, eliminating an LLM call from Bid Evaluation entirely — came from live eval evidence, not from re-reading the original cognitive-demand rationale harder. That habit is now partly automated: a tier promotion is snapshotted before it ships, and a quality regression rolls it back without a human in the loop. The cheapest model is sometimes no model at all, and continuous checking is what finds that out.
+  </p>
+
+  <p>
+    <strong>Keep evaluation off the path it's evaluating.</strong> The Claude Haiku judges run async, post-award, through a separate model configuration from the tier ladder they don't participate in. That's a deliberate boundary: judge quality never gets coupled to a cost-tiering decision, and a judge-model change can't accidentally alter what gets cached, priced, or tiered on the negotiation's own critical path.
+  </p>
+
+  <hr>
+
+  <h2>Summary</h2>
+
+  <p>
+    What's real and live: a 3-tier Nova model ladder that's been actively pruned toward fewer LLM calls, not more of them, each change driven by eval evidence, config-driven so it ships without a redeploy, and backed by an automated rollback that reverts a bad promotion on its own; a prompt cache that covers the system prompt on the Nova fleet, with cross-tenant isolation designed in at the build boundary rather than patrolled at request time, measured at a ~97% hit rate and now confirmed at scale (116.1K cache-read tokens against 275.5K uncached input across the first full live suite run); a Kraljic classifier that's short-circuited before it's invoked more often than it's actually called, with a cache key that now invalidates itself on both threshold changes and live accuracy regressions; and a context-compaction hook that keeps both ends of a truncated tool result so a running total or final status is never silently dropped. Batch inference, CUR-based per-tenant attribution, and dollar-denominated cost alarms stay deliberately deferred until <code>negotiation.total_cost_usd</code> — now verified against the real table and carrying its own <code>cost.usd</code> per-call breakdown — has the live volume to make building on top of it worthwhile.
+  </p>
+
+  <p>
+    The instinct threading through all four mechanisms — verify against the real table or the real trace, not just the dashboard, before building the next layer on top — is what let the tier ladder gain an automated safety net, the Kraljic cache gain quality-driven invalidation, and the cost pipeline gain a per-call metric this month, each addition checked against live data rather than assumed correct. That's the habit worth carrying into whatever gets built on top of this next.
+  </p>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="dag-vs-llm-planner.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Why we chose a deterministic DAG over a pure LLM planner</div>
+      </a>
+      <a href="architecture-and-design-patterns.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">One microkernel, six plug-ins: the patterns behind Buyer Team</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; August 2026</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> &mdash; an autonomous multi-agent procurement negotiation system.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

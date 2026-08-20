@@ -2,7 +2,43 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://gpazevedo.github.io/</loc>
-    <lastmod>2026-08-12</lastmod>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/blog/eng/oauth-resource-server-pattern.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/blog/eng/evaluation.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/blog/eng/security-without-trust.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/blog/eng/no-silent-failures.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/blog/eng/cost-architecture.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/blog/eng/architecture-and-design-patterns.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/blog/eng/tenant-isolation-agent-attack-vector.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/blog/eng/observability.html</loc>
+    <lastmod>2026-08-19</lastmod>
   </url>
   <url>
     <loc>https://gpazevedo.github.io/blog/eng/scalable-mcp.html</loc>
