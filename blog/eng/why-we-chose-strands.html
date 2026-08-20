@@ -19,7 +19,7 @@
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-06-09T00:00:00+00:00"/>
-<meta property="article:modified_time" content="2026-06-10T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-20T00:00:00+00:00"/>
 <meta property="article:section" content="Engineering"/>
 <meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
 <meta property="article:tag" content="Agentic Frameworks"/>
@@ -30,7 +30,7 @@
 <meta name="twitter:description" content="Everyone asks why we chose Strands. The SDK was the third decision, not the first — here's the full decision tree."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"How we decided to build Buyer Team — the decision tree behind the SDK choice","description":"Everyone asks why we chose the Strands Agents SDK. The SDK was the third decision, not the first. Here is the full decision tree, and why the architecture made each choice smaller than the one before it.","datePublished":"2026-06-09","dateModified":"2026-06-10","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"How we decided to build Buyer Team — the decision tree behind the SDK choice","description":"Everyone asks why we chose the Strands Agents SDK. The SDK was the third decision, not the first. Here is the full decision tree, and why the architecture made each choice smaller than the one before it.","datePublished":"2026-06-09","dateModified":"2026-08-20","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"How we decided to build Buyer Team","item":"https://gpazevedo.github.io/blog/eng/why-we-chose-strands.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -283,9 +283,9 @@
   <p>Already resolved by Decision 1 — but it re-enters here as the baseline every SDK must beat: if an SDK doesn't give us something we couldn't responsibly build, adopting it is pure dependency risk.</p>
 
   <h3>Strands</h3>
-  <p>What won it is one structural property: the hook system is an <strong>SDK-owned chokepoint</strong>. Every tool invocation — every one — passes through <code>BeforeToolCallEvent</code>, where our steering hooks inspect, modify, or <code>cancel_tool</code> before any side effect occurs. The model cannot route around it, because the route doesn't exist; there is one door, and the guard is bolted to it. It fails closed. On top of that: A2A deployment as a first-class primitive, native Bedrock AgentCore alignment (OTEL spans, Evaluations as the quality gate, per-tenant model selection), and an agent loop that preserves prompt-cache prefix purity — which is what keeps us under the $0.10-per-negotiation cost KPI.</p>
+  <p>What won it is one structural property: the hook system is an <strong>SDK-owned chokepoint</strong>. Every tool invocation — every one — passes through <code>BeforeToolCallEvent</code>, where our steering hooks inspect, modify, or <code>cancel_tool</code> before any side effect occurs. The model cannot route around it, because the route doesn't exist; there is one door, and the guard is bolted to it. That door ships fail-open by default — an SDK-caught exception in a handler logs and lets the call through — so "fails closed" isn't something the SDK hands you, it's something we built on top of the chokepoint it gives you: every guard we deploy subclasses a base that converts an escaping exception or a timeout into a cancelled call instead. The chokepoint is the SDK's guarantee; the closed failure mode is ours. On top of that: A2A deployment as a first-class primitive, native Bedrock AgentCore alignment (OTEL spans, a Kraljic-scoped online evaluation sample, per-agent-role model tiering), and an agent loop where prompt caching is something we deliberately keep to the models it stays correct on — which is what keeps us under the $0.10-per-negotiation cost KPI.</p>
 
-  <figure class="diagram" role="img" aria-label="Two-panel comparison: a topological guard can be bypassed by a stray graph edge; the SDK-owned hook is the only route to the tool and fails closed.">
+  <figure class="diagram" role="img" aria-label="Two-panel comparison: a topological guard can be bypassed by a stray graph edge; the SDK-owned hook is the only route to the tool, and Buyer Team wraps it to fail closed.">
     <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" font-family="Sora, sans-serif">
       <defs>
         <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -326,7 +326,7 @@
       <text x="180" y="246" text-anchor="middle" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--amber)" font-weight="600">maintained by review</text>
 
       <!-- RIGHT: SDK-owned hook -->
-      <text x="540" y="36" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12.5" fill="var(--teal)" font-weight="600">guard by construction (SDK hook)</text>
+      <text x="540" y="36" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12.5" fill="var(--teal)" font-weight="600">one door by construction, closed by us (SDK hook)</text>
 
       <rect x="396" y="110" width="84" height="44" rx="8" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.5"/>
       <text x="438" y="136" text-anchor="middle" font-family="'DM Mono', monospace" font-size="12" fill="var(--ink)">model</text>
@@ -345,9 +345,9 @@
 
       <text x="540" y="196" text-anchor="middle" font-size="11.5" fill="var(--ink-muted)">there is one door, and the guard is bolted to it —</text>
       <text x="540" y="214" text-anchor="middle" font-size="11.5" fill="var(--ink-muted)">the route around it does not exist</text>
-      <text x="540" y="246" text-anchor="middle" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--teal)" font-weight="600">fails closed, by construction</text>
+      <text x="540" y="246" text-anchor="middle" font-family="'DM Mono', monospace" font-size="11.5" fill="var(--teal)" font-weight="600">one door — we make it fail closed</text>
     </svg>
-    <figcaption>Fig. 3 — Decision 3's non-negotiable: a guardrail guarantee maintained by review vs. one that holds by construction.</figcaption>
+    <figcaption>Fig. 3 — Decision 3's non-negotiable: a guardrail guarantee maintained by review vs. one that holds by construction, then hardened to fail closed.</figcaption>
   </figure>
 
   <table class="decision">
@@ -359,7 +359,7 @@
       <tr><td>AutoGen</td><td>Convention</td><td>Emergent by design</td><td>Partial</td><td><span class="verdict v-risk">wrong shape</span></td></tr>
       <tr><td>LangGraph</td><td>Topological — edge-dependent</td><td>Duplicates Step Functions</td><td>Portable, generic</td><td><span class="verdict v-build">discipline-bound</span></td></tr>
       <tr><td>Roll-your-own</td><td>Ours to get right, forever</td><td>Neutral</td><td>Build everything</td><td><span class="verdict v-build">resolved in D1</span></td></tr>
-      <tr><td>Strands</td><td>SDK-owned, fails closed</td><td>Library, not orchestrator</td><td>Native</td><td><span class="verdict v-chosen">chosen</span></td></tr>
+      <tr><td>Strands</td><td>SDK-owned chokepoint, we make it fail closed</td><td>Library, not orchestrator</td><td>Native</td><td><span class="verdict v-chosen">chosen</span></td></tr>
     </tbody>
   </table>
 
@@ -371,14 +371,14 @@
         <div class="tcard-icon icon-teal">◎</div>
         <div class="tcard-title">Effective — the guarantees</div>
       </div>
-      <p>Guardrails that survive a misbehaving model, by construction. A complete OTEL audit trail on every negotiation. Hard tenant isolation below the agent layer. And replaceability: every layer of the tree — SDK, even language — can be swapped without touching durable state or orchestration.</p>
+      <p>A guardrail chokepoint the model can't route around, by construction — and a fail-closed failure mode on top of it, by our own design rather than the SDK's default. A complete OTEL audit trail on every negotiation. Hard tenant isolation below the agent layer. And replaceability: every layer of the tree — SDK, even language — can be swapped without touching durable state or orchestration.</p>
     </div>
     <div class="tcard">
       <div class="tcard-head">
         <div class="tcard-icon icon-teal">⚡</div>
         <div class="tcard-title">Efficient — the economics</div>
       </div>
-      <p>A small team shipping six production agents in weeks, not quarters, because we built only the layer that differentiates us. Engineering hours spent on negotiation logic and guardrail policy. AI cost held under $0.10 per negotiation through prompt-cache purity the SDK preserves rather than fights.</p>
+      <p>A small team shipping six production agents in weeks, not quarters, because we built only the layer that differentiates us. Engineering hours spent on negotiation logic and guardrail policy. AI cost held under $0.10 per negotiation by keeping prompt caching to the models it stays correct on rather than fighting it everywhere.</p>
     </div>
   </div>
 

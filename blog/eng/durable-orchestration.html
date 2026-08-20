@@ -19,7 +19,7 @@
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-05-29T00:00:00+00:00"/>
-<meta property="article:modified_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-20T00:00:00+00:00"/>
 <meta property="article:section" content="Engineering"/>
 <meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
 <meta property="article:tag" content="Durability"/>
@@ -29,7 +29,7 @@
 <meta name="twitter:description" content="How a multi-day procurement negotiation stays alive across crashes, restarts, and a 96-hour human approval wait — per-node DynamoDB checkpoints, idempotent resume, recovery locks, and the interrupt pattern."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Pause for four days, resume in five seconds: durable execution in a multi-agent system","description":"Durability as a reliability property: how a procurement negotiation survives crashes, restarts, deploys, and a 96-hour approval pause without losing state or redoing work — per-node DynamoDB checkpoints, idempotent resume, recovery locks, and an interrupt pattern that pauses a DAG without holding a process open.","datePublished":"2026-05-29","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/durable-orchestration.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/durable-orchestration.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Pause for four days, resume in five seconds: durable execution in a multi-agent system","description":"Durability as a reliability property: how a procurement negotiation survives crashes, restarts, deploys, and a 96-hour approval pause without losing state or redoing work — per-node DynamoDB checkpoints, idempotent resume, recovery locks, and an interrupt pattern that pauses a DAG without holding a process open.","datePublished":"2026-05-29","dateModified":"2026-08-20","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/durable-orchestration.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/durable-orchestration.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Pause for four days, resume in five seconds","item":"https://gpazevedo.github.io/blog/eng/durable-orchestration.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -673,7 +673,7 @@ Node 7   &rarr;  existing CommunicationLog entry</code></pre>
 </div>
 <div class="layer l3">
 <div class="layer-meta"><span class="layer-num">Days 4&ndash;5</span> <span class="layer-name">Evaluate &rarr; Approve (96h wait) &rarr; Award</span> <span class="layer-src">Nodes 5&ndash;7</span></div>
-<div class="chips"><span class="chip">SUPERSEDED bids excluded from eval</span> <span class="chip">Node 6 interrupt &rarr; paused 40h &rarr; approved</span> <span class="chip">resume &le;5s &rarr; Node 7 &rarr; AWARDED</span> <span class="chip">terminal: per-tenant + global counters decrement</span></div>
+<div class="chips"><span class="chip">one bid row per supplier, latest round wins</span> <span class="chip">Node 6 interrupt &rarr; paused 40h &rarr; approved</span> <span class="chip">resume &le;5s &rarr; Node 7 &rarr; AWARDED</span> <span class="chip">terminal: per-tenant + global counters decrement</span></div>
 </div>
 </div>
 <p>At no point in those five days was a process held open across the idle stretches, and at no point did the round-3 crash cost more than the seconds it took a fresh instance to acquire the lock and reload the checkpoint. The auction that the supplier experienced was continuous; the execution behind it was anything but.</p>
