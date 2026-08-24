@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="index, follow"/>
+<meta name="author" content="Gustavo Peixoto de Azevedo"/>
+<title>Spring GenAI — Gustavo Peixoto de Azevedo</title>
+<meta name="description" content="Can an organisation put its existing Java stack on a managed agent runtime without rewriting it in Python? Amazon Bedrock AgentCore's reference material assumes Python, so the path for a Spring Boot team is undocumented rather than unsupported — and that difference is where projects stall. The agent is deliberately trivial; the deliverable is proof that everything around it works."/>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/projects/spring-genai.html"/>
+<meta property="og:title" content="Spring GenAI"/>
+<meta property="og:description" content="Can an organisation put its existing Java stack on a managed agent runtime without rewriting it in Python? Amazon Bedrock AgentCore's reference material assumes Python, so the path for a Spring Boot team is undocumented rather than unsupported — and that difference is where projects stall. The agent is deliberately trivial; the deliverable is proof that everything around it works."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Spring GenAI"/>
+<meta name="twitter:description" content="Can an organisation put its existing Java stack on a managed agent runtime without rewriting it in Python? Amazon Bedrock AgentCore's reference material assumes Python, so the path for a Spring Boot team is undocumented rather than unsupported — and that difference is where projects stall. The agent is deliberately trivial; the deliverable is proof that everything around it works."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Spring GenAI","description":"Can an organisation put its existing Java stack on a managed agent runtime without rewriting it in Python? Amazon Bedrock AgentCore's reference material assumes Python, so the path for a Spring Boot team is undocumented rather than unsupported — and that difference is where projects stall. The agent is deliberately trivial; the deliverable is proof that everything around it works.","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/projects/spring-genai.html","keywords":"Spring AI, AgentCore, Java"}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../blog/buyer-team-blog.css">
+<link rel="stylesheet" href="../blog/site-blog.css">
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="../index.html#ai-projects">AI Projects</a></li>
+    <li><a href="../index.html#blog">Blog</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../index.html#ai-projects">AI Projects</a>
+    <span class="sep">›</span>
+    <span class="current">Spring GenAI</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Project</span>
+    <span class="dot">·</span>
+    <span>Spring AI</span>
+    <span class="dot">·</span>
+    <span>Deployed</span>
+  </div>
+
+  <h1>Spring GenAI</h1>
+
+  <p class="deck">Can an organisation put its existing Java stack on a managed agent runtime without rewriting it in Python? Amazon Bedrock AgentCore's reference material assumes Python, so the path for a Spring Boot team is undocumented rather than unsupported — and that difference is where projects stall. The agent is deliberately trivial; the deliverable is proof that everything around it works.</p>
+
+  <hr>
+
+  <h2>The problem</h2>
+
+  <p>This question surfaces early in most enterprise GenAI conversations, and it is
+     rarely about capability. An organisation with a decade of Spring Boot services,
+     an established build pipeline, and operators who know how to read its telemetry
+     asks whether a managed agent runtime is open to them, or whether adoption means
+     standing up a parallel Python estate alongside everything they already run.</p>
+
+  <p>The honest answer is that nothing blocks them. Amazon Bedrock AgentCore contracts
+     on HTTP endpoints, not on a language. But almost every worked example assumes a
+     Python application, and the gap between <em>undocumented</em> and <em>unsupported</em>
+     is invisible from the outside. Teams read the absence of a Java path as a
+     prohibition, and the evaluation stops there. Closing that gap needs a deployed
+     artefact, not an assurance.</p>
+
+  <h2>What it proves</h2>
+
+  <p>Spring GenAI is a small, fully deployed reference agent. Keeping it trivial is the
+     point: with no domain logic to explain away, every difficulty encountered belongs
+     to the platform integration, which makes the result reusable both as a starting
+     template and as an honest account of the friction a Java team should expect.</p>
+
+  <p>Four things had to work, and each corresponds to a question that decides whether a
+     workload reaches production:</p>
+
+  <ul>
+    <li><strong>The runtime contract.</strong> A Spring Boot 3 application serves the two
+        endpoints AgentCore expects — <code>POST /invocations</code>, SSE-streamed on
+        virtual threads, and <code>GET /ping</code> — and delegates inference to Amazon
+        Nova Lite through the Bedrock Converse API via Spring AI's
+        <code>ChatClient</code>.</li>
+    <li><strong>Real user identity.</strong> Inbound requests carry a Cognito-issued JWT
+        that AgentCore validates at the boundary. The application parses it only to
+        derive a user ID, which it composes with the AgentCore session header into a
+        <code>userId:sessionId</code> conversation key.</li>
+    <li><strong>Managed conversation state.</strong> A custom
+        <code>AgentCoreChatMemoryRepository</code> implements Spring AI's
+        <code>ChatMemoryRepository</code> over the AgentCore Memory Events API, wired
+        behind <code>MessageWindowChatMemory</code>. State lives in the managed store
+        rather than in process, so the runtime is free to scale and replace instances.</li>
+    <li><strong>Operator-grade visibility.</strong> Traces and logs reach X-Ray and
+        CloudWatch through the same tooling used for everything else in the account —
+        no bespoke dashboard, no separate pane of glass.</li>
+  </ul>
+
+  <p>The whole environment is provisioned by Terraform: runtime, Cognito pool, IAM
+     execution role, ARM64 ECR image, memory store, X-Ray configuration and vended log
+     deliveries. An equivalent local stack — OTel Collector into Jaeger, Prometheus,
+     Loki and Grafana under Docker Compose — runs the same instrumentation before
+     anything is deployed.</p>
+
+  <h2>Where the friction actually was</h2>
+
+  <p>Not where a Java team would expect. The runtime contract and the Bedrock call were
+     unremarkable. Observability carried nearly all of the non-obvious cost, and every
+     item below is the kind of thing that produces an empty dashboard with no error
+     anywhere to explain it:</p>
+
+  <ul>
+    <li>The ADOT Java agent has to be loaded explicitly through
+        <code>JAVA_TOOL_OPTIONS</code>. Auto-injection covers Python runtimes only.</li>
+    <li>Traces and logs are signed with SigV4 and exported over OTLP directly to X-Ray
+        and CloudWatch Logs, with no sidecar collector in the deployed path.</li>
+    <li>Appearing in the CloudWatch GenAI Observability dashboard additionally required
+        setting <code>cloud.resource_id</code> to the <em>endpoint</em> ARN rather than
+        the runtime ARN — a distinction with no diagnostic if you get it wrong.</li>
+    <li>X-Ray Transaction Search has to be enabled, and root-span sampling forced to
+        100%, because Micrometer's default 5% decision silently drops every downstream
+        Bedrock span. The parent trace still appears, which is what makes this one hard
+        to spot: the data looks present until you go looking for the model call.</li>
+  </ul>
+
+  <p>That list is the real deliverable. A Java team can satisfy the runtime contract in
+     an afternoon; what costs them a week is discovering these four settings by
+     elimination.</p>
+
+  <h2>What it is not</h2>
+
+  <p>It is not a product, and the agent has no capability worth using. It is a proof of
+     path and a starting template — deliberately scoped so that nothing in it needs to be
+     explained away as domain-specific.</p>
+
+  <p>Two limits worth stating plainly. The 100% root-span sampling that makes the traces
+     complete is a development setting, not a production one; a real workload trades
+     fidelity against observability spend, and that trade-off is left open rather than
+     decided here. And the reference covers a single-container agent on AgentCore
+     Runtime — it says nothing about multi-agent orchestration, which is a different
+     problem with a different answer.</p>
+
+  <h2>Further reading</h2>
+  <ul>
+    <li>TODO — link the repository.</li>
+  </ul>
+
+</article>
+
+</body>
+</html>

@@ -22,7 +22,7 @@
   </url>
   <url>
     <loc>https://gpazevedo.github.io/blog/eng/no-silent-failures.html</loc>
-    <lastmod>2026-08-20</lastmod>
+    <lastmod>2026-08-19</lastmod>
   </url>
   <url>
     <loc>https://gpazevedo.github.io/blog/eng/cost-architecture.html</loc>
@@ -79,5 +79,33 @@
   <url>
     <loc>https://gpazevedo.github.io/blog/eng/dag-vs-llm-planner.html</loc>
     <lastmod>2026-05-01</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/projects/buyer-team.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/projects/atlas-counsel.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/projects/scalable-mcp.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/projects/spring-genai.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/projects/aws-agentic-generator.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/demos/pr-to-po.html</loc>
+    <lastmod>2026-08-19</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/demos/aws-architecture.html</loc>
+    <lastmod>2026-08-19</lastmod>
   </url>
 </urlset>

@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>PR to PO by strategy — Gustavo Azevedo</title>
+<meta name="description" content="An interactive walkthrough of an autonomous procurement negotiation from purchase requisition to purchase order — the shared workflow spine, the four Kraljic strategy branches, and the measured cost of each."/>
+<link rel="canonical" href="https://gpazevedo.github.io/demos/pr-to-po.html"/>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/demos/pr-to-po.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="PR to PO: one spine, four negotiation strategies"/>
+<meta property="og:description" content="An interactive walkthrough of an autonomous procurement negotiation from purchase requisition to purchase order — the shared workflow spine, the four Kraljic strategy branches, and the measured cost of each."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-08-22T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-22T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Architecture"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="PR to PO: one spine, four negotiation strategies"/>
+<meta name="twitter:description" content="An interactive walkthrough of an autonomous procurement negotiation from purchase requisition to purchase order — the shared workflow spine, the four Kraljic strategy branches, and the measured cost of each."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"PR to PO: one spine, four negotiation strategies","description":"An interactive walkthrough of an autonomous procurement negotiation from purchase requisition to purchase order — the shared workflow spine, the four Kraljic strategy branches, and the measured cost of each.","datePublished":"2026-08-22","dateModified":"2026-08-22","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/demos/pr-to-po.html","mainEntityOfPage":"https://gpazevedo.github.io/demos/pr-to-po.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"PR to PO: one spine, four negotiation strategies","item":"https://gpazevedo.github.io/demos/pr-to-po.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../blog/buyer-team-blog.css">
+<link rel="stylesheet" href="../blog/site-blog.css">
+<style>
+/* ---- interactive walkthrough (scoped to .btw) ---- */
+.btw{--btw-teal:#0e8c7c;--btw-ink:#1f2d46;--btw-line:#b7c2d1;
+     margin:2.2rem 0;font-family:'Sora',-apple-system,BlinkMacSystemFont,
+     'Segoe UI',sans-serif}
+.btw *{box-sizing:border-box}
+.btw .btw-bar{background:#12233c;border-radius:12px;padding:13px 16px;
+              color:#fff;margin-bottom:12px}
+.btw .btw-row{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.btw .btw-row+.btw-row{margin-top:11px}
+.btw button{font-family:inherit}
+.btw .tab{border:1.5px solid rgba(255,255,255,.28);background:transparent;
+          color:#cfdcec;border-radius:999px;padding:7px 14px;cursor:pointer;
+          font-size:12.5px;font-weight:600;letter-spacing:.4px}
+.btw .tab:hover{border-color:rgba(255,255,255,.6);color:#fff}
+.btw .tab.sel{color:#fff;border-color:transparent}
+.btw .btn{border:1.5px solid rgba(255,255,255,.28);background:transparent;
+          color:#e6eef8;border-radius:8px;padding:6px 12px;cursor:pointer;
+          font-size:12.5px}
+.btw .btn:hover{background:rgba(255,255,255,.09)}
+.btw .btn.pri{background:#0e8c7c;border-color:#0e8c7c;color:#fff;
+              font-weight:700}
+.btw .btn:disabled{opacity:.32;cursor:not-allowed}
+.btw .seg{display:flex;border:1.5px solid rgba(255,255,255,.28);
+          border-radius:8px;overflow:hidden}
+.btw .seg button{border:0;background:transparent;color:#cfdcec;
+                 padding:6px 11px;cursor:pointer;font-size:12.5px}
+.btw .seg button.sel{background:rgba(255,255,255,.16);color:#fff;
+                     font-weight:700}
+.btw .lbl{font-size:10px;letter-spacing:1.3px;color:#7f93ad;font-weight:700;
+          text-transform:uppercase}
+.btw .btw-sp{flex:1}
+.btw .readout{font-family:'DM Mono',ui-monospace,Consolas,monospace;
+              font-size:12px;color:#9fb4cd;white-space:nowrap}
+.btw .readout b{color:#fff}
+.btw .btw-cap{background:#fff;border:1px solid var(--btw-line);
+              border-left:5px solid var(--btw-teal);border-radius:10px;
+              padding:12px 16px;margin-bottom:10px;min-height:92px}
+.btw .btw-cap h3{margin:0 0 5px;font-size:15px;line-height:1.3;
+                 font-family:inherit;color:var(--btw-ink)}
+.btw .btw-cap p{margin:0;font-size:13.5px;line-height:1.55;color:#2c3b52}
+.btw .btw-cap .clk{float:right;font-family:'DM Mono',ui-monospace,monospace;
+                   font-size:12px;color:#5a6b80;margin-left:12px}
+.btw .btw-prog{height:4px;background:#dde5ee;border-radius:2px;
+               overflow:hidden;margin-bottom:10px}
+.btw .btw-prog i{display:block;height:100%;width:0;background:var(--btw-teal);
+                 transition:width .3s ease}
+.btw .btw-scroll{background:#f7f9fc;border:1px solid #dde5ee;border-radius:12px;
+                 padding:6px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.btw .btw-scroll>svg{width:100%;min-width:1080px;height:auto;display:block}
+.btw .btw-hint{font-size:11.5px;color:#5a6b80;margin:7px 2px 0}
+.btw:focus-visible{outline:2px solid var(--btw-teal);outline-offset:4px}
+/* animation states */
+.btw .stage,.btw .edge,.btw .sub{transition:opacity .35s ease}
+.btw.running .stage.dim{opacity:.13}
+.btw.running .sub.subdim{opacity:.16}
+.btw.running .edge{opacity:.10}
+.btw.running .edge.lit{opacity:1}
+.btw .stage.now .card{stroke:#0e8c7c;stroke-width:3.6}
+.btw .stage.now{filter:drop-shadow(0 3px 12px rgba(14,140,124,.4))}
+.btw .stage.fault .card{stroke:#c0392f;stroke-width:3.6}
+.btw .stage.fault{filter:drop-shadow(0 3px 12px rgba(192,57,47,.4))}
+.btw .stage.skipped{opacity:.3}
+.btw .stage.skipped .card{stroke:#c25a33;stroke-width:2;stroke-dasharray:7 5}
+.btw .edge.flow path{stroke-dasharray:10 8;animation:btwflow .7s linear infinite}
+@keyframes btwflow{to{stroke-dashoffset:-18}}
+@media (prefers-reduced-motion: reduce){
+  .btw .stage,.btw .edge,.btw .sub{transition:none}
+  .btw .edge.flow path{animation:none}
+  .btw .btw-prog i{transition:none}
+}
+@media (max-width:720px){
+  .btw .btw-cap{min-height:120px}
+  .btw .readout{width:100%}
+}
+/* embed mode: ?embed=1 strips the page chrome so this file can be iframed */
+body.btw-embed .blog-nav,body.btw-embed .breadcrumb,body.btw-embed .eyebrow,
+body.btw-embed h1,body.btw-embed .deck,body.btw-embed hr,
+body.btw-embed .btw-prose,body.btw-embed .post-footer,
+body.btw-embed .related-posts{display:none!important}
+body.btw-embed{background:transparent}
+body.btw-embed .page{padding:0!important;margin:0!important;max-width:none}
+body.btw-embed .btw{margin:0}
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="../index.html#demos">Demos</a></li>
+    <li><a href="../index.html#blog">Blog</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+<div class="breadcrumb"><a href="../index.html#demos">Demos</a> <span class="sep">&rsaquo;</span> <span class="current">PR to PO by strategy</span></div>
+<div class="eyebrow"><span class="tag">Engineering</span> <span class="dot">&middot;</span> <span>Architecture</span> <span class="dot">&middot;</span> <time datetime="2026-08-22">August 2026</time> <span class="dot">&middot;</span> <span>Interactive</span></div>
+<h1>PR to PO: one spine,<br>four <em>negotiation strategies</em></h1>
+
+<p class="deck">Every negotiation this system runs takes the same path from
+purchase requisition to purchase order &mdash; the same six node Lambdas, in
+the same order, with the same checkpoints. The four Kraljic strategies differ
+in exactly one place. This walks that path one stage at a time, and you can
+pick which strategy runs.</p>
+<hr>
+<div class="btw-prose">
+<h2>What you are looking at</h2>
+<p>The top row is the shared head: ingestion through the gateway, validation
+and admission control, Kraljic classification, and a Choice state that reads
+the resulting quadrant. The bottom row is the shared tail: deterministic bid
+evaluation, the approval gate, award, and PO delivery. Between them sits
+Node&nbsp;3 &mdash; one Lambda with four dispatch targets, and the only place
+the strategies diverge at all.</p>
+<p>Two of the four branches carry a deterministic bypass: below a configurable
+floor, the strategy agent is never invoked and pricing runs inline in the node
+Lambda. Toggle the value between <em>&le;&nbsp;$5k</em> and
+<em>&gt;&nbsp;$5k</em> on those branches to see the difference &mdash; and
+watch the cost readout, which only moves when an agent is actually called.</p>
+<p>Two failures are staged deliberately, because they are the parts worth
+seeing rather than reading about. The LEVERAGE run loses its runtime in the
+middle of round&nbsp;3 and resumes from the last checkpoint without re-sending
+a single invitation. The BOTTLENECK run loses a tool and degrades to an
+approximated calculation rather than failing the round.</p>
+<h2>The costs on the badges</h2>
+<p>Those are measured across 23 end-to-end negotiations, not estimated. The
+two above-threshold runs are marked <strong>modelled</strong> in the readout,
+because every spot and auction negotiation in that dataset happened to fall
+under the bypass &mdash; the agent path for those two quadrants is real code
+that the measured sample simply never exercised.</p>
+</div>
+
+
+<div class="btw" id="bt-player" tabindex="0" role="group"
+     aria-label="Interactive walkthrough of the negotiation workflow">
+  <div class="btw-bar">
+    <div class="btw-row">
+      <span class="lbl">Strategy</span>
+      <button class="tab" type="button" data-k="spot" data-col="#0e8c7c" aria-pressed="false">NON_CRITICAL</button><button class="tab" type="button" data-k="lev" data-col="#1b4c92" aria-pressed="false">LEVERAGE</button><button class="tab" type="button" data-k="bot" data-col="#c25a33" aria-pressed="false">BOTTLENECK</button><button class="tab" type="button" data-k="str" data-col="#96222f" aria-pressed="false">STRATEGIC</button>
+      <span class="btw-sp"></span>
+      <span class="lbl">Value</span>
+      <div class="seg modeseg">
+        <button type="button" data-mode="bypass" id="bt-m-bypass">&le; $5k</button>
+        <button type="button" data-mode="agent" id="bt-m-agent">&gt; $5k</button>
+      </div>
+    </div>
+    <div class="btw-row">
+      <button class="btn pri" type="button" id="bt-play">&#9654;&nbsp; Play</button>
+      <button class="btn" type="button" id="bt-step">Step &rsaquo;</button>
+      <button class="btn" type="button" id="bt-back">&lsaquo; Back</button>
+      <button class="btn" type="button" id="bt-reset">Reset</button>
+      <span class="lbl">Speed</span>
+      <div class="seg spdseg">
+        <button type="button" data-s="0.6">0.6&times;</button>
+        <button type="button" data-s="1" class="sel">1&times;</button>
+        <button type="button" data-s="1.8">1.8&times;</button>
+      </div>
+      <label style="font-size:12.5px;color:#cfdcec;display:flex;gap:6px;
+                    align-items:center;cursor:pointer">
+        <input type="checkbox" id="bt-cyc"> cycle-back
+      </label>
+      <span class="btw-sp"></span>
+      <span class="readout">agent&nbsp;LLM&nbsp;<b id="bt-cost">$0.0000</b>
+        &nbsp;&nbsp;step&nbsp;<b id="bt-pos">0/0</b></span>
+    </div>
+  </div>
+
+  <div class="btw-cap" id="bt-cap" aria-live="polite">
+    <span class="clk" id="bt-clk"></span>
+    <h3 id="bt-capt">Pick a strategy and press Play</h3>
+    <p id="bt-capc">The spine is identical for all four. Watch where the
+      paths separate &mdash; it is only ever inside Node&nbsp;3.</p>
+  </div>
+  <div class="btw-prog"><i id="bt-bar"></i></div>
+
+  <div class="btw-scroll"><svg viewBox="0 0 1760 1162" xmlns="http://www.w3.org/2000/svg" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" role="img" aria-labelledby="bt-t bt-d">
+<title id="bt-t">Buyer Team: purchase requisition to purchase order, by negotiation strategy</title>
+<desc id="bt-d">The shared workflow spine — ingest, Kraljic classification, routing, bid evaluation, approval, award — with the four strategy branches that diverge only inside Node 3, and the measured per-negotiation cost of each.</desc>
+<defs>
+<linearGradient id="bt-hg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0f1e33"/><stop offset="1" stop-color="#132845"/></linearGradient>
+<marker id="bt-a-navy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#1f2d46"/></marker>
+<marker id="bt-a-gray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8493a8"/></marker>
+<marker id="bt-a-terra" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#c25a33"/></marker>
+</defs>
+<rect width="1760" height="1162" fill="#f7f9fc"/>
+<rect x="0" y="0" width="1760" height="86" fill="url(#bt-hg)"/>
+<text x="46" y="44" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="29" font-weight="bold" fill="#ffffff" text-anchor="start" letter-spacing="0">PR → PO: one spine, four strategies</text>
+<text x="46" y="70" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="15" font-weight="normal" fill="#B9C8DC" text-anchor="start" letter-spacing="0">Every negotiation runs the same six node Lambdas. The four Kraljic strategies differ only inside Node 3.</text>
+<text x="1730" y="44" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" fill="#7f93ad" text-anchor="end" letter-spacing="2.4">INTERACTIVE</text>
+<text x="1730" y="70" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" fill="#7f93ad" text-anchor="end" letter-spacing="0">Buyer Team · Step Functions Standard · 6 node Lambdas (no node 4)</text>
+<g id="bt-stage-ingest" class="stage">
+<rect class="card" x="46.0" y="108" width="378.0" height="108.0" rx="8" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<rect x="46.0" y="108" width="4.5" height="108.0" rx="2.2" fill="#1b4c92"/>
+<text x="64.0" y="132" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="15.5" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">PR ingested</text>
+<text x="64.0" y="149" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="bold" fill="#1b4c92" text-anchor="start" letter-spacing="0">pre-DAG</text>
+<text x="64.0" y="167" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.2" fill="#5a6b80"><tspan x="64.0" dy="0">DynamoDB Streams → PR Event Router → Ingest</tspan><tspan x="64.0" dy="14.5">Gateway (JWT; interceptor injects tenant_id before</tspan><tspan x="64.0" dy="14.5">Cedar) → Skill Runtime → SFN StartExecution</tspan></text>
+</g>
+<g id="bt-edge-h0" class="edge">
+<path d="M 429.0 162.0 L 448.0 162.0" fill="none" stroke="#1f2d46" stroke-width="2.0" marker-end="url(#bt-a-navy)"/>
+</g>
+<g id="bt-stage-n1" class="stage">
+<rect class="card" x="454.0" y="108" width="378.0" height="108.0" rx="8" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<rect x="454.0" y="108" width="4.5" height="108.0" rx="2.2" fill="#1b4c92"/>
+<text x="472.0" y="132" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="15.5" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">Node 1 · Ingest &amp; Validate</text>
+<text x="472.0" y="149" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="bold" fill="#1b4c92" text-anchor="start" letter-spacing="0">Lambda · no LLM</text>
+<text x="472.0" y="167" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.2" fill="#5a6b80"><tspan x="472.0" dy="0">Schema validation · per-tenant admission control</tspan><tspan x="472.0" dy="14.5">(reserved / max / weight) → ACTIVE · dedup</tspan><tspan x="472.0" dy="14.5">(tenant, category, hash(items), deadline)</tspan></text>
+</g>
+<g id="bt-edge-h1" class="edge">
+<path d="M 837.0 162.0 L 856.0 162.0" fill="none" stroke="#1f2d46" stroke-width="2.0" marker-end="url(#bt-a-navy)"/>
+</g>
+<g id="bt-stage-n2" class="stage">
+<rect class="card" x="862.0" y="108" width="378.0" height="108.0" rx="8" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<rect x="862.0" y="108" width="4.5" height="108.0" rx="2.2" fill="#1b4c92"/>
+<text x="880.0" y="132" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="15.5" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">Node 2 · Kraljic Classify</text>
+<text x="880.0" y="149" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="bold" fill="#1b4c92" text-anchor="start" letter-spacing="0">A2A · DefaultLLM (Nova Lite)</text>
+<text x="880.0" y="167" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.2" fill="#5a6b80"><tspan x="880.0" dy="0">override → seeded quadrant → 24h semantic cache →</tspan><tspan x="880.0" dy="14.5">live agent → rule fallback. Usually 0 tokens on</tspan><tspan x="880.0" dy="14.5">the live path.</tspan></text>
+</g>
+<g id="bt-edge-h2" class="edge">
+<path d="M 1245.0 162.0 L 1264.0 162.0" fill="none" stroke="#1f2d46" stroke-width="2.0" marker-end="url(#bt-a-navy)"/>
+</g>
+<g id="bt-stage-route" class="stage">
+<rect class="card" x="1270.0" y="108" width="378.0" height="108.0" rx="8" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<rect x="1270.0" y="108" width="4.5" height="108.0" rx="2.2" fill="#1b4c92"/>
+<text x="1288.0" y="132" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="15.5" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">Route Strategy</text>
+<text x="1288.0" y="149" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="bold" fill="#1b4c92" text-anchor="start" letter-spacing="0">Choice state · no Lambda, no LLM</text>
+<text x="1288.0" y="167" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.2" fill="#5a6b80"><tspan x="1288.0" dy="0">Four-way branch keyed solely on the Kraljic</tspan><tspan x="1288.0" dy="14.5">quadrant. Deterministic Python, sub-100 ms,</tspan><tspan x="1288.0" dy="14.5">exclusive — exactly one path runs.</tspan></text>
+</g>
+<g id="bt-edge-drop" class="edge">
+<path d="M 1459.0 216.0 L 1459.0 238.0 L 847.0 238.0 L 847.0 250.0" fill="none" stroke="#1f2d46" stroke-width="2.0" marker-end="url(#bt-a-navy)"/>
+</g>
+<g id="bt-band-frame" class="stage">
+<rect class="card" x="46" y="256.0" width="1602" height="575.0" rx="14" fill="#fdf3ee" stroke="#c25a33" stroke-width="2.0" stroke-dasharray="9 6"/>
+<text x="68" y="286.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#c25a33" text-anchor="start" letter-spacing="1.6">NODE 3 · STRATEGY EXECUTE</text>
+<text x="358.5" y="286.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="13.5" font-weight="normal" fill="#2c3b52" text-anchor="start" letter-spacing="0">one Lambda, four dispatch targets over A2A — the only place the four paths differ</text>
+</g>
+<g id="bt-stage-gate" class="stage">
+<rect class="card" x="68" y="296.0" width="1558" height="42" rx="9" fill="#ffffff" stroke="#c25a33" stroke-width="1.2"/>
+<text x="86" y="322.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" fill="#c25a33" text-anchor="start" letter-spacing="0">Before dispatch · shared:</text>
+<text x="301.5" y="322.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="13" font-weight="normal" fill="#2c3b52" text-anchor="start" letter-spacing="0">hard delivery gate (can_deliver_to + delivery_threshold_days) + two-tier ESG gate on the candidate pool · typed discard reasons · empty pool → CANCELLED no_eligible_suppliers</text>
+</g>
+<g id="bt-edge-fanstem" class="edge">
+<path d="M 847.0 338.0 L 847.0 356.0" fill="none" stroke="#8493a8" stroke-width="1.6" marker-end="url(#bt-a-gray)"/>
+<path d="M 253.0 364.0 L 1441.0 364.0" fill="none" stroke="#8493a8" stroke-width="1.6"/>
+</g>
+<g id="bt-edge-fan-0" class="edge">
+<path d="M 253.0 364.0 L 253.0 376.0" fill="none" stroke="#8493a8" stroke-width="1.6" marker-end="url(#bt-a-gray)"/>
+</g>
+<g id="bt-edge-fan-1" class="edge">
+<path d="M 649.0 364.0 L 649.0 376.0" fill="none" stroke="#8493a8" stroke-width="1.6" marker-end="url(#bt-a-gray)"/>
+</g>
+<g id="bt-edge-fan-2" class="edge">
+<path d="M 1045.0 364.0 L 1045.0 376.0" fill="none" stroke="#8493a8" stroke-width="1.6" marker-end="url(#bt-a-gray)"/>
+</g>
+<g id="bt-edge-fan-3" class="edge">
+<path d="M 1441.0 364.0 L 1441.0 376.0" fill="none" stroke="#8493a8" stroke-width="1.6" marker-end="url(#bt-a-gray)"/>
+</g>
+<g id="bt-col-0" class="stage col">
+<rect class="card" x="68.0" y="382.0" width="370.0" height="427.0" rx="10" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<path d="M 68.0 392.0 a 10 10 0 0 1 10 -10 l 350.0 0 a 10 10 0 0 1 10 10 l 0 44 l -370.0 0 z" fill="#0e8c7c"/>
+<text x="84.0" y="406.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#ffffff" text-anchor="start" letter-spacing="0.8">NON_CRITICAL</text>
+<text x="84.0" y="425.0" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="12.5" font-weight="normal" fill="#ffffff" text-anchor="start" letter-spacing="0">SPOT_BID</text>
+<text id="bt-col0-round" x="422.0" y="413.0" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="end" letter-spacing="0"></text>
+<g id="bt-col0-agent" class="sub">
+<text x="84.0" y="458.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">Spot Bidding · DefaultLLM (Nova Lite)</text>
+</g>
+<g id="bt-col0-bypass" class="sub">
+<rect x="84.0" y="470.0" width="338.0" height="26" rx="13.0" fill="#e1f4f0" stroke="#0e8c7c" stroke-width="1.1"/>
+<text x="253.0" y="487.32" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#0e8c7c" text-anchor="middle" letter-spacing="0.3">≤ $5k → AGENT BYPASSED</text>
+</g>
+<g id="bt-col0-shape" class="sub">
+<text x="84.0" y="516.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">SHAPE</text>
+<text x="84.0" y="533.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.4" fill="#2c3b52"><tspan x="84.0" dy="0">Single round. Concurrent send_bid_invitation</tspan><tspan x="84.0" dy="15.5">per supplier, each in its own try/except —</tspan><tspan x="84.0" dy="15.5">isolation, not a breaker; a dead supplier is</tspan><tspan x="84.0" dy="15.5">reported unreachable and the round compiles</tspan><tspan x="84.0" dy="15.5">partial results. check_bid_responses ·</tspan><tspan x="84.0" dy="15.5">send_follow_up.</tspan></text>
+</g>
+<g id="bt-col0-guards" class="sub">
+<text x="84.0" y="636.5" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">GUARDS &amp; FAILURE</text>
+<text x="84.0" y="653.5" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.4" fill="#2c3b52"><tspan x="84.0" dy="0">No strategy-specific steering hook. Zero-bids</tspan><tspan x="84.0" dy="15.5">is a distinct terminal escalation, not a</tspan><tspan x="84.0" dy="15.5">degenerate partial failure.</tspan></text>
+</g>
+<g id="bt-col0-idem" class="sub">
+<text x="84.0" y="710.5" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">IDEMPOTENCY KEY</text>
+<text x="84.0" y="726.5" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="11.6" fill="#5a6b80"><tspan x="84.0" dy="0">(negotiation_id, supplier_id, type)</tspan></text>
+</g>
+<g id="bt-col0-badge" class="sub">
+<rect x="84.0" y="759.0" width="338.0" height="34" rx="8" fill="#1f2d46" stroke="#1f2d46" stroke-width="1.2"/>
+<text x="98.0" y="781.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="start" letter-spacing="0">$0.0025 / neg</text>
+<text x="408.0" y="781.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#a9bad0" text-anchor="end" letter-spacing="0">agent LLM $0.00</text>
+</g>
+</g>
+<g id="bt-col-1" class="stage col">
+<rect class="card" x="464.0" y="382.0" width="370.0" height="427.0" rx="10" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<path d="M 464.0 392.0 a 10 10 0 0 1 10 -10 l 350.0 0 a 10 10 0 0 1 10 10 l 0 44 l -370.0 0 z" fill="#1b4c92"/>
+<text x="480.0" y="406.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#ffffff" text-anchor="start" letter-spacing="0.8">LEVERAGE</text>
+<text x="480.0" y="425.0" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="12.5" font-weight="normal" fill="#ffffff" text-anchor="start" letter-spacing="0">COMPETITIVE_AUCTION</text>
+<text id="bt-col1-round" x="818.0" y="413.0" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="end" letter-spacing="0"></text>
+<g id="bt-col1-agent" class="sub">
+<text x="480.0" y="458.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">Leverage Auction · StrategyLLM (Nova Pro)</text>
+</g>
+<g id="bt-col1-bypass" class="sub">
+<rect x="480.0" y="470.0" width="338.0" height="26" rx="13.0" fill="#e1f4f0" stroke="#0e8c7c" stroke-width="1.1"/>
+<text x="649.0" y="487.32" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#0e8c7c" text-anchor="middle" letter-spacing="0.3">≤ $5k → AGENT BYPASSED</text>
+</g>
+<g id="bt-col1-shape" class="sub">
+<text x="480.0" y="516.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">SHAPE</text>
+<text x="480.0" y="533.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.4" fill="#2c3b52"><tspan x="480.0" dy="0">Up to 5 rounds. One AUCTION_ROUND_FEEDBACK log</tspan><tspan x="480.0" dy="15.5">per round; convergence detection can end it</tspan><tspan x="480.0" dy="15.5">early. Runs over days — Standard workflow</tspan><tspan x="480.0" dy="15.5">holds no process open across the idle</tspan><tspan x="480.0" dy="15.5">stretches.</tspan></text>
+</g>
+<g id="bt-col1-guards" class="sub">
+<text x="480.0" y="621.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">GUARDS &amp; FAILURE</text>
+<text x="480.0" y="638.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.4" fill="#2c3b52"><tspan x="480.0" dy="0">AuctionIntegrityGuard +</tspan><tspan x="480.0" dy="15.5">BidConfidentialityGuard: round-N prices must</tspan><tspan x="480.0" dy="15.5">never reach a round N+1 participant.</tspan></text>
+</g>
+<g id="bt-col1-idem" class="sub">
+<text x="480.0" y="695.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">IDEMPOTENCY KEY</text>
+<text x="480.0" y="711.0" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="11.6" fill="#5a6b80"><tspan x="480.0" dy="0">(negotiation_id, supplier_id, action,</tspan><tspan x="480.0" dy="14">round_number) — a crash mid-round re-sends</tspan><tspan x="480.0" dy="14">nothing</tspan></text>
+</g>
+<g id="bt-col1-badge" class="sub">
+<rect x="480.0" y="759.0" width="338.0" height="34" rx="8" fill="#1f2d46" stroke="#1f2d46" stroke-width="1.2"/>
+<text x="494.0" y="781.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="start" letter-spacing="0">$0.0024 / neg</text>
+<text x="804.0" y="781.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#a9bad0" text-anchor="end" letter-spacing="0">agent LLM $0.00</text>
+</g>
+</g>
+<g id="bt-col-2" class="stage col">
+<rect class="card" x="860.0" y="382.0" width="370.0" height="427.0" rx="10" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<path d="M 860.0 392.0 a 10 10 0 0 1 10 -10 l 350.0 0 a 10 10 0 0 1 10 10 l 0 44 l -370.0 0 z" fill="#c25a33"/>
+<text x="876.0" y="406.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#ffffff" text-anchor="start" letter-spacing="0.8">BOTTLENECK</text>
+<text x="876.0" y="425.0" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="12.5" font-weight="normal" fill="#ffffff" text-anchor="start" letter-spacing="0">PARTNERSHIP_RISK</text>
+<text id="bt-col2-round" x="1214.0" y="413.0" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="end" letter-spacing="0"></text>
+<g id="bt-col2-agent" class="sub">
+<text x="876.0" y="458.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">Bottleneck Negotiation · StrategyLLM (Nova Pro)</text>
+</g>
+<g id="bt-col2-bypass" class="sub">
+<rect x="876.0" y="470.0" width="338.0" height="26" rx="13.0" fill="#fbeae8" stroke="#96222f" stroke-width="1.1"/>
+<text x="1045.0" y="487.32" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#96222f" text-anchor="middle" letter-spacing="0.3">NO BYPASS · always an LLM call</text>
+</g>
+<g id="bt-col2-shape" class="sub">
+<text x="876.0" y="516.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">SHAPE</text>
+<text x="876.0" y="533.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.4" fill="#2c3b52"><tspan x="876.0" dy="0">Multi-round. calculate_tco,</tspan><tspan x="876.0" dy="15.5">assess_supplier_risk and proposal delivery all</tspan><tspan x="876.0" dy="15.5">fail independently; full-round and</tspan><tspan x="876.0" dy="15.5">partial-round delivery failures are separate</tspan><tspan x="876.0" dy="15.5">coded paths.</tspan></text>
+</g>
+<g id="bt-col2-guards" class="sub">
+<text x="876.0" y="621.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">GUARDS &amp; FAILURE</text>
+<text x="876.0" y="638.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.4" fill="#2c3b52"><tspan x="876.0" dy="0">TCOEnforcementGuard +</tspan><tspan x="876.0" dy="15.5">RiskAssessmentEnforcement · approximated-TCO</tspan><tspan x="876.0" dy="15.5">fallback on tool unavailability · 5</tspan><tspan x="876.0" dy="15.5">consecutive hook rejections → DLQ.</tspan></text>
+</g>
+<g id="bt-col2-idem" class="sub">
+<text x="876.0" y="710.5" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">IDEMPOTENCY KEY</text>
+<text x="876.0" y="726.5" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="11.6" fill="#5a6b80"><tspan x="876.0" dy="0">DynamoDB session cache (crash idempotency)</tspan></text>
+</g>
+<g id="bt-col2-badge" class="sub">
+<rect x="876.0" y="759.0" width="338.0" height="34" rx="8" fill="#1f2d46" stroke="#1f2d46" stroke-width="1.2"/>
+<text x="890.0" y="781.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="start" letter-spacing="0">$0.0143 / neg</text>
+<text x="1200.0" y="781.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#a9bad0" text-anchor="end" letter-spacing="0">agent LLM $0.0102 / neg</text>
+</g>
+</g>
+<g id="bt-col-3" class="stage col">
+<rect class="card" x="1256.0" y="382.0" width="370.0" height="427.0" rx="10" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<path d="M 1256.0 392.0 a 10 10 0 0 1 10 -10 l 350.0 0 a 10 10 0 0 1 10 10 l 0 44 l -370.0 0 z" fill="#96222f"/>
+<text x="1272.0" y="406.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="14.5" font-weight="bold" fill="#ffffff" text-anchor="start" letter-spacing="0.8">STRATEGIC</text>
+<text x="1272.0" y="425.0" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="12.5" font-weight="normal" fill="#ffffff" text-anchor="start" letter-spacing="0">PARTNERSHIP_VALUE</text>
+<text id="bt-col3-round" x="1610.0" y="413.0" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="end" letter-spacing="0"></text>
+<g id="bt-col3-agent" class="sub">
+<text x="1272.0" y="458.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">Strategic Partnership · StrategyLLM (Nova Pro)</text>
+</g>
+<g id="bt-col3-bypass" class="sub">
+<rect x="1272.0" y="470.0" width="338.0" height="26" rx="13.0" fill="#fbeae8" stroke="#96222f" stroke-width="1.1"/>
+<text x="1441.0" y="487.32" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#96222f" text-anchor="middle" letter-spacing="0.3">NO BYPASS · always an LLM call</text>
+</g>
+<g id="bt-col3-shape" class="sub">
+<text x="1272.0" y="516.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">SHAPE</text>
+<text x="1272.0" y="533.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.4" fill="#2c3b52"><tspan x="1272.0" dy="0">Multi-round proposal exchange carrying</tspan><tspan x="1272.0" dy="15.5">relationship context. Compaction hook</tspan><tspan x="1272.0" dy="15.5">truncates oversized tool results at 4 000</tspan><tspan x="1272.0" dy="15.5">chars, keeping ⅔ head and ⅓ tail.</tspan></text>
+</g>
+<g id="bt-col3-guards" class="sub">
+<text x="1272.0" y="605.5" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">GUARDS &amp; FAILURE</text>
+<text x="1272.0" y="622.5" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.4" fill="#2c3b52"><tspan x="1272.0" dy="0">RelationshipHistoryEnforcement blocks a</tspan><tspan x="1272.0" dy="15.5">cold-start strategic award · TCO and risk</tspan><tspan x="1272.0" dy="15.5">enforcement also registered here.</tspan></text>
+</g>
+<g id="bt-col3-idem" class="sub">
+<text x="1272.0" y="679.5" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="10.5" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.1">IDEMPOTENCY KEY</text>
+<text x="1272.0" y="695.5" font-family="'DM Mono', ui-monospace, Consolas, monospace" font-size="11.6" fill="#5a6b80"><tspan x="1272.0" dy="0">DynamoDB session cache (crash idempotency)</tspan></text>
+</g>
+<g id="bt-col3-badge" class="sub">
+<rect x="1272.0" y="759.0" width="338.0" height="34" rx="8" fill="#1f2d46" stroke="#1f2d46" stroke-width="1.2"/>
+<text x="1286.0" y="781.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="start" letter-spacing="0">$0.0099 / neg</text>
+<text x="1596.0" y="781.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#a9bad0" text-anchor="end" letter-spacing="0">agent LLM $0.0079 / neg</text>
+</g>
+</g>
+<g id="bt-edge-join-0" class="edge">
+<path d="M 253.0 809.0 L 253.0 857.0" fill="none" stroke="#8493a8" stroke-width="1.6"/>
+</g>
+<g id="bt-edge-join-1" class="edge">
+<path d="M 649.0 809.0 L 649.0 857.0" fill="none" stroke="#8493a8" stroke-width="1.6"/>
+</g>
+<g id="bt-edge-join-2" class="edge">
+<path d="M 1045.0 809.0 L 1045.0 857.0" fill="none" stroke="#8493a8" stroke-width="1.6"/>
+</g>
+<g id="bt-edge-join-3" class="edge">
+<path d="M 1441.0 809.0 L 1441.0 857.0" fill="none" stroke="#8493a8" stroke-width="1.6"/>
+</g>
+<g id="bt-edge-joinbus" class="edge">
+<path d="M 235.0 857.0 L 1441.0 857.0" fill="none" stroke="#8493a8" stroke-width="1.6"/>
+<path d="M 235.0 857.0 L 235.0 877.0" fill="none" stroke="#1f2d46" stroke-width="2.0" marker-end="url(#bt-a-navy)"/>
+</g>
+<text x="1648" y="848.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="normal" fill="#8493a8" text-anchor="end" letter-spacing="0">all four converge</text>
+<g id="bt-stage-n5" class="stage">
+<rect class="card" x="46.0" y="883.0" width="378.0" height="137.0" rx="8" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<rect x="46.0" y="883.0" width="4.5" height="137.0" rx="2.2" fill="#1b4c92"/>
+<text x="64.0" y="907.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="15.5" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">Node 5 · Bid Evaluation</text>
+<text x="64.0" y="924.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="bold" fill="#1b4c92" text-anchor="start" letter-spacing="0">Lambda · no LLM, no agent</text>
+<text x="64.0" y="942.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.2" fill="#5a6b80"><tspan x="64.0" dy="0">orchestrator.scoring · supplier-record match +</tspan><tspan x="64.0" dy="14.5">price / delivery trust check · &gt;10% suspicious</tspan><tspan x="64.0" dy="14.5">over a round of 5+ → halt and escalate ·</tspan><tspan x="64.0" dy="14.5">SUPERSEDED bids excluded · over-budget flag</tspan><tspan x="64.0" dy="14.5">surfaced, not auto-rejected</tspan></text>
+</g>
+<g id="bt-edge-t0" class="edge">
+<path d="M 429.0 951.5 L 448.0 951.5" fill="none" stroke="#1f2d46" stroke-width="2.0" marker-end="url(#bt-a-navy)"/>
+</g>
+<g id="bt-stage-n6" class="stage">
+<rect class="card" x="454.0" y="883.0" width="378.0" height="137.0" rx="8" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<rect x="454.0" y="883.0" width="4.5" height="137.0" rx="2.2" fill="#96222f"/>
+<text x="472.0" y="907.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="15.5" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">Node 6 · Approval Gate</text>
+<text x="472.0" y="924.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="bold" fill="#96222f" text-anchor="start" letter-spacing="0">Human-in-the-loop · task token</text>
+<text x="472.0" y="942.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.2" fill="#5a6b80"><tspan x="472.0" dy="0">Value band + composite minimum decide auto-approve</tspan><tspan x="472.0" dy="14.5">vs. review · Verified Permissions: approver ≠</tspan><tspan x="472.0" dy="14.5">requester · 30-min sweep escalates at 96h, 7-day</tspan><tspan x="472.0" dy="14.5">auto-cancel · three outcomes: APPROVED, REJECTED,</tspan><tspan x="472.0" dy="14.5">CYCLE_BACK (max 1)</tspan></text>
+</g>
+<g id="bt-edge-t1" class="edge">
+<path d="M 837.0 951.5 L 856.0 951.5" fill="none" stroke="#1f2d46" stroke-width="2.0" marker-end="url(#bt-a-navy)"/>
+</g>
+<g id="bt-stage-n7" class="stage">
+<rect class="card" x="862.0" y="883.0" width="378.0" height="137.0" rx="8" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<rect x="862.0" y="883.0" width="4.5" height="137.0" rx="2.2" fill="#1b4c92"/>
+<text x="880.0" y="907.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="15.5" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">Node 7 · Award &amp; Comms</text>
+<text x="880.0" y="924.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="bold" fill="#1b4c92" text-anchor="start" letter-spacing="0">SimpleLLM configured, not invoked live</text>
+<text x="880.0" y="942.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.2" fill="#5a6b80"><tspan x="880.0" dy="0">One ISSUED PO per supplier with ≥1 awarded item,</tspan><tspan x="880.0" dy="14.5">inheriting the PR's claims snapshot ·</tspan><tspan x="880.0" dy="14.5">notifications render from deterministic templates</tspan><tspan x="880.0" dy="14.5">· SES delivers supplier email</tspan></text>
+</g>
+<g id="bt-edge-t2" class="edge">
+<path d="M 1245.0 951.5 L 1264.0 951.5" fill="none" stroke="#1f2d46" stroke-width="2.0" marker-end="url(#bt-a-navy)"/>
+</g>
+<g id="bt-stage-po" class="stage">
+<rect class="card" x="1270.0" y="883.0" width="378.0" height="137.0" rx="8" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<rect x="1270.0" y="883.0" width="4.5" height="137.0" rx="2.2" fill="#0e8c7c"/>
+<text x="1288.0" y="907.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="15.5" font-weight="bold" fill="#1f2d46" text-anchor="start" letter-spacing="0">PO delivered</text>
+<text x="1288.0" y="924.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11.5" font-weight="bold" fill="#0e8c7c" text-anchor="start" letter-spacing="0">terminal</text>
+<text x="1288.0" y="942.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.2" fill="#5a6b80"><tspan x="1288.0" dy="0">Receiving Gateway (Cedar) → Skill Runtime PO tools</tspan><tspan x="1288.0" dy="14.5">→ tenant ERP · async post-award self-invoke scores</tspan><tspan x="1288.0" dy="14.5">negotiations.reasoning · admission counters</tspan><tspan x="1288.0" dy="14.5">decrement</tspan></text>
+</g>
+<g id="bt-edge-cycle" class="edge">
+<path d="M 643.0 1020.0 L 643.0 1052.0 L 1734 1052.0 L 1734 771.0 L 1654 771.0" fill="none" stroke="#c25a33" stroke-width="2.0" marker-end="url(#bt-a-terra)" stroke-dasharray="7 5"/>
+<text x="659.0" y="1044.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#c25a33" text-anchor="start" letter-spacing="0">cycle-back ×1  ·  bids → SUPERSEDED  ·  re-routes through the router</text>
+</g>
+<rect x="46" y="1076.0" width="1602" height="58" rx="9" fill="#ffffff" stroke="#b7c2d1" stroke-width="1.2"/>
+<text x="66" y="1100.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11" font-weight="bold" fill="#8493a8" text-anchor="start" letter-spacing="1.2">IDENTICAL ON ALL FOUR PATHS</text>
+<text x="66" y="1120.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#2c3b52" text-anchor="start" letter-spacing="0">invoke chokepoint (retry + per-agent circuit breaker + timeout + cost.usd)  ·  fail-closed steering hooks  ·  Bedrock Guardrails  ·  compaction  ·  per-node checkpoint</text>
+<text x="1628" y="1100.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="11" font-weight="bold" fill="#8493a8" text-anchor="end" letter-spacing="0.6">Measured over 23 e2e negotiations</text>
+<text x="1628" y="1120.0" font-family="'Sora', 'DejaVu Sans', Arial, Helvetica, sans-serif" font-size="12.5" font-weight="normal" fill="#2c3b52" text-anchor="end" letter-spacing="0">Both cheap quadrants recorded zero agent-LLM cost.</text>
+</svg></div>
+  <p class="btw-hint">Space plays &middot; arrow keys step &middot; on a narrow
+    screen, drag the diagram sideways to follow the path.</p>
+</div>
+
+<div class="post-footer">
+<p><strong><a href="../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; August 2026</p>
+<p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> &mdash; an autonomous multi-agent procurement negotiation system.</p>
+</div>
+
+</article>
+<script src="../blog/blog.js"></script>
+<script>
+// ?embed=1 -> strip the page chrome and report height to the parent frame
+(function(){
+  try{
+    if(new URLSearchParams(location.search).get('embed')==='1'){
+      document.body.classList.add('btw-embed');
+      var send=function(){
+        parent.postMessage({btwHeight:document.body.scrollHeight},'*');
+      };
+      window.addEventListener('load',send);
+      window.addEventListener('resize',send);
+      setInterval(send,1000);
+    }
+  }catch(e){}
+})();
+</script>
+<script>
+(function(){
+const RUNS={"spot|bypass": [{"t": "PR lands", "c": "A requisition for $4,200 is written to the tenant's PR table. A DynamoDB Streams event wakes the PR Event Router, which calls the Ingest Gateway's canonical ingest tool.", "on": ["stage-ingest"], "e": [], "k": "t = 0s"}, {"t": "Node 1 · Ingest & Validate", "c": "Schema validation, then admission control: this tenant has a reserved slot free, so the negotiation goes ACTIVE. Checkpoint written. No LLM has been touched yet.", "on": ["stage-n1"], "e": ["edge-h0"], "k": "t = 1s"}, {"t": "Node 2 · Kraljic Classify", "c": "The category's row already carries a seeded quadrant, so the classifier short-circuits before the cache and before the agent. Result: NON_CRITICAL. Zero tokens.", "on": ["stage-n2"], "e": ["edge-h1"], "k": "t = 2s"}, {"t": "Route Strategy", "c": "A Step Functions Choice state reads the quadrant and picks the branch. Deterministic Python, sub-100 ms, exclusive — NON_CRITICAL can only go one way.", "on": ["stage-route"], "e": ["edge-h2"], "k": "t = 2s"}, {"t": "Node 3 opens · shared gates", "c": "Before any dispatch: the hard delivery gate drops suppliers that can't reach the address in time, then the two-tier ESG gate runs. Discards are recorded with typed reasons. An empty pool would end the negotiation here as CANCELLED.", "on": ["band-frame", "stage-gate"], "e": ["edge-drop"], "k": "t = 3s"}, {"t": "Dispatch", "c": "Node 3 dispatches to the NON_CRITICAL branch. The other three columns never execute.", "on": ["col-0", "col0-agent"], "e": ["edge-fanstem", "edge-fan-0"], "k": "t = 3s"}, {"t": "Under the floor — no agent", "c": "$4,200 is below SPOT_BID_MAX_VALUE. The Spot Bidding agent is never invoked: deterministic pricing runs inline in the node Lambda. ~5s instead of ~45s, and zero tokens.", "on": ["col-0", "col0-bypass"], "e": [], "k": "t = 5s"}, {"t": "Bids recorded", "c": "Quotes are written straight to the bid table under the (negotiation_id, supplier_id, type) dedup key, so a Lambda retry can't double-count them.", "on": ["col-0", "col0-idem"], "e": [], "k": "t = 6s"}, {"t": "Node 5 · Bid Evaluation", "c": "Bids converge here from all four branches. Deterministic scoring inside the node Lambda — supplier-record match, price and delivery trust checks, weighted composite. This used to be an LLM agent; removing it took ~30s off the hot path.", "on": ["stage-n5"], "e": ["edge-join-0", "edge-joinbus"], "k": ""}, {"t": "Node 6 · skipped", "c": "Below-threshold NON_CRITICAL spot bids never reach the approval gate. Auto-approved on the value band — which also makes cycle-back structurally unreachable for this path.", "on": [], "e": ["edge-t0"], "k": "", "m": ["stage-n6", "skipped"]}, {"t": "Node 7 · Award & Comms", "c": "Awards are grouped one ISSUED PO per supplier with at least one awarded item, each inheriting the PR's claims snapshot. Notifications render from deterministic templates — the Award agent is configured but never invoked on this path.", "on": ["stage-n7"], "e": ["edge-t1"], "k": ""}, {"t": "PO delivered", "c": "The PO goes out through the Receiving Gateway to the tenant's ERP, SES delivers the supplier email, and an async self-invoke scores the negotiation's reasoning off the critical path. Admission counters decrement.", "on": ["stage-po", "col0-badge"], "e": ["edge-t2"], "k": ""}], "spot|agent": [{"t": "PR lands", "c": "A requisition for $18,400 is written to the tenant's PR table. A DynamoDB Streams event wakes the PR Event Router, which calls the Ingest Gateway's canonical ingest tool.", "on": ["stage-ingest"], "e": [], "k": "t = 0s"}, {"t": "Node 1 · Ingest & Validate", "c": "Schema validation, then admission control: this tenant has a reserved slot free, so the negotiation goes ACTIVE. Checkpoint written. No LLM has been touched yet.", "on": ["stage-n1"], "e": ["edge-h0"], "k": "t = 1s"}, {"t": "Node 2 · Kraljic Classify", "c": "The category's row already carries a seeded quadrant, so the classifier short-circuits before the cache and before the agent. Result: NON_CRITICAL. Zero tokens.", "on": ["stage-n2"], "e": ["edge-h1"], "k": "t = 2s"}, {"t": "Route Strategy", "c": "A Step Functions Choice state reads the quadrant and picks the branch. Deterministic Python, sub-100 ms, exclusive — NON_CRITICAL can only go one way.", "on": ["stage-route"], "e": ["edge-h2"], "k": "t = 2s"}, {"t": "Node 3 opens · shared gates", "c": "Before any dispatch: the hard delivery gate drops suppliers that can't reach the address in time, then the two-tier ESG gate runs. Discards are recorded with typed reasons. An empty pool would end the negotiation here as CANCELLED.", "on": ["band-frame", "stage-gate"], "e": ["edge-drop"], "k": "t = 3s"}, {"t": "Dispatch", "c": "Node 3 dispatches to the NON_CRITICAL branch. The other three columns never execute.", "on": ["col-0", "col0-agent"], "e": ["edge-fanstem", "edge-fan-0"], "k": "t = 3s"}, {"t": "Above the floor — A2A call", "c": "$18,400 clears the bypass threshold, so Node 3 makes a real A2A call to the Spot Bidding agent on Nova Lite — through the invoke chokepoint that carries the retry, the circuit breaker and the timeout.", "on": ["col-0", "col0-agent"], "e": [], "k": "t = 8s", "$": 0.0021}, {"t": "One round, isolated sends", "c": "send_bid_invitation fires per supplier, each wrapped in its own try/except. Supplier 3 is offline — it's reported unreachable and the round compiles partial results rather than failing.", "on": ["col-0", "col0-shape"], "e": [], "k": "t = 40s", "r": [0, "4 sent · 1 down"]}, {"t": "Responses collected", "c": "check_bid_responses gathers what came back; send_follow_up chases the quiet ones. Zero bids would be its own terminal escalation, not a degenerate partial failure.", "on": ["col-0", "col0-guards"], "e": [], "k": "t = 45s", "r": [0, "3 bids"]}, {"t": "Node 5 · Bid Evaluation", "c": "Bids converge here from all four branches. Deterministic scoring inside the node Lambda — supplier-record match, price and delivery trust checks, weighted composite. This used to be an LLM agent; removing it took ~30s off the hot path.", "on": ["stage-n5"], "e": ["edge-join-0", "edge-joinbus"], "k": ""}, {"t": "Node 6 · Approval Gate", "c": "Composite clears the auto-approve band, so no human is needed. The gate still records the decision.", "on": ["stage-n6"], "e": ["edge-t0"], "k": "", "g": true}, {"t": "Node 7 · Award & Comms", "c": "Awards are grouped one ISSUED PO per supplier with at least one awarded item, each inheriting the PR's claims snapshot. Notifications render from deterministic templates — the Award agent is configured but never invoked on this path.", "on": ["stage-n7"], "e": ["edge-t1"], "k": ""}, {"t": "PO delivered", "c": "The PO goes out through the Receiving Gateway to the tenant's ERP, SES delivers the supplier email, and an async self-invoke scores the negotiation's reasoning off the critical path. Admission counters decrement.", "on": ["stage-po", "col0-badge"], "e": ["edge-t2"], "k": ""}], "lev|bypass": [{"t": "PR lands", "c": "A requisition for $3,900 is written to the tenant's PR table. A DynamoDB Streams event wakes the PR Event Router, which calls the Ingest Gateway's canonical ingest tool.", "on": ["stage-ingest"], "e": [], "k": "t = 0s"}, {"t": "Node 1 · Ingest & Validate", "c": "Schema validation, then admission control: this tenant has a reserved slot free, so the negotiation goes ACTIVE. Checkpoint written. No LLM has been touched yet.", "on": ["stage-n1"], "e": ["edge-h0"], "k": "t = 1s"}, {"t": "Node 2 · Kraljic Classify", "c": "The category's row already carries a seeded quadrant, so the classifier short-circuits before the cache and before the agent. Result: LEVERAGE. Zero tokens.", "on": ["stage-n2"], "e": ["edge-h1"], "k": "t = 2s"}, {"t": "Route Strategy", "c": "A Step Functions Choice state reads the quadrant and picks the branch. Deterministic Python, sub-100 ms, exclusive — LEVERAGE can only go one way.", "on": ["stage-route"], "e": ["edge-h2"], "k": "t = 2s"}, {"t": "Node 3 opens · shared gates", "c": "Before any dispatch: the hard delivery gate drops suppliers that can't reach the address in time, then the two-tier ESG gate runs. Discards are recorded with typed reasons. An empty pool would end the negotiation here as CANCELLED.", "on": ["band-frame", "stage-gate"], "e": ["edge-drop"], "k": "t = 3s"}, {"t": "Dispatch", "c": "Node 3 dispatches to the LEVERAGE branch. The other three columns never execute.", "on": ["col-1", "col1-agent"], "e": ["edge-fanstem", "edge-fan-1"], "k": "t = 3s"}, {"t": "Under the floor — no agent", "c": "The same bypass Spot Bidding gets: below $5k, the Leverage Auction agent is skipped entirely and deterministic pricing runs inline. A Nova Pro call avoided is the most expensive call avoided.", "on": ["col-1", "col1-bypass"], "e": [], "k": "t = 5s"}, {"t": "Node 5 · Bid Evaluation", "c": "Bids converge here from all four branches. Deterministic scoring inside the node Lambda — supplier-record match, price and delivery trust checks, weighted composite. This used to be an LLM agent; removing it took ~30s off the hot path.", "on": ["stage-n5"], "e": ["edge-join-1", "edge-joinbus"], "k": ""}, {"t": "Node 6 · Approval Gate", "c": "Composite clears the auto-approve band, so no human is needed. The gate still records the decision.", "on": ["stage-n6"], "e": ["edge-t0"], "k": "", "g": true}, {"t": "Node 7 · Award & Comms", "c": "Awards are grouped one ISSUED PO per supplier with at least one awarded item, each inheriting the PR's claims snapshot. Notifications render from deterministic templates — the Award agent is configured but never invoked on this path.", "on": ["stage-n7"], "e": ["edge-t1"], "k": ""}, {"t": "PO delivered", "c": "The PO goes out through the Receiving Gateway to the tenant's ERP, SES delivers the supplier email, and an async self-invoke scores the negotiation's reasoning off the critical path. Admission counters decrement.", "on": ["stage-po", "col1-badge"], "e": ["edge-t2"], "k": ""}], "lev|agent": [{"t": "PR lands", "c": "A requisition for $240,000 is written to the tenant's PR table. A DynamoDB Streams event wakes the PR Event Router, which calls the Ingest Gateway's canonical ingest tool.", "on": ["stage-ingest"], "e": [], "k": "t = 0s"}, {"t": "Node 1 · Ingest & Validate", "c": "Schema validation, then admission control: this tenant has a reserved slot free, so the negotiation goes ACTIVE. Checkpoint written. No LLM has been touched yet.", "on": ["stage-n1"], "e": ["edge-h0"], "k": "t = 1s"}, {"t": "Node 2 · Kraljic Classify", "c": "The category's row already carries a seeded quadrant, so the classifier short-circuits before the cache and before the agent. Result: LEVERAGE. Zero tokens.", "on": ["stage-n2"], "e": ["edge-h1"], "k": "t = 2s"}, {"t": "Route Strategy", "c": "A Step Functions Choice state reads the quadrant and picks the branch. Deterministic Python, sub-100 ms, exclusive — LEVERAGE can only go one way.", "on": ["stage-route"], "e": ["edge-h2"], "k": "t = 2s"}, {"t": "Node 3 opens · shared gates", "c": "Before any dispatch: the hard delivery gate drops suppliers that can't reach the address in time, then the two-tier ESG gate runs. Discards are recorded with typed reasons. An empty pool would end the negotiation here as CANCELLED.", "on": ["band-frame", "stage-gate"], "e": ["edge-drop"], "k": "t = 3s"}, {"t": "Dispatch", "c": "Node 3 dispatches to the LEVERAGE branch. The other three columns never execute.", "on": ["col-1", "col1-agent"], "e": ["edge-fanstem", "edge-fan-1"], "k": "t = 3s"}, {"t": "A2A call · Nova Pro", "c": "Leverage means a competitive market and real money on the table, so this branch runs on the StrategyLLM tier. The auction can last days.", "on": ["col-1", "col1-agent"], "e": [], "k": "t = 10s", "$": 0.0009}, {"t": "Round 1", "c": "Invitations out, bids back, one AUCTION_ROUND_FEEDBACK entry logged. The round number is part of the dedup key.", "on": ["col-1", "col1-shape"], "e": [], "k": "day 1", "$": 0.0004, "r": [1, "ROUND 1/5"]}, {"t": "Round 2", "c": "Feedback goes back to each supplier — relative position only. AuctionIntegrityGuard blocks competitor pricing from appearing in the feedback; leaking round-N prices into round N+1 is bid-rigging exposure.", "on": ["col-1", "col1-guards"], "e": [], "k": "day 2", "$": 0.0004, "r": [1, "ROUND 2/5"]}, {"t": "Round 3 — the runtime dies", "c": "The instance is terminated mid-round. Nothing is lost: a new instance takes the recovery lock on a conditional write, reloads the last checkpoint, and resumes at round 3. Round idempotency finds rounds 1-2 already logged and re-sends nothing.", "on": ["col-1", "col1-idem"], "e": [], "k": "day 3", "$": 0.0004, "r": [1, "RECOVER → 3"], "f": "col-1"}, {"t": "Round 4 — convergence", "c": "Bid movement between rounds falls under the convergence threshold, so the auction ends early rather than burning round 5. The supplier experienced one continuous auction.", "on": ["col-1", "col1-shape"], "e": [], "k": "day 4", "$": 0.0004, "r": [1, "CONVERGED"]}, {"t": "Node 5 · Bid Evaluation", "c": "Bids converge here from all four branches. Deterministic scoring inside the node Lambda — supplier-record match, price and delivery trust checks, weighted composite. This used to be an LLM agent; removing it took ~30s off the hot path.", "on": ["stage-n5"], "e": ["edge-join-1", "edge-joinbus"], "k": ""}, {"t": "Node 6 · Approval Gate", "c": "Value band plus the bid-ranking composite send this to a human. The task token pauses the execution — no process is held open while it waits. A 30-minute sweep escalates at 96h; 7 days auto-cancels.", "on": ["stage-n6"], "e": ["edge-t0"], "k": "", "g": true}, {"t": "Node 7 · Award & Comms", "c": "Awards are grouped one ISSUED PO per supplier with at least one awarded item, each inheriting the PR's claims snapshot. Notifications render from deterministic templates — the Award agent is configured but never invoked on this path.", "on": ["stage-n7"], "e": ["edge-t1"], "k": ""}, {"t": "PO delivered", "c": "The PO goes out through the Receiving Gateway to the tenant's ERP, SES delivers the supplier email, and an async self-invoke scores the negotiation's reasoning off the critical path. Admission counters decrement.", "on": ["stage-po", "col1-badge"], "e": ["edge-t2"], "k": ""}], "bot|agent": [{"t": "PR lands", "c": "A requisition for $76,000 is written to the tenant's PR table. A DynamoDB Streams event wakes the PR Event Router, which calls the Ingest Gateway's canonical ingest tool.", "on": ["stage-ingest"], "e": [], "k": "t = 0s"}, {"t": "Node 1 · Ingest & Validate", "c": "Schema validation, then admission control: this tenant has a reserved slot free, so the negotiation goes ACTIVE. Checkpoint written. No LLM has been touched yet.", "on": ["stage-n1"], "e": ["edge-h0"], "k": "t = 1s"}, {"t": "Node 2 · Kraljic Classify", "c": "The category's row already carries a seeded quadrant, so the classifier short-circuits before the cache and before the agent. Result: BOTTLENECK. Zero tokens.", "on": ["stage-n2"], "e": ["edge-h1"], "k": "t = 2s"}, {"t": "Route Strategy", "c": "A Step Functions Choice state reads the quadrant and picks the branch. Deterministic Python, sub-100 ms, exclusive — BOTTLENECK can only go one way.", "on": ["stage-route"], "e": ["edge-h2"], "k": "t = 2s"}, {"t": "Node 3 opens · shared gates", "c": "Before any dispatch: the hard delivery gate drops suppliers that can't reach the address in time, then the two-tier ESG gate runs. Discards are recorded with typed reasons. An empty pool would end the negotiation here as CANCELLED.", "on": ["band-frame", "stage-gate"], "e": ["edge-drop"], "k": "t = 3s"}, {"t": "Dispatch", "c": "Node 3 dispatches to the BOTTLENECK branch. The other three columns never execute.", "on": ["col-2", "col2-agent"], "e": ["edge-fanstem", "edge-fan-2"], "k": "t = 3s"}, {"t": "No bypass exists here", "c": "Bottleneck means few suppliers and high supply risk — there is no deterministic shortcut, so every negotiation in this quadrant makes an LLM call. This is the most failure-rich node in the pipeline.", "on": ["col-2", "col2-bypass"], "e": [], "k": "t = 10s", "$": 0.003}, {"t": "TCO and risk tooling", "c": "calculate_tco and assess_supplier_risk run as in-process Strands tools, then proposal delivery goes out. All three can fail independently, and each has its own coded path.", "on": ["col-2", "col2-shape"], "e": [], "k": "day 1", "$": 0.0036, "r": [2, "TCO · RISK"]}, {"t": "calculate_tco is unavailable", "c": "Rather than failing the round, the agent falls back to an approximated TCO and carries on. The fallback is recorded, not silent — the difference between degraded and broken.", "on": ["col-2", "col2-guards"], "e": [], "k": "day 1", "$": 0.0018, "r": [2, "TCO ≈ approx"], "f": "col-2"}, {"t": "Enforcement before any award", "c": "TCOEnforcementGuard and RiskAssessmentEnforcement sit in front of award-adjacent actions: no TCO or no risk assessment means the call is cancelled, not merely discouraged. Five consecutive rejections would trip to the DLQ.", "on": ["col-2", "col2-idem"], "e": [], "k": "day 2", "$": 0.0018, "r": [2, "GUARDS PASS"]}, {"t": "Node 5 · Bid Evaluation", "c": "Bids converge here from all four branches. Deterministic scoring inside the node Lambda — supplier-record match, price and delivery trust checks, weighted composite. This used to be an LLM agent; removing it took ~30s off the hot path.", "on": ["stage-n5"], "e": ["edge-join-2", "edge-joinbus"], "k": ""}, {"t": "Node 6 · Approval Gate", "c": "Value band plus the bid-ranking composite send this to a human. The task token pauses the execution — no process is held open while it waits. A 30-minute sweep escalates at 96h; 7 days auto-cancels.", "on": ["stage-n6"], "e": ["edge-t0"], "k": "", "g": true}, {"t": "Node 7 · Award & Comms", "c": "Awards are grouped one ISSUED PO per supplier with at least one awarded item, each inheriting the PR's claims snapshot. Notifications render from deterministic templates — the Award agent is configured but never invoked on this path.", "on": ["stage-n7"], "e": ["edge-t1"], "k": ""}, {"t": "PO delivered", "c": "The PO goes out through the Receiving Gateway to the tenant's ERP, SES delivers the supplier email, and an async self-invoke scores the negotiation's reasoning off the critical path. Admission counters decrement.", "on": ["stage-po", "col2-badge"], "e": ["edge-t2"], "k": ""}], "str|agent": [{"t": "PR lands", "c": "A requisition for $1.4M is written to the tenant's PR table. A DynamoDB Streams event wakes the PR Event Router, which calls the Ingest Gateway's canonical ingest tool.", "on": ["stage-ingest"], "e": [], "k": "t = 0s"}, {"t": "Node 1 · Ingest & Validate", "c": "Schema validation, then admission control: this tenant has a reserved slot free, so the negotiation goes ACTIVE. Checkpoint written. No LLM has been touched yet.", "on": ["stage-n1"], "e": ["edge-h0"], "k": "t = 1s"}, {"t": "Node 2 · Kraljic Classify", "c": "The category's row already carries a seeded quadrant, so the classifier short-circuits before the cache and before the agent. Result: STRATEGIC. Zero tokens.", "on": ["stage-n2"], "e": ["edge-h1"], "k": "t = 2s"}, {"t": "Route Strategy", "c": "A Step Functions Choice state reads the quadrant and picks the branch. Deterministic Python, sub-100 ms, exclusive — STRATEGIC can only go one way.", "on": ["stage-route"], "e": ["edge-h2"], "k": "t = 2s"}, {"t": "Node 3 opens · shared gates", "c": "Before any dispatch: the hard delivery gate drops suppliers that can't reach the address in time, then the two-tier ESG gate runs. Discards are recorded with typed reasons. An empty pool would end the negotiation here as CANCELLED.", "on": ["band-frame", "stage-gate"], "e": ["edge-drop"], "k": "t = 3s"}, {"t": "Dispatch", "c": "Node 3 dispatches to the STRATEGIC branch. The other three columns never execute.", "on": ["col-3", "col3-agent"], "e": ["edge-fanstem", "edge-fan-3"], "k": "t = 3s"}, {"t": "No bypass · Nova Pro", "c": "Strategic partnerships are the highest-value quadrant. The agent always runs, and relationship context is the whole point of the branch.", "on": ["col-3", "col3-bypass"], "e": [], "k": "t = 10s", "$": 0.002}, {"t": "Relationship history required", "c": "RelationshipHistoryEnforcement blocks a partnership recommendation before supplier history has been read. A cold-start strategic award is exactly the thing this quadrant must not produce.", "on": ["col-3", "col3-guards"], "e": [], "k": "day 1", "$": 0.002, "r": [3, "HISTORY ✓"]}, {"t": "Multi-round proposal exchange", "c": "Rounds accumulate tool results, and every one of them re-enters the next call. The compaction hook truncates anything over 4 000 chars, keeping two thirds of the head and one third of the tail so running totals at the end survive.", "on": ["col-3", "col3-shape"], "e": [], "k": "day 3", "$": 0.0025, "r": [3, "ROUND 3"]}, {"t": "Rationale persisted", "c": "The agent's free-text reasoning is written to the negotiation record. That field is what the judge scores after the award — the only rationale text the system keeps.", "on": ["col-3", "col3-idem"], "e": [], "k": "day 4", "$": 0.0014, "r": [3, "REASONING"]}, {"t": "Node 5 · Bid Evaluation", "c": "Bids converge here from all four branches. Deterministic scoring inside the node Lambda — supplier-record match, price and delivery trust checks, weighted composite. This used to be an LLM agent; removing it took ~30s off the hot path.", "on": ["stage-n5"], "e": ["edge-join-3", "edge-joinbus"], "k": ""}, {"t": "Node 6 · Approval Gate", "c": "Value band plus the bid-ranking composite send this to a human. The task token pauses the execution — no process is held open while it waits. A 30-minute sweep escalates at 96h; 7 days auto-cancels.", "on": ["stage-n6"], "e": ["edge-t0"], "k": "", "g": true}, {"t": "Node 7 · Award & Comms", "c": "Awards are grouped one ISSUED PO per supplier with at least one awarded item, each inheriting the PR's claims snapshot. Notifications render from deterministic templates — the Award agent is configured but never invoked on this path.", "on": ["stage-n7"], "e": ["edge-t1"], "k": ""}, {"t": "PO delivered", "c": "The PO goes out through the Receiving Gateway to the tenant's ERP, SES delivers the supplier email, and an async self-invoke scores the negotiation's reasoning off the critical path. Admission counters decrement.", "on": ["stage-po", "col3-badge"], "e": ["edge-t2"], "k": ""}]}, CYCLE=[{"t": "Human returns CYCLE_BACK", "c": "Not a rejection — a third, distinct outcome. The approver wants another attempt, so the negotiation re-routes through the Strategy Router. Modelling this as a reject-with-retry flag would have put two intents in one signal.", "on": ["stage-n6"], "e": ["edge-cycle"], "k": "+1 day"}, {"t": "Bids marked SUPERSEDED", "c": "Every existing bid is superseded before the branch re-runs, so Node 5 can never score a stale bid alongside a fresh one. The cleanup retries three times, then halts to REQUIRES_ATTENTION rather than proceeding dirty.", "on": ["__COL__"], "e": [], "k": "+1 day"}, {"t": "Second pass, then the ceiling", "c": "The branch runs once more and returns to the gate. A second CYCLE_BACK raises cycle_back_exhausted — the retry budget is one, enforced in code, which is what makes worst-case cost and duration predictable.", "on": ["__COL__", "stage-n5", "stage-n6"], "e": ["edge-joinbus", "edge-t0"], "k": "+2 days"}], COL_OF={"spot": 0, "lev": 1, "bot": 2, "str": 3},
+      HAS_BYPASS={"spot": true, "lev": true, "bot": false, "str": false}, MODELLED={"spot|agent": 1, "lev|agent": 1}, KEYQ={"spot": "NON_CRITICAL", "lev": "LEVERAGE", "bot": "BOTTLENECK", "str": "STRATEGIC"},
+      P='bt-';
+const root=document.getElementById(P+'player');
+if(!root) return;
+const $=id=>document.getElementById(P+id);
+const all=s=>Array.from(root.querySelectorAll(s));
+const cssEsc=(window.CSS&&CSS.escape)?CSS.escape.bind(CSS)
+               :(s=>String(s).replace(/[^\w-]/g,'\\$&'));
+const byId=id=>root.querySelector('#'+cssEsc(P+id));
+const reduce=window.matchMedia&&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let key='spot', mode='bypass', steps=[], i=-1, timer=null, speed=1, cost=0,
+    started=false;
+
+function buildSteps(){
+  let s=(RUNS[key+'|'+mode]||RUNS[key+'|agent']).slice();
+  if($('cyc')&&$('cyc').checked){
+    const gi=s.findIndex(x=>x.g);
+    if(gi>=0){
+      const col='col-'+COL_OF[key];
+      const ins=CYCLE.map(x=>{const y=JSON.parse(JSON.stringify(x));
+        y.on=y.on.map(id=>id==='__COL__'?col:id); return y;});
+      s=s.slice(0,gi+1).concat(ins,s.slice(gi+1));
+    }
+  }
+  return s;
+}
+function clearAll(){
+  all('.stage').forEach(e=>{e.classList.remove('now','fault','skipped');
+                            e.classList.add('dim');});
+  all('.sub').forEach(e=>e.classList.add('subdim'));
+  all('.edge').forEach(e=>e.classList.remove('lit','flow'));
+  [0,1,2,3].forEach(n=>{const r=byId('col'+n+'-round'); if(r) r.textContent='';});
+}
+function paint(){
+  $('pos').textContent=(i+1)+'/'+steps.length;
+  $('cost').textContent='$'+cost.toFixed(4)+
+    (MODELLED[key+'|'+mode]?' modelled':'');
+  $('bar').style.width=(steps.length?((i+1)/steps.length*100):0)+'%';
+}
+function applyTo(n){
+  clearAll(); cost=0;
+  for(let j=0;j<=n;j++){
+    const s=steps[j];
+    (s.on||[]).forEach(id=>{const el=byId(id);
+      if(el){el.classList.remove('dim');el.classList.remove('subdim');}});
+    (s.e||[]).forEach(id=>{const el=byId(id); if(el) el.classList.add('lit');});
+    if(s.m){const el=byId(s.m[0]); if(el) el.classList.add(s.m[1]);}
+    if(s.r){const el=byId('col'+s.r[0]+'-round');
+            if(el) el.textContent=s.r[1];}
+    if(s['$']) cost+=s['$'];
+  }
+  const s=steps[n];
+  (s.on||[]).forEach(id=>{const el=byId(id);
+    if(el&&el.classList.contains('stage')) el.classList.add('now');});
+  if(!reduce)(s.e||[]).forEach(id=>{const el=byId(id);
+    if(el) el.classList.add('flow');});
+  if(s.f){const el=byId(s.f);
+          if(el){el.classList.remove('now');el.classList.add('fault');}}
+  $('capt').textContent=s.t; $('capc').textContent=s.c;
+  $('clk').textContent=s.k||'';
+  $('cap').style.borderLeftColor=s.f?'#c0392f':'#0e8c7c';
+  paint();
+}
+function reset(){
+  clearInterval(timer); timer=null; i=-1; cost=0;
+  root.classList.add('running'); clearAll();
+  steps=buildSteps(); paint();
+  $('capt').textContent='Ready \u2014 '+(KEYQ[key]||key)+
+    (HAS_BYPASS[key]?(mode==='bypass'?' below the $5k floor'
+                                     :' above the $5k floor'):'');
+  $('capc').textContent='Press Play, or step through one stage at a time.';
+  $('clk').textContent='';
+  $('play').innerHTML='&#9654;&nbsp; Play';
+  syncUrl();
+}
+function step(){ if(i>=steps.length-1){pause();return false;}
+                 i++; applyTo(i); return true; }
+function back(){ if(i>0){i--;applyTo(i);} else reset(); }
+function pause(){ clearInterval(timer); timer=null;
+                  $('play').innerHTML='&#9654;&nbsp; Play'; }
+function play(){
+  if(timer){pause();return;}
+  if(i>=steps.length-1) reset();
+  started=true;
+  $('play').innerHTML='&#10073;&#10073;&nbsp; Pause';
+  step();
+  timer=setInterval(()=>{if(!step())pause();},4200/speed);
+}
+function syncMode(){
+  const has=HAS_BYPASS[key];
+  const b=$('m-bypass'), a=$('m-agent');
+  b.disabled=!has; b.style.opacity=has?1:.3;
+  if(!has) mode='agent';
+  b.classList.toggle('sel',mode==='bypass');
+  a.classList.toggle('sel',mode==='agent');
+  b.setAttribute('aria-pressed',mode==='bypass');
+  a.setAttribute('aria-pressed',mode==='agent');
+}
+function syncUrl(){
+  // Deep-link syncing is a convenience, never a dependency: opaque-origin
+  // contexts (about:srcdoc, sandboxed iframes, file://) throw on replaceState,
+  // and this runs from reset() at init, so an escaping throw would take the
+  // whole player down with it.
+  try{
+    if(!history.replaceState) return;
+    if(!/^https?:$/.test(location.protocol)) return;
+    const u=new URL(window.location.href);
+    u.searchParams.set('s',key); u.searchParams.set('m',mode);
+    if($('cyc')&&$('cyc').checked) u.searchParams.set('cyc','1');
+    else u.searchParams.delete('cyc');
+    history.replaceState(null,'',u.toString());
+  }catch(e){}
+}
+root.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  root.querySelectorAll('.tab').forEach(x=>{x.classList.remove('sel');
+    x.style.background='transparent'; x.setAttribute('aria-pressed','false');});
+  b.classList.add('sel'); b.style.background=b.dataset.col;
+  b.setAttribute('aria-pressed','true');
+  key=b.dataset.k; syncMode(); reset();
+});
+root.querySelectorAll('.modeseg button').forEach(b=>b.onclick=()=>{
+  if(b.disabled)return; mode=b.dataset.mode; syncMode(); reset();});
+root.querySelectorAll('.spdseg button').forEach(b=>b.onclick=()=>{
+  root.querySelectorAll('.spdseg button').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel'); speed=parseFloat(b.dataset.s);
+  if(timer){pause();play();}});
+$('play').onclick=play;
+$('step').onclick=()=>{pause();step();};
+$('back').onclick=()=>{pause();back();};
+$('reset').onclick=reset;
+if($('cyc')) $('cyc').onchange=reset;
+root.addEventListener('keydown',e=>{
+  if(e.key===' '){e.preventDefault();play();}
+  if(e.key==='ArrowRight'){e.preventDefault();pause();step();}
+  if(e.key==='ArrowLeft'){e.preventDefault();pause();back();}
+});
+// deep link: ?s=lev&m=agent&cyc=1
+try{
+  const q=new URLSearchParams(window.location.search);
+  if(q.get('s')&&COL_OF[q.get('s')]!==undefined) key=q.get('s');
+  if(q.get('m')==='agent'||q.get('m')==='bypass') mode=q.get('m');
+  if(q.get('cyc')==='1'&&$('cyc')) $('cyc').checked=true;
+}catch(e){}
+const tabEl=root.querySelector('.tab[data-k="'+key+'"]')||
+            root.querySelector('.tab');
+tabEl.classList.add('sel'); tabEl.style.background=tabEl.dataset.col;
+tabEl.setAttribute('aria-pressed','true');
+syncMode(); reset();
+// start once when scrolled into view, unless the visitor asked for less motion
+if('IntersectionObserver' in window && !reduce){
+  const io=new IntersectionObserver(es=>{
+    es.forEach(e=>{ if(e.isIntersecting&&!started){ play(); io.disconnect(); } });
+  },{threshold:.55});
+  io.observe(root);
+}
+})();
+</script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../assets/count.js"></script>
+</body>
+</html>
