@@ -19,7 +19,7 @@
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-05-31T00:00:00+00:00"/>
-<meta property="article:modified_time" content="2026-08-19T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-08-23T00:00:00+00:00"/>
 <meta property="article:section" content="Engineering"/>
 <meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
 <meta property="article:tag" content="Deployment"/>
@@ -30,7 +30,7 @@
 <meta name="twitter:description" content="How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Shipping Agents Safely: deployment, rollout, and rollback","description":"How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback.","datePublished":"2026-05-31","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Shipping Agents Safely: deployment, rollout, and rollback","description":"How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback.","datePublished":"2026-05-31","dateModified":"2026-08-23","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Shipping Agents Safely","item":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -282,6 +282,11 @@ Prod (manual, SRE): verify gate green for this exact SHA
     <p>This is an <strong>operator-driven</strong> mechanism. There is no automatic analysis of the shadow agreement rate and no automatic promotion or rollback of a variant — a human reads the comparison and decides. It buys real exposure control on a platform that offers none; it does not buy an automated experiment pipeline. It is also a second thing called "canary", which is why this post keeps the two apart: the deploy-time observation window confirms a build is safe to run at all; variant routing confirms a specific behavioral change is actually good, against real tenant traffic, before every tenant sees it.</p>
   </div>
 
+  <div class="callout">
+    <div class="callout-label">A third thing, also called "canary"</div>
+    <p>As of August 2026 there's a third, unrelated mechanism with the same name: an hourly synthetic-transaction canary Lambda that drives one real negotiation through the full six-node orchestrator under a dedicated tenant and alarms if it stops passing. It's a production-health probe, not a deploy mechanism — it isn't wired into <code>dev-deploy.yml</code> or <code>prod-deploy.yml</code>, doesn't feed the observation window, and doesn't gate or trigger either rollback path described in this post. Three unrelated things sharing one word in the same codebase is exactly the confusion this post exists to head off: not this canary, not that canary, a third one.</p>
+  </div>
+
   <h2>Rollback: two mechanisms, one word</h2>
 
   <p>If either confirmation gate fails — the observation window or the quadrant smoke — the pipeline rolls <em>forward</em> to the previous known-good SHA, with a target of completing within <strong>five minutes</strong> of failure detection. Mechanically it is unglamorous, which is the point: the <code>plan</code> job snapshotted the previous image-tag map before overwriting it, so recovery is restoring that snapshot and running <code>terraform apply</code> against images already sitting in ECR. No separate rollback artifact, no new variables on the recovery path.</p>
@@ -487,7 +492,7 @@ Prod (manual, SRE): verify gate green for this exact SHA
 
   <div class="post-footer">
     <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; May 2026</p>
-    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> &mdash; an autonomous multi-agent procurement negotiation system. Reconciled against the implementation repository &mdash; workflows, Terraform, and the decision record, not the design documents &mdash; updated 2026-08-19.</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> &mdash; an autonomous multi-agent procurement negotiation system. Reconciled against the implementation repository &mdash; workflows, Terraform, and the decision record, not the design documents &mdash; updated 2026-08-23.</p>
   </div>
 
 </article>
