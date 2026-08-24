@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="index, follow"/>
+<meta name="author" content="Gustavo Peixoto de Azevedo"/>
+<title>Buyer Team — Gustavo Peixoto de Azevedo</title>
+<meta name="description" content="An autonomous multi-agent negotiation system that takes a purchase requisition from a tenant ERP and returns an issued purchase order. A deterministic Step Functions DAG owns the workflow shape and records every transition; six LLM agents supply judgment at fixed nodes, under runtime guardrails they cannot be prompted past — all inside a ten-cent-per-negotiation cost ceiling."/>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/projects/buyer-team.html"/>
+<meta property="og:title" content="Buyer Team"/>
+<meta property="og:description" content="An autonomous multi-agent negotiation system that takes a purchase requisition from a tenant ERP and returns an issued purchase order. A deterministic Step Functions DAG owns the workflow shape and records every transition; six LLM agents supply judgment at fixed nodes, under runtime guardrails they cannot be prompted past — all inside a ten-cent-per-negotiation cost ceiling."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Buyer Team"/>
+<meta name="twitter:description" content="An autonomous multi-agent negotiation system that takes a purchase requisition from a tenant ERP and returns an issued purchase order. A deterministic Step Functions DAG owns the workflow shape and records every transition; six LLM agents supply judgment at fixed nodes, under runtime guardrails they cannot be prompted past — all inside a ten-cent-per-negotiation cost ceiling."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Buyer Team","description":"An autonomous multi-agent negotiation system that takes a purchase requisition from a tenant ERP and returns an issued purchase order. A deterministic Step Functions DAG owns the workflow shape and records every transition; six LLM agents supply judgment at fixed nodes, under runtime guardrails they cannot be prompted past — all inside a ten-cent-per-negotiation cost ceiling.","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/projects/buyer-team.html","keywords":"Multi-agent, AgentCore, Step Functions"}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../blog/buyer-team-blog.css">
+<link rel="stylesheet" href="../blog/site-blog.css">
+<style>
+  .bt-figure .edge { stroke: var(--ink-muted, #94A3B8); stroke-width: 1.6; fill: none; }
+  .bt-figure .box { fill: var(--surface, #FFFFFF); stroke: var(--rule, #CBD5E1); stroke-width: 1.5; }
+  .bt-figure .box-teal { fill: var(--surface, #FFFFFF); stroke: var(--teal, #0D9488); stroke-width: 1.5; }
+  .bt-figure .box-amber { fill: var(--surface, #FFFFFF); stroke: var(--amber, #D97706); stroke-width: 1.5; }
+  .bt-figure .title { font-size: 12.5px; font-weight: 600; fill: var(--ink, #0F172A); }
+  .bt-figure .num { font-family: 'DM Mono', ui-monospace, monospace; font-size: 9px; font-weight: 500; letter-spacing: .07em; fill: var(--ink-muted, #64748B); }
+  .bt-figure .sub { font-size: 10px; fill: var(--ink-muted, #64748B); }
+  .bt-figure .mono { font-family: 'DM Mono', ui-monospace, monospace; font-size: 9px; fill: var(--ink-muted, #475569); }
+  .bt-figure .pausefill { fill: var(--amber, #D97706); opacity: .07; }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="../index.html#ai-projects">AI Projects</a></li>
+    <li><a href="../index.html#blog">Blog</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../index.html#ai-projects">AI Projects</a>
+    <span class="sep">›</span>
+    <span class="current">Buyer Team</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Project</span>
+    <span class="dot">·</span>
+    <span>Multi-agent</span>
+    <span class="dot">·</span>
+    <span>Deployed · no live tenants</span>
+  </div>
+
+  <h1>Buyer Team</h1>
+
+  <p class="deck">An autonomous multi-agent negotiation system that takes a purchase requisition from a tenant ERP and returns an issued purchase order. A deterministic Step Functions DAG owns the workflow shape and records every transition; six LLM agents supply judgment at fixed nodes, under runtime guardrails they cannot be prompted past — all inside a ten-cent-per-negotiation cost ceiling.</p>
+
+  <hr>
+
+  <h2>The problem</h2>
+
+  <p>Most procurement spend is never negotiated. Not because nobody wants to, but because
+     a buyer's time costs more than the saving on any individual line. Strategic
+     categories get a human and a quarterly review; the long tail gets a catalogue price
+     and a rubber stamp. The economics are the constraint, and they have been for
+     decades.</p>
+
+  <p>An agent that can hold a supplier conversation changes that arithmetic — but only if
+     it can be trusted to run without supervision, and only if running it costs
+     essentially nothing. Both conditions are architectural, not model choices. Buyer Team
+     is a reference implementation built to hold both at once: an autonomous negotiation
+     system that takes a purchase requisition from a tenant ERP and returns an issued
+     purchase order, under governance strict enough that a procurement organisation would
+     actually let it run.</p>
+
+  <h2>Orchestration before intelligence</h2>
+
+  <p>Everything descends from one decision. A governed, audited business process cannot be
+     run by a model that decides its own next steps. So the system is a hybrid two-level
+     topology: a deterministic Step Functions DAG owns the workflow shape and records
+     every transition, and LLM agents supply judgment at fixed nodes. The orchestrator
+     invokes intelligence; intelligence never invokes the orchestrator.</p>
+
+  <p>The workflow is a fixed seven-node graph with exactly one conditional branch — the
+     Kraljic quadrant router at Node 3, which sends a requisition to one of four
+     negotiation strategies — and exactly one governed loop: a single cycle-back from
+     human review, after which the negotiation escalates rather than looping again.</p>
+
+  <figure class="bt-figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1219.06 1340" role="img" aria-labelledby="wf-title wf-desc">
+<title id="wf-title">Buyer Team Complete 7-Node Workflow Graph (All Agents)</title>
+<desc id="wf-desc">End-to-end procurement negotiation workflow showing all 7 nodes, the four-way Kraljic branch at Node 3, the HITL approval gate at Node 6, steering hooks per agent, and model assignments per node. Triggered by a Purchase Requisition; produces one Purchase Order per awarded supplier.</desc>
+<defs>
+  <style>
+    .wf text { font-family: "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; stroke: none; fill: var(--ink-muted); }
+    .wf .node-label   { font-size: 14px; font-weight: 500; text-anchor: middle; }
+    .wf .node-sub     { font-size: 12px; font-weight: 400; text-anchor: middle; }
+    .wf .branch-label { font-size: 12px; font-weight: 500; }
+    .wf .legend-title { font-size: 14px; font-weight: 500; text-anchor: middle; fill: var(--ink); }
+    .wf .legend-head  { font-size: 12px; font-weight: 500; }
+    .wf .legend-item  { font-size: 12px; font-weight: 400; }
+    .wf rect.node   { stroke-width: 1.5; }
+    .wf rect.legend { fill: var(--surface); stroke: var(--rule); stroke-width: 1; }
+    .wf line, .wf path { fill: none; stroke: var(--ink-muted); stroke-width: 1.5; }
+  </style>
+  <marker id="wf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+  </marker>
+</defs>
+<g class="wf">
+  
+  <rect x="0" y="0" width="1219.06" height="70" fill="#0F172A"></rect>
+  <text x="600" y="35" class="node-label" style="fill:#FFFFFF; font-size:15px;">Complete Workflow — 7 Nodes, 6 Agents</text>
+  <text x="600" y="55" class="node-sub" style="fill:#94A3B8;">Buyer Team — End-to-end procurement lifecycle</text>
+
+
+  
+  <rect class="io" x="450" y="85" width="300" height="40" rx="20" fill="#E0F2FE" stroke="#0284C7" stroke-width="1.5"></rect>
+  <text x="600" y="110" style="fill:#0C4A6E; font-size:13px; font-weight:600; text-anchor:middle;">📋 Purchase Requisition</text>
+  <text x="600" y="123" style="fill:#0369A1; font-size:11px; font-weight:400; text-anchor:middle; font-style:italic;">trigger · items · budget · deadline</text>
+  <line x1="600" y1="125" x2="600" y2="148" stroke="#0284C7" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#wf-arrow)"></line>
+  
+  <rect class="node" x="450" y="150" width="300" height="58" rx="6" fill="#F8FAFC" stroke="#475569"></rect>
+  <text x="600" y="173" class="node-label" fill="#334155">Node 1 — Ingest &amp; Validate</text>
+  <text x="600" y="191" class="node-sub">Deterministic · Python</text>
+  <line x1="600" y1="208" x2="600" y2="240" marker-end="url(#wf-arrow)"></line>
+
+  
+  <rect class="node" x="450" y="240" width="300" height="68" rx="6" fill="#EFF6FF" stroke="#1E40AF"></rect>
+  <text x="600" y="263" class="node-label" fill="#1E3A8A">Node 2 — Kraljic Classify</text>
+  <text x="600" y="281" class="node-sub" fill="#1D4ED8">SimpleLLM · semantic cache (24h)</text>
+  <text x="600" y="297" class="node-sub" fill="#1D4ED8">Quadrant from profit / risk</text>
+  <line x1="600" y1="308" x2="600" y2="340" marker-end="url(#wf-arrow)"></line>
+
+  
+  <rect class="node" x="450" y="340" width="300" height="60" rx="6" fill="#F8FAFC" stroke="#475569"></rect>
+  <text x="600" y="365" class="node-label" fill="#334155">Node 3 — Strategy Router</text>
+  <text x="600" y="383" class="node-sub">Deterministic · no LLM</text>
+
+  
+  <path d="M 600 400 L 600 420 L 200 420 L 200 470" marker-end="url(#wf-arrow)"></path>
+  <path d="M 600 400 L 600 420 L 480 420 L 480 470" marker-end="url(#wf-arrow)"></path>
+  <path d="M 600 400 L 600 420 L 760 420 L 760 470" marker-end="url(#wf-arrow)"></path>
+  <path d="M 600 400 L 600 420 L 1020 420 L 1020 470" marker-end="url(#wf-arrow)"></path>
+
+  <text x="270" y="435" class="branch-label" fill="#475569">NON_CRITICAL</text>
+  <text x="510" y="435" class="branch-label" fill="#475569">LEVERAGE</text>
+  <text x="780" y="435" class="branch-label" fill="#475569">BOTTLENECK</text>
+  <text x="1050" y="435" class="branch-label" fill="#475569">STRATEGIC</text>
+
+  
+  <rect class="node" x="100" y="470" width="200" height="80" rx="6" fill="#ECFDF5" stroke="#065F46"></rect>
+  <text x="200" y="492" class="node-label" fill="#065F46">Node 4a</text>
+  <text x="200" y="510" class="node-label" fill="#065F46">Spot Bidding</text>
+  <text x="200" y="528" class="node-sub" fill="#047857">Concurrent invitations</text>
+  <text x="200" y="542" class="node-sub" fill="#047857">+ follow-ups</text>
+
+  
+  <rect class="node" x="380" y="470" width="200" height="80" rx="6" fill="#ECFDF5" stroke="#065F46"></rect>
+  <text x="480" y="492" class="node-label" fill="#065F46">Node 4b</text>
+  <text x="480" y="510" class="node-label" fill="#065F46">Leverage Auction</text>
+  <text x="480" y="528" class="node-sub" fill="#047857">Multi-round bidding</text>
+  <text x="480" y="542" class="node-sub" fill="#047857">+ convergence detect</text>
+
+  
+  <rect class="node" x="660" y="470" width="200" height="80" rx="6" fill="#ECFDF5" stroke="#065F46"></rect>
+  <text x="760" y="492" class="node-label" fill="#065F46">Node 4c</text>
+  <text x="760" y="510" class="node-label" fill="#065F46">Bottleneck Negot.</text>
+  <text x="760" y="528" class="node-sub" fill="#047857">Risk + TCO +</text>
+  <text x="760" y="542" class="node-sub" fill="#047857">backup supply</text>
+
+  
+  <rect class="node" x="920" y="470" width="200" height="80" rx="6" fill="#ECFDF5" stroke="#065F46"></rect>
+  <text x="1020" y="492" class="node-label" fill="#065F46">Node 4d</text>
+  <text x="1020" y="510" class="node-label" fill="#065F46">Strategic Partner</text>
+  <text x="1020" y="528" class="node-sub" fill="#047857">Innovation + TCO +</text>
+  <text x="1020" y="542" class="node-sub" fill="#047857">relationship history</text>
+
+  
+  <path d="M 200 550 L 200 600 L 600 600 L 600 640" marker-end="url(#wf-arrow)"></path>
+  <path d="M 480 550 L 480 590 L 600 590"></path>
+  <path d="M 760 550 L 760 590 L 600 590"></path>
+  <path d="M 1020 550 L 1020 600 L 600 600"></path>
+
+  
+  <rect class="node" x="450" y="640" width="300" height="78" rx="6" fill="#F8FAFC" stroke="#475569"></rect>
+  <text x="600" y="663" class="node-label" fill="#334155">Node 5 — Bid Evaluation</text>
+  <text x="600" y="681" class="node-sub">Deterministic · Python · multi-dimensional</text>
+  <text x="600" y="697" class="node-sub">Cost · Delivery · Quality · ESG · History</text>
+  <text x="600" y="713" class="node-sub">Emits quality_score · gate fires at Node 6</text>
+  <line x1="600" y1="718" x2="600" y2="750" marker-end="url(#wf-arrow)"></line>
+
+  
+  <rect class="node" x="450" y="750" width="300" height="78" rx="6" fill="#FFFBEB" stroke="#92400E"></rect>
+  <text x="600" y="773" class="node-label" fill="rgb(99,56,6)">Node 6 — Approval Gate</text>
+  <text x="600" y="791" class="node-sub" fill="rgb(133,79,11)">Quality gate (def. 0.72) · Amount gate</text>
+  <text x="600" y="807" class="node-sub" fill="rgb(133,79,11)">Auto-approve OR HITL interrupt</text>
+  <text x="600" y="823" class="node-sub" fill="rgb(133,79,11)">Max 1 cycle-back to Node 4</text>
+  <line x1="600" y1="828" x2="600" y2="860" marker-end="url(#wf-arrow)"></line>
+
+  
+  <path d="M 450 790 L 60 790 L 60 510 L 100 510" stroke-dasharray="4,3" marker-end="url(#wf-arrow)"></path>
+  <text x="80" y="660" class="branch-label" fill="#92400E" transform="rotate(-90 80 660)">reject + retry (≤ 1)</text>
+
+  
+  <rect class="node" x="450" y="860" width="300" height="78" rx="6" fill="#F0FDF4" stroke="#15803D"></rect>
+  <text x="600" y="883" class="node-label" fill="rgb(39,80,10)">Node 7 — Award &amp; Comms</text>
+  <text x="600" y="901" class="node-sub" fill="rgb(59,109,17)">SimpleLLM · confidentiality-guarded</text>
+  <text x="600" y="917" class="node-sub" fill="rgb(59,109,17)">Comms first, then PO assembly</text>
+  <text x="600" y="933" class="node-sub" fill="rgb(59,109,17)">WinnerDisclosureGuard hook</text>
+
+
+  
+  <line x1="600" y1="938" x2="600" y2="960" stroke="#0284C7" stroke-width="1.5" marker-end="url(#wf-arrow)"></line>
+
+  
+  <rect class="io" x="464" y="974" width="300" height="40" rx="20" fill="#E0F2FE" stroke="#0284C7" stroke-width="1.5" opacity="0.45"></rect>
+  <rect class="io" x="457" y="969" width="300" height="40" rx="20" fill="#E0F2FE" stroke="#0284C7" stroke-width="1.5" opacity="0.7"></rect>
+  <rect class="io" x="450" y="964" width="300" height="40" rx="20" fill="#E0F2FE" stroke="#0284C7" stroke-width="1.5"></rect>
+  <text x="600" y="983" style="fill:#0C4A6E; font-size:13px; font-weight:600; text-anchor:middle;">📄 Purchase Orders</text>
+  <text x="600" y="996" style="fill:#0369A1; font-size:11px; font-weight:400; text-anchor:middle; font-style:italic;">product · one per awarded supplier</text>
+  
+  <rect class="legend" x="60" y="1040" width="380" height="250" rx="6"></rect>
+  <text x="250" y="1063" class="legend-title">Steering Hooks (6 types · 8 deployed)</text>
+  <text x="250" y="1081" class="legend-item" text-anchor="middle" font-style="italic">All PRE-CALL · violation → Guide (cancel + retry)</text>
+  <text x="80" y="1104" class="legend-head">Node 4a (Spot):</text>
+  <text x="80" y="1120" class="legend-item">• BidConfidentiality</text>
+  <text x="80" y="1142" class="legend-head">Node 4b (Auction):</text>
+  <text x="80" y="1158" class="legend-item">• AuctionIntegrity</text>
+  <text x="80" y="1180" class="legend-head">Node 4c / 4d (Negotiation):</text>
+  <text x="80" y="1196" class="legend-item">• RiskAssessment</text>
+  <text x="80" y="1212" class="legend-item">• TCOEnforcement</text>
+  <text x="80" y="1228" class="legend-item">• RelationshipHistory (4d only)</text>
+  <text x="80" y="1250" class="legend-head">Node 7 (Award):</text>
+  <text x="80" y="1266" class="legend-item">• WinnerDisclosure</text>
+
+  
+  <rect class="legend" x="780" y="1040" width="380" height="250" rx="6"></rect>
+  <text x="970" y="1065" class="legend-title">Model tiering &amp; cost discipline</text>
+  <text x="800" y="1090" class="legend-head">SimpleLLM (fast / cheap):</text>
+  <text x="800" y="1106" class="legend-item">• Node 2 — Kraljic Classify (cached 24h)</text>
+  <text x="800" y="1122" class="legend-item">• Node 4a — Spot Bidding (tail-spend volume)</text>
+  <text x="800" y="1138" class="legend-item">• Node 7 — Award &amp; Communications</text>
+  <text x="800" y="1160" class="legend-head">DefaultLLM (capable):</text>
+  <text x="800" y="1176" class="legend-item">• Nodes 4b–4d — strategy execution</text>
+  <text x="800" y="1198" class="legend-head">Deterministic (no LLM):</text>
+  <text x="800" y="1214" class="legend-item">• Node 1 — validation</text>
+  <text x="800" y="1230" class="legend-item">• Node 3 — strategy routing</text>
+  <text x="800" y="1246" class="legend-item">• Node 5 — multi-dimensional evaluation</text>
+  <text x="800" y="1262" class="legend-item">• Node 6 — approval gate logic</text>
+  <text x="800" y="1284" class="legend-item" font-style="italic">Target: &lt; $0.10 per negotiation (KR3.2)</text>
+</g>
+</svg>
+<figcaption class="bt-figcaption">The seven-node Buyer Team workflow. Deterministic nodes (grey, amber) own structure and governance; LLM-backed nodes (blue, green) own adaptive intelligence under steering hooks.</figcaption>
+</figure>
+
+  <p>The rigidity is deliberate and its cost is accepted openly. A new negotiation style
+     requires a DAG change rather than a prompt change. In exchange, a misbehaving agent
+     can never alter the workflow shape, which is what makes 100% governance-compliance
+     and audit-completeness targets reachable at all.</p>
+
+  <p>The same philosophy governs state. The orchestrator's DynamoDB record is the
+     long-lived truth; agent sessions are ephemeral execution windows. Agents never talk
+     to each other — they communicate only through the orchestrator's shared state — and
+     they hold no cross-session state of their own.</p>
+
+  <h2>Control lives outside the prompt</h2>
+
+  <p>Six agents, each owning exactly one cognitive domain, each running as its own
+     isolated runtime. Three principles bound what any of them can do:</p>
+
+  <ul>
+    <li><strong>Tools as boundaries.</strong> Every external action is a tool call. The
+        system prompt carries reasoning instructions only; data in and side effects out
+        flow exclusively through typed, idempotent tools.</li>
+    <li><strong>Steering over prompting.</strong> Behavioural guardrails are runtime hooks
+        that intercept tool calls <em>outside</em> the reasoning loop. The model cannot
+        forget them, be talked out of them, or be injected past them. Hook failures are
+        fail-closed: a crashed guard suppresses the tool rather than letting it run
+        unchecked.</li>
+    <li><strong>Governance in code, not prompts.</strong> Spend gates, budget ceilings,
+        approved-supplier filters, ESG rules, the walk-away price — every policy is
+        enforced by deterministic code at a specific node.</li>
+  </ul>
+
+  <p>That third principle has a number attached, and it is the one worth carrying into any
+     conversation about agent safety: instructing a model to respect a constraint achieved
+     82.5% compliance. Enforcing the same constraint at the runtime boundary achieves
+     100%, because it is no longer a thing the model can be persuaded about. The approval
+     gate at Node 6 is the clearest case — a pure function over policy and state, with no
+     model involved in the decision to require human review. It cannot be reasoned around,
+     retried out of, or convinced to skip itself for an unusual edge case.</p>
+
+  <h2>Where a model earned its place, and where it didn't</h2>
+
+  <p>The recurring test is <em>does this step need judgment, or just correctness?</em> Only
+     judgment earns a model invocation, and the test was applied ruthlessly enough to
+     reverse work already built.</p>
+
+  <p>Bid evaluation was originally an LLM agent. It became inline Python scoring, because
+     multi-dimensional comparison against fixed weights is arithmetic, not judgment — and
+     arithmetic done by a model is arithmetic you have to evaluate, monitor, and pay for.
+     Low-value spot bids skip the agent entirely. Rejection letters are template renders.
+     Structured responses are assembled in code from the tool-call transcript rather than
+     by a second model call.</p>
+
+  <p>Removing an agent that already worked is a harder decision than not building one. It
+     is also the one that most improved the system.</p>
+
+  <h2>Surviving the wait</h2>
+
+  <p>A negotiation is not a request. It spans supplier response times, and it stops dead at
+     the human approval gate for as long as the approver takes. Holding a live execution
+     open across that window is not an option, so the graph serialises its state and tears
+     execution down — for up to 96 hours the negotiation is simply a row in DynamoDB.</p>
+
+  <figure class="bt-figure"><svg viewBox="0 0 860 380" xmlns="http://www.w3.org/2000/svg" font-family="'Sora', system-ui, sans-serif" role="img" aria-labelledby="int-title int-desc">
+  <title id="int-title">Interrupt-and-resume: pausing a DAG for human approval</title>
+  <desc id="int-desc">At Node 6 the graph serialises state to DynamoDB and tears down execution. During the wait of up to 96 hours zero compute is held; the negotiation lives only as a row. An inbound API call resumes it in under five seconds.</desc>
+
+  <style>
+    .ink   { fill: var(--ink, #0F172A); }
+    .muted { fill: var(--ink-muted, #64748B); }
+    .box       { fill: var(--surface, #FFFFFF); stroke: var(--rule, #CBD5E1); stroke-width: 1.5; }
+    .box-teal  { fill: var(--surface, #FFFFFF); stroke: var(--teal, #0D9488); stroke-width: 1.5; }
+    .box-amber { fill: var(--surface, #FFFFFF); stroke: var(--amber, #D97706); stroke-width: 1.5; }
+    .title { font-size: 12.5px; font-weight: 600; fill: var(--ink, #0F172A); }
+    .num   { font-family: 'DM Mono', ui-monospace, monospace; font-size: 9px; font-weight: 500; letter-spacing: .07em; fill: var(--ink-muted, #64748B); }
+    .sub   { font-size: 10px; fill: var(--ink-muted, #64748B); }
+    .mono  { font-family: 'DM Mono', ui-monospace, monospace; font-size: 9px; fill: var(--ink-muted, #475569); }
+    .edge  { stroke: var(--ink-muted, #94A3B8); stroke-width: 1.6; fill: none; }
+    .elabel{ font-family: 'DM Mono', ui-monospace, monospace; font-size: 9px; fill: var(--ink-muted, #64748B); }
+    .pausefill { fill: var(--amber, #D97706); opacity: .07; }
+  </style>
+  <defs>
+    <marker id="i-arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L7,3 L0,6 Z" fill="var(--ink-muted, #94A3B8)"></path>
+    </marker>
+  </defs>
+
+  
+  <rect class="pausefill" x="300" y="44" width="260" height="300" rx="12"></rect>
+  <text class="num" x="430" y="64" text-anchor="middle" fill="var(--amber,#D97706)">THE WAIT — UP TO 96h · ZERO COMPUTE</text>
+
+  
+  <g>
+    <rect class="box-teal" x="40" y="120" width="200" height="120" rx="11"></rect>
+    <text class="num" x="58" y="146">NODE 6 · INTERRUPT (REQ-G200)</text>
+    <text class="title" x="58" y="168">Approval required</text>
+    <text class="sub" x="58" y="190">persist state snapshot</text>
+    <text class="sub" x="58" y="206">status → PENDING_APPROVAL</text>
+    <text class="sub" x="58" y="222">store approval_task_token on the row</text>
+    <text class="mono" x="58" y="236" fill="var(--coral,#E11D48)">execution paused — torn down</text>
+  </g>
+  <path class="edge" d="M240,180 L300,180" marker-end="url(#i-arrow)"></path>
+
+  
+  <g>
+    <rect class="box-amber" x="320" y="120" width="220" height="120" rx="11"></rect>
+    <text class="num" x="338" y="146">STATE OF RECORD</text>
+    <text class="title" x="338" y="168">A DynamoDB row</text>
+    <text class="sub" x="338" y="190">no process, no microVM session</text>
+    <text class="sub" x="338" y="206">survives deploys &amp; recycles</text>
+    <text class="sub" x="338" y="222">slot retained — not decremented</text>
+    <text class="mono" x="338" y="236">span: interrupt.waiting</text>
+  </g>
+  <path class="edge" d="M540,180 L620,180" marker-end="url(#i-arrow)"></path>
+
+  
+  <g>
+    <rect class="box-teal" x="620" y="120" width="200" height="120" rx="11"></rect>
+    <text class="num" x="638" y="146">RESUME (REQ-G201)</text>
+    <text class="title" x="638" y="168">Inbound API call</text>
+    <text class="sub" x="638" y="190">POST /requisitions/{id}/approve|reject|cycle_back</text>
+    <text class="sub" x="638" y="206">JWT + claim check (REQ-G251)</text>
+    <text class="sub" x="638" y="222">validate decision</text>
+    <text class="mono" x="638" y="236" fill="var(--teal,#0D9488)">resumes in ≤ 5 seconds</text>
+  </g>
+
+  
+  <path class="edge" d="M720,240 L720,278" marker-end="url(#i-arrow)"></path>
+  <g>
+    <rect class="box" x="560" y="288" width="100" height="40" rx="8"></rect>
+    <text class="sub" x="576" y="305">approve →</text>
+    <text class="title" x="576" y="320" font-size="11">Node 7</text>
+  </g>
+  <g>
+    <rect class="box" x="672" y="288" width="116" height="40" rx="8"></rect>
+    <text class="sub" x="688" y="305">cycle-back →</text>
+    <text class="title" x="688" y="320" font-size="11">Node 4x</text>
+  </g>
+  <path class="edge" d="M770,240 C800,258 690,270 660,286" marker-end="url(#i-arrow)"></path>
+  <path class="edge" d="M700,240 C690,260 700,270 716,286" marker-end="url(#i-arrow)"></path>
+
+  
+  <g transform="translate(40,288)">
+    <rect class="box" x="0" y="0" width="480" height="56" rx="9" stroke-dasharray="5 4"></rect>
+    <text class="num" x="16" y="22" fill="var(--coral,#E11D48)">TIMEOUT BACKSTOP</text>
+    <text class="sub" x="16" y="40">96h no decision → REQUIRES_ATTENTION (never auto-approve, REQ-G203);</text>
+    <text class="sub" x="16" y="52">then +7 days stale → auto-CANCEL (REQ-G203a) — cancelling commits nothing.</text>
+  </g>
+</svg>
+<figcaption class="bt-figcaption">The interrupt pattern. At Node 6 the graph serialises state and tears execution down; for up to 96h the negotiation is just a <strong>DynamoDB row</strong> &mdash; zero compute, survives deploys. An inbound API call resumes it in &le; 5s.</figcaption>
+</figure>
+
+  <p>Underneath, every node writes a versioned checkpoint on completion, and node contracts
+     are idempotent, so a crash mid-auction resumes from the last completed node rather
+     than restarting the negotiation. Durable execution is what lets the workflow be
+     honest about time.</p>
+
+  <h2>The cost ceiling</h2>
+
+  <p>The load-bearing business number is under ten cents per negotiation. Above that, the
+     economics that made the tail unnegotiable in the first place reassert themselves and
+     the whole premise collapses.</p>
+
+  <p>Four shipped mechanisms hold it: a three-tier Amazon Nova model ladder that puts the
+     cheap tier on classification, spot bidding and award communications while reserving
+     the capable tier for the three strategy-execution nodes; partial prompt caching;
+     a Kraljic classifier cached for 24 hours, so it mostly never runs; and a
+     context-compaction hook. Each is a real trade-off — how much of the request to cache
+     versus keep fresh, how much classification to skip versus recompute, how much context
+     to keep versus discard — rather than a switch someone flipped.</p>
+
+  <p>An earlier version of this cost story was larger and partly aspirational: a second
+     model family, nightly batch inference, an hourly CUR/Athena pipeline attributing the
+     AWS bill to per-tenant token counts. A repo audit established that none of the three
+     had been built. They are deferred deliberately rather than described as present —
+     building an attribution layer on top of a cost number nobody had verified would have
+     turned an honest absence into a confidently wrong chargeback figure.</p>
+
+  <h2>What it is not</h2>
+
+  <p>Buyer Team is deployed to a production engineering standard. It has no live tenants,
+     and "production-grade" here is a claim about the engineering, not about operating a
+     live SaaS. Bids are self-seeded — there is no real supplier inbound path — so the
+     negotiation logic is exercised against synthetic counterparties rather than
+     commercial ones.</p>
+
+  <p>Both are constraints rather than oversights, and stating them plainly is the point:
+     an architecture is only worth reading if you know which parts of it have met reality.
+     The production promotion gate has been blocked for five consecutive weeks on a
+     synthetic human-label data gap — the evaluation harness cannot yet be calibrated
+     against real human judgment, so the gate stays shut. That is the system working as
+     designed, and it is also the most useful thing about it to discuss.</p>
+
+  <h2>Further reading</h2>
+  <ul>
+    <li><a href="../blog/eng/dag-vs-llm-planner.html">Why we chose a deterministic DAG over a pure LLM planner</a></li>
+    <li><a href="../blog/eng/durable-orchestration.html">Pause for four days, resume in five seconds</a> — checkpoints, recovery locks, the interrupt pattern</li>
+    <li><a href="../blog/eng/cost-architecture.html">The cost architecture of an autonomous procurement agent</a> — the four mechanisms behind the ceiling</li>
+    <li><a href="../blog/eng/failure-handling.html">Designing for failure in a multi-agent procurement system</a></li>
+    <li><a href="../blog/eng/evaluation.html">Not a testing problem: how a multi-agent system evaluates itself in production</a></li>
+    <li><a href="../blog/eng/security-without-trust.html">Security without trust: defending an autonomous negotiation agent</a></li>
+  </ul>
+
+</article>
+
+</body>
+</html>

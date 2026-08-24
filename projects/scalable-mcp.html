@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="index, follow"/>
+<meta name="author" content="Gustavo Peixoto de Azevedo"/>
+<title>scalable-mcp — Gustavo Peixoto de Azevedo</title>
+<meta name="description" content="The auth, rate limiting, session lifecycle and sealed pause/resume convention that ATLAS Counsel's MCP server grew, extracted as a base other servers build on instead of re-deriving from the SDK's primitives. Current with the 2026-07-28 stateless transport revision and the stateful handshake before it — at the same endpoint, so adopting the new era costs older clients nothing."/>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/projects/scalable-mcp.html"/>
+<meta property="og:title" content="scalable-mcp"/>
+<meta property="og:description" content="The auth, rate limiting, session lifecycle and sealed pause/resume convention that ATLAS Counsel's MCP server grew, extracted as a base other servers build on instead of re-deriving from the SDK's primitives. Current with the 2026-07-28 stateless transport revision and the stateful handshake before it — at the same endpoint, so adopting the new era costs older clients nothing."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="scalable-mcp"/>
+<meta name="twitter:description" content="The auth, rate limiting, session lifecycle and sealed pause/resume convention that ATLAS Counsel's MCP server grew, extracted as a base other servers build on instead of re-deriving from the SDK's primitives. Current with the 2026-07-28 stateless transport revision and the stateful handshake before it — at the same endpoint, so adopting the new era costs older clients nothing."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"scalable-mcp","description":"The auth, rate limiting, session lifecycle and sealed pause/resume convention that ATLAS Counsel's MCP server grew, extracted as a base other servers build on instead of re-deriving from the SDK's primitives. Current with the 2026-07-28 stateless transport revision and the stateful handshake before it — at the same endpoint, so adopting the new era costs older clients nothing.","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/projects/scalable-mcp.html","keywords":"MCP, Open Source, Library"}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../blog/buyer-team-blog.css">
+<link rel="stylesheet" href="../blog/site-blog.css">
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="../index.html#ai-projects">AI Projects</a></li>
+    <li><a href="../index.html#blog">Blog</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../index.html#ai-projects">AI Projects</a>
+    <span class="sep">›</span>
+    <span class="current">scalable-mcp</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Project</span>
+    <span class="dot">·</span>
+    <span>MCP</span>
+    <span class="dot">·</span>
+    <span>On PyPI · v0.1.0</span>
+  </div>
+
+  <h1>scalable-mcp</h1>
+
+  <p class="deck">The auth, rate limiting, session lifecycle and sealed pause/resume convention that ATLAS Counsel's MCP server grew, extracted as a base other servers build on instead of re-deriving from the SDK's primitives. Current with the 2026-07-28 stateless transport revision and the stateful handshake before it — at the same endpoint, so adopting the new era costs older clients nothing.</p>
+
+  <hr>
+
+  <h2>The problem</h2>
+
+  <p>The MCP SDK gives you primitives. It does not give you a production posture. Every
+     team that puts an MCP server in front of real traffic re-derives the same set of
+     concerns from those primitives — how to authenticate a caller without leaking which
+     credentials exist, how to rate-limit before doing expensive work rather than after,
+     how to keep the session manager's lifecycle attached to the application's own, and
+     how to pause a tool call across two HTTP requests without handing the client a token
+     it can replay somewhere else.</p>
+
+  <p><a href="atlas-counsel.html">ATLAS Counsel</a>'s MCP server grew all of that. None
+     of it was specific to legal-document retrieval. So it now ships on its own:
+     <code>scalable_mcp</code> for the server side, <code>scalable_mcp_client</code> for
+     the client — a base to build on rather than a pattern to copy.</p>
+
+  <p>The extraction was folded back, not forked. Counsel now runs on the package rather
+     than on the code the package was taken from, which matters more than it sounds: a
+     base generalised out of one system and then left behind drifts from it, and every
+     guarantee below becomes a claim about code nobody exercises. These are exercised
+     every time Counsel answers a question.</p>
+
+  <h2>What building on it gets you</h2>
+
+  <p>Five things, enforced by construction rather than by a checklist a consumer has to
+     remember:</p>
+
+  <ul>
+    <li><strong>Auth.</strong> A pluggable <code>AuthResolver</code> protocol with
+        reference implementations — <code>JwtAuth</code>, <code>ApiKeyAuth</code>,
+        <code>ChainAuth</code> — that are constant-time and enumeration-safe by
+        construction. Every failure mode returns the same string; comparisons use
+        <code>hmac.compare_digest</code>.</li>
+    <li><strong>Rate limiting.</strong> One <code>RateLimiter</code> protocol, in-memory
+        or Redis-backed. The ordering that makes it effective — rate limit
+        <em>before</em> auth — is built into <code>create_app</code> itself, so a
+        consumer cannot assemble it the wrong way round.</li>
+    <li><strong>Session lifecycle.</strong> The anyio threadpool raised past the SDK's
+        default cap, the MCP session manager entered from the application's own lifespan,
+        idle Streamable HTTP sessions reaped automatically.</li>
+    <li><strong>Pause and resume.</strong> A sealed convention for REST handlers that
+        pause an agent thread across separate requests, plus protection for the SDK's own
+        mid-call <code>tools/call</code> round trip.</li>
+    <li><strong>Protocol currency.</strong> Built on <code>mcp&gt;=2.0</code>, serving
+        both transport eras at one endpoint.</li>
+  </ul>
+
+  <p>The server package is organised in three independently testable layers: primitives
+     with no framework dependencies (<code>rate_limit.py</code>, <code>crypto.py</code>),
+     transport-agnostic ASGI middleware, and the FastAPI app factory. Two ways in at the
+     top — <code>AppConfig</code> with <code>create_app</code> for full control, or
+     <code>SimpleServerConfig</code> with <code>create_simple_server</code> for an
+     opinionated one-call setup. Neither pulls in more than it needs: no
+     <code>httpx</code>, no <code>boto3</code>, and Redis is an optional extra rather
+     than a hard dependency.</p>
+
+  <h2>Two protocol eras, one endpoint</h2>
+
+  <p>The MCP transport moved to a stateless-per-request revision on 2026-07-28 — the
+     largest change to the protocol since authorization was added. A server built on
+     <code>scalable_mcp</code> serves that revision and the earlier stateful handshake at
+     the same <code>/mcp/</code> endpoint.</p>
+
+  <p>That matters more than it sounds. Adopting the new revision would otherwise force a
+     migration window on every client that hasn't moved yet; serving both means picking it
+     up costs them nothing. The mounting details that make it work —
+     <code>streamable_http_path</code> set to the root, the trailing slash, host
+     validation against the proxy's <code>Host</code> header — are inherited rather than
+     re-derived.</p>
+
+  <h2>Two pause points, two protections</h2>
+
+  <p>There are two structurally different round trips that each need to prove a pause was
+     legitimate, and they are easy to conflate because both implement the same SEP-2322
+     requestState idea.</p>
+
+  <p>The first is the SDK's native <code>tools/call</code> elicitation, protected by
+     passing <code>RequestStateSecurity</code> through <code>create_mcp_server</code>. A
+     single-process deployment can omit it and rely on the SDK's ephemeral per-process
+     key. A multi-instance deployment must pass a shared secret, or state minted
+     mid-elicitation on one replica will fail to verify when the client's next request
+     lands on another.</p>
+
+  <p>The second is the REST continuation convention behind consumer-defined endpoints,
+     keyed by <code>MCP_HMAC_SECRET</code>. Its tokens carry
+     <code>{thread_id, tenant_id, iat}</code> sealed with AES-256-GCM through the SDK's
+     own <code>AESGCMRequestStateCodec</code> — encrypted and authenticated rather than
+     merely signed, with a fresh nonce per call, so minting the same payload twice
+     produces two different tokens that both verify to identical contents.
+     <code>scalable_mcp</code> no longer carries cryptographic code of its own here; it
+     owns the envelope the convention actually needs — the 120-second TTL, the thread and
+     tenant binding that stops a token being replayed against a different thread or
+     tenant, and clean degradation to checkpoint-only resume when the secret is unset.</p>
+
+  <h2>Where the boundary sits</h2>
+
+  <p>Worth being precise about, because it is the question a consumer asks second.
+     <code>scalable_mcp</code> resolves a credential to a tenant and makes that identity
+     available everywhere it is needed — <code>current_tenant</code>, the rate limiter's
+     key, the SDK's session-ownership check. Deciding <em>which tools a given tenant may
+     call</em> is still the application's job: <code>AccessToken.scopes</code> is empty by
+     default, and there is no per-tool authorization model in the base itself.</p>
+
+  <p>Identity and transport are what the package gives you. What a tenant is allowed to do
+     with that identity is yours.</p>
+
+  <p>One further limit: <code>scalable_mcp</code> is published;
+     <code>scalable_mcp_client</code> follows the same install path once it publishes. The
+     split is deliberate, so a client-only consumer never pulls in FastAPI.</p>
+
+  <h2>Further reading</h2>
+  <ul>
+    <li><a href="../blog/eng/scalable-mcp.html">scalable-mcp: a reusable base for MCP servers and clients</a> — the full write-up, with code</li>
+    <li><a href="../blog/eng/atlas-counsel-mcp-v2-oauth.html">ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure</a> — where this came from</li>
+    <li><a href="https://pypi.org/project/scalable-mcp">pypi.org/project/scalable-mcp</a> · <a href="https://github.com/gpazevedo/scalable-mcp">github.com/gpazevedo/scalable-mcp</a></li>
+  </ul>
+
+</article>
+
+</body>
+</html>

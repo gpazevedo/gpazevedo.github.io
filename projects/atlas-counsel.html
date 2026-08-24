@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="index, follow"/>
+<meta name="author" content="Gustavo Peixoto de Azevedo"/>
+<title>ATLAS Counsel — Gustavo Peixoto de Azevedo</title>
+<meta name="description" content="A citation-first RAG agent that answers procurement-policy and contract questions. Every claim is bound to a retrievable source span by a type contract rather than a prompt request, the agent refuses when the corpus does not cover a question, and it escalates to a human across a stateless HTTP/MCP boundary when it is not sure."/>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/projects/atlas-counsel.html"/>
+<meta property="og:title" content="ATLAS Counsel"/>
+<meta property="og:description" content="A citation-first RAG agent that answers procurement-policy and contract questions. Every claim is bound to a retrievable source span by a type contract rather than a prompt request, the agent refuses when the corpus does not cover a question, and it escalates to a human across a stateless HTTP/MCP boundary when it is not sure."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="ATLAS Counsel"/>
+<meta name="twitter:description" content="A citation-first RAG agent that answers procurement-policy and contract questions. Every claim is bound to a retrievable source span by a type contract rather than a prompt request, the agent refuses when the corpus does not cover a question, and it escalates to a human across a stateless HTTP/MCP boundary when it is not sure."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"ATLAS Counsel","description":"A citation-first RAG agent that answers procurement-policy and contract questions. Every claim is bound to a retrievable source span by a type contract rather than a prompt request, the agent refuses when the corpus does not cover a question, and it escalates to a human across a stateless HTTP/MCP boundary when it is not sure.","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/projects/atlas-counsel.html","keywords":"RAG, LangGraph, MCP"}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../blog/buyer-team-blog.css">
+<link rel="stylesheet" href="../blog/site-blog.css">
+<style>
+
+  /* The boards carry 9-15px type at 1300 wide. Held to the ~700px article
+     column that type lands near 6px, so they break out of it. */
+  .bt-figure-wide { width: min(94vw, 1320px); margin-left: 50%; transform: translateX(-50%); }
+  .bt-figure-wide img { display: block; width: 100%; height: auto; border-radius: 8px; }
+@media (max-width: 900px) {
+  .bt-figure-wide { width: 100%; margin-left: 0; transform: none; }
+}
+  .bt-figure .grd-card { fill: #F8FAFC; stroke: #E2E8F0; stroke-width: 1; }
+  .bt-figure .grd-num { font: 500 12px "DM Mono", ui-monospace, monospace; letter-spacing: .04em; }
+  .bt-figure .grd-name { font: 500 16px "Sora", sans-serif; }
+  .bt-figure .grd-src { font: 400 13px "DM Mono", ui-monospace, monospace; }
+  .bt-figure .grd-flow { font: 400 12px "DM Mono", ui-monospace, monospace; fill: #64748B; }
+  .bt-figure .grd-edge { stroke: #94A3B8; stroke-width: 1.5; fill: none; }
+  .bt-figure .bar-teal { fill: #0D9488; }
+  .bt-figure .acc-teal { fill: #0D9488; }
+  .bt-figure .bar-blue { fill: #2563EB; }
+  .bt-figure .acc-blue { fill: #2563EB; }
+  .bt-figure .bar-amber { fill: #B45309; }
+  .bt-figure .acc-amber { fill: #B45309; }
+  .bt-figure .t-name { fill: #0F172A; }
+  .bt-figure .t-src { fill: #475569; }
+@media (prefers-color-scheme: dark) {
+  .bt-figure .grd-card { fill: #111B2E; stroke: #1E293B; }
+  .bt-figure .grd-flow { fill: #94A3B8; }
+  .bt-figure .grd-edge { stroke: #475569; }
+  .bt-figure .t-name { fill: #F1F5F9; }
+  .bt-figure .t-src { fill: #94A3B8; }
+  .bt-figure .bar-teal { fill: #2DD4BF; }
+  .bt-figure .acc-teal { fill: #2DD4BF; }
+  .bt-figure .bar-blue { fill: #60A5FA; }
+  .bt-figure .acc-blue { fill: #60A5FA; }
+  .bt-figure .bar-amber { fill: #FBBF24; }
+  .bt-figure .acc-amber { fill: #FBBF24; }
+}
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="../index.html#ai-projects">AI Projects</a></li>
+    <li><a href="../index.html#blog">Blog</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../index.html#ai-projects">AI Projects</a>
+    <span class="sep">›</span>
+    <span class="current">ATLAS Counsel</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Project</span>
+    <span class="dot">·</span>
+    <span>RAG</span>
+    <span class="dot">·</span>
+    <span>Deployed</span>
+  </div>
+
+  <h1>ATLAS Counsel</h1>
+
+  <p class="deck">A citation-first RAG agent that answers procurement-policy and contract questions. Every claim is bound to a retrievable source span by a type contract rather than a prompt request, the agent refuses when the corpus does not cover a question, and it escalates to a human across a stateless HTTP/MCP boundary when it is not sure.</p>
+
+  <hr>
+
+  <h2>The problem</h2>
+
+  <p>Most RAG systems treat citation as a courtesy: ask the model to name its sources in
+     the prompt, and hope it complies. That is tolerable for a search assistant. It is not
+     tolerable for a system that answers <em>who approves a $60,000 purchase?</em> and
+     expects a procurement director to act on the answer. A wrong citation there is not a
+     UX blemish — it is an audit finding.</p>
+
+  <p>The hard part is that a citation can be wrong and still look right. A model asked to
+     cite its sources will cite <em>something</em>, whether or not that something supports
+     the claim. Prompt-level citation degrades silently: no exception, no log line, just a
+     plausible reference to a document that says something else.</p>
+
+  <p>ATLAS Counsel answers procurement-policy and contract questions. It grounds every
+     claim in a retrievable source span, refuses when the corpus does not cover the
+     question, and pauses for a human when it is not sure. It runs as a bounded subsystem
+     with its own stack — a LangGraph <code>StateGraph</code> over a hybrid retriever
+     (OpenSearch Serverless in production, Qdrant for local dev) with an optional FalkorDB
+     graph channel for relationships plain similarity cannot see — and is exposed to the
+     rest of the platform as MCP tools. The orchestrator calls it like any other tool;
+     neither system knows the other's internals.</p>
+
+  <figure class="bt-figure bt-figure-wide"><img src="../assets/diagrams/atlas-counsel-architecture.jpg" alt="ATLAS Counsel architecture overview: two ingest sources feeding one chunk-and-embed pipeline, an online query pipeline through hybrid retrieval and reranking into a LangGraph agent, an eval harness observing it, and a provider abstraction row." width="1300" height="861" loading="lazy" decoding="async"/>
+<figcaption class="bt-figcaption">The full architecture. Two ingest paths share one pipeline; the span id minted at chunk time is what every later citation check resolves against.</figcaption></figure>
+
+  <h2>Grounding as a type contract, not a prompt</h2>
+
+  <p>Every span in the corpus carries a stable, human-readable id. <code>POL-001#S1</code>
+     is, and always will be, the $50,000 single-source-purchase threshold clause. That id
+     survives chunking, survives embedding, and appears in every retrieval result, so a
+     chunk is always traceable back to a specific sentence in a specific document.</p>
+
+  <figure class="bt-figure">
+    <svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 680 470" role="img" aria-labelledby="grd-title grd-desc" font-family="'Sora', system-ui, sans-serif">
+      <title id="grd-title">Three checkpoints enforce citation grounding</title>
+      <desc id="grd-desc">A stable span id assigned at corpus generation flows through a required Pydantic field on every claim, and is independently re-checked by a verify node against what was actually retrieved. Any claim that fails any checkpoint is retried or escalated, never shipped.</desc>
+      <style>
+        .grd-card { fill: #F8FAFC; stroke: #E2E8F0; stroke-width: 1; }
+        .grd-num  { font: 500 12px 'DM Mono', ui-monospace, monospace; letter-spacing: .04em; }
+        .grd-name { font: 500 16px 'Sora', sans-serif; }
+        .grd-src  { font: 400 13px 'DM Mono', ui-monospace, monospace; }
+        .grd-flow { font: 400 12px 'DM Mono', ui-monospace, monospace; fill: #64748B; }
+        .grd-edge { stroke: #94A3B8; stroke-width: 1.5; fill: none; }
+        .bar-teal { fill: #0D9488; } .acc-teal { fill: #0D9488; }
+        .bar-blue { fill: #2563EB; } .acc-blue { fill: #2563EB; }
+        .bar-amber { fill: #B45309; } .acc-amber { fill: #B45309; }
+        .t-name { fill: #0F172A; }
+        .t-src  { fill: #475569; }
+        @media (prefers-color-scheme: dark) {
+          .grd-card { fill: #111B2E; stroke: #1E293B; }
+          .grd-flow { fill: #94A3B8; }
+          .grd-edge { stroke: #475569; }
+          .t-name { fill: #F1F5F9; }
+          .t-src  { fill: #94A3B8; }
+          .bar-teal { fill: #2DD4BF; } .acc-teal { fill: #2DD4BF; }
+          .bar-blue { fill: #60A5FA; } .acc-blue { fill: #60A5FA; }
+          .bar-amber { fill: #FBBF24; } .acc-amber { fill: #FBBF24; }
+        }
+      </style>
+      <defs>
+        <marker id="grd-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <text class="grd-flow" x="60" y="32">Corpus generation</text>
+      <line class="grd-edge" x1="60" y1="42" x2="60" y2="72" marker-end="url(#grd-arrow)"/>
+      <rect class="grd-card" x="40" y="72" width="600" height="92" rx="12"/>
+      <rect class="bar-teal" x="40" y="72" width="5" height="92" rx="2.5"/>
+      <text class="grd-num acc-teal" x="64" y="98">CHECKPOINT 1</text>
+      <text class="grd-name t-name" x="64" y="120">Corpus — stable span_id per citable sentence</text>
+      <text class="grd-src t-src" x="64" y="142">24 spans across 8 documents, e.g. POL-001#S1</text>
+      <text class="grd-src t-src" x="64" y="158">Chunk carries its span_id through embed + index</text>
+      <line class="grd-edge" x1="340" y1="164" x2="340" y2="190" marker-end="url(#grd-arrow)"/>
+      <rect class="grd-card" x="40" y="190" width="600" height="92" rx="12"/>
+      <rect class="bar-blue" x="40" y="190" width="5" height="92" rx="2.5"/>
+      <text class="grd-num acc-blue" x="64" y="216">CHECKPOINT 2</text>
+      <text class="grd-name t-name" x="64" y="238">Synthesize — span_id is a required Claim field</text>
+      <text class="grd-src t-src" x="64" y="260">DraftAnswer.claims: list[Claim], Claim.span_id: str</text>
+      <text class="grd-src t-src" x="64" y="276">No citation is not a style gap — it's a validation error</text>
+      <line class="grd-edge" x1="340" y1="282" x2="340" y2="308" marker-end="url(#grd-arrow)"/>
+      <rect class="grd-card" x="40" y="308" width="600" height="92" rx="12"/>
+      <rect class="bar-amber" x="40" y="308" width="5" height="92" rx="2.5"/>
+      <text class="grd-num acc-amber" x="64" y="334">CHECKPOINT 3</text>
+      <text class="grd-name t-name" x="64" y="356">Verify — independently re-checks against retrieval</text>
+      <text class="grd-src t-src" x="64" y="378">Rejects a claim citing a span not actually retrieved</text>
+      <text class="grd-src t-src" x="64" y="394">or whose text drifted from the source — bounded retry</text>
+      <text class="grd-flow" x="340" y="432" text-anchor="middle">A claim that fails any checkpoint is retried or escalated — never shipped</text>
+    </svg>
+    <figcaption class="bt-figcaption">Citation grounding enforced at three independent points: stable identity at generation, a required field at synthesis, and an independent re-check at verification.</figcaption>
+  </figure>
+
+  <p>Citation is then a required field rather than a prompt request. A claim without a
+     <code>span_id</code> fails model validation and never becomes an answer. A separate
+     verification step independently re-checks each claim's span against the spans
+     actually retrieved for that question — so a claim citing an untouched span fails even
+     if synthesis asserted it was faithful.</p>
+
+  <p>The checkpoint was tested with a deliberately hallucinating stub model that always
+     cites a span it never retrieved. The graph catches it every time, retries up to the
+     cap, and escalates to the human gate rather than shipping a fabricated citation.
+     Reliability here is not a matter of prompt wording; it is the type system plus a
+     control-flow guarantee that holds whether or not the model behaves.</p>
+
+  <h2>Why a retrieval score cannot drive refusal</h2>
+
+  <p>The obvious refusal heuristic — decline when the top retrieval score is low — scored a
+     flat 0.0 on refusal accuracy the moment the eval harness ran.</p>
+
+  <p>The reason is worth keeping. Reciprocal Rank Fusion scores are rank-based, not
+     absolute: the top hit scores roughly 1/(k+1) whether it is a perfect match or merely
+     the least-bad candidate in the set. On a planted unanswerable question, retrieval
+     scored 0.0325 against 0.0328 for questions with a clear answer. No threshold on a
+     fused score can separate those.</p>
+
+  <p>Refusal was rebuilt around lexical grounding overlap — does the question's distinctive
+     content actually appear in the retrieved spans — and refusal accuracy went to 1.0.
+     The lesson generalises past this system: before thresholding a score, check whether
+     the score means anything in absolute terms.</p>
+
+  <h2>Bounded room to try harder</h2>
+
+  <p>Counsel's control flow is cyclic by necessity. The agent re-checks its draft against
+     the evidence and retries when a claim is unsupported; when the first retrieval pass
+     comes up short it tries a second, narrower one before giving up. A chain models that
+     awkwardly at best, which is why the graph is a first-class object rather than a
+     sequence of calls.</p>
+
+  <figure class="bt-figure bt-figure-wide"><img src="../assets/diagrams/atlas-counsel-langgraph.jpg" alt="The compiled LangGraph state graph: plan, retrieve, validate, gap analysis with a bounded re-retrieve loop, synthesize, verify with a bounded retry, a human gate, and finalize — alongside the MCP surface that exposes the whole graph to Buyer Team as one tool." width="1300" height="979" loading="lazy" decoding="async"/>
+<figcaption class="bt-figcaption">The compiled state graph. Two bounded loops give the agent room to try harder before it gives up; exhausting a cap escalates rather than spins.</figcaption></figure>
+
+  <p>Two properties carry the reliability story. Gap-aware retrieval does not escalate on
+     the first miss: when validation finds the retrieved spans insufficient, the agent asks
+     which of the question's content tokens are still uncovered, issues those as follow-up
+     queries, and merges the results into — rather than replacing — the existing set, so
+     coverage accumulates across iterations. And every loop is capped. Once the caps are
+     exhausted the graph falls through to the human gate rather than spinning. An
+     unbounded verify-and-retry loop is a production incident with a UUID.</p>
+
+  <p>A genuinely unanswerable question still escalates — just after exhausting cheap
+     self-help first, which is the difference between a system that tries and one that
+     guesses.</p>
+
+  <h2>A pause that survives a stateless protocol</h2>
+
+  <p>Escalating to a human is easy to draw on a whiteboard. It is a real integration
+     problem when the agent is called over HTTP and MCP — both strictly request/response —
+     and the human might not respond for hours. A pause cannot hold a socket open while a
+     procurement director is at lunch, and it should not have to: the run might resume from
+     a different process entirely.</p>
+
+  <p>So the pause is a normal result rather than a special case the caller has to detect.
+     A run that hits the gate returns <code>needs_input</code> plus a thread id that acts
+     as an opaque resume token. A later, entirely independent resume call carries the
+     human's decision, and the checkpointer reconstitutes the run state and continues where
+     it stopped. Both transports are thin wrappers over one shared service object, with a
+     test asserting they return identical results for identical inputs — which is what
+     makes the MCP tool behave exactly like the HTTP endpoint without a compatibility
+     matrix to maintain.</p>
+
+  <p>The gate surfaced a bug worth recounting. When a human steered an initially-ungrounded
+     question toward a specific document, the final step still refused: the original
+     automated <code>grounded=False</code> verdict was stale and silently outranked the
+     human's override. The fix was not a patch but a precedence rule — a human steer always
+     wins over the automated grounding decision. Human-in-the-loop is easy to diagram; the
+     precedence semantics between what the model decided and what the human just said are
+     where it gets real.</p>
+
+  <h2>Identity is derived, never asserted</h2>
+
+  <p>One rule is load-bearing and has survived every revision: tools never take a
+     <code>tenant_id</code> argument. Identity is derived from a verified credential, so a
+     caller cannot simply assert a different tenant the way it could with a plain request
+     parameter. Request models forbid extra fields, so a client that sends one gets a 422
+     naming the field rather than being served as whatever its credential maps to.</p>
+
+  <figure class="bt-figure bt-figure-wide"><img src="../assets/diagrams/atlas-counsel-mcp-oauth.jpg" alt="The MCP surface and OAuth 2.1 posture: the RFC 9728 discovery sequence for obtaining a credential, the middleware order and single tenant resolver, the JWKS cache and client-to-tenant mapping, and the session and rate-limiting hardening." width="1100" height="1033" loading="lazy" decoding="async"/>
+<figcaption class="bt-figcaption">Three accepted credentials, one function that resolves them. Identity is derived from what the caller proved, never from what it asserted.</figcaption></figure>
+
+  <p>Version 2 moved the rest of the security posture from configuration into structure.
+     The service cannot boot without a credential — the flag that could relax it was
+     deleted rather than defaulted. Every authenticated surface resolves tenancy through
+     one function, so a new endpoint cannot grow a weaker rule of its own. Rate limits key
+     on the authenticated tenant rather than the client address, so customers sharing an
+     egress IP cannot exhaust each other's budget. Each tenant is answered only from the
+     corpus it ingested.</p>
+
+  <p>The distinction that matters: a security property holding because an environment
+     variable is set correctly is a security property with a failure mode. Each of these is
+     now enforced by a construct with no way to express the unsafe case — which is the
+     difference between running a pilot and opening the door.</p>
+
+  <p>None of that posture is hand-rolled here any more. Counsel's MCP server runs on
+     <a href="scalable-mcp.html"><code>scalable_mcp</code></a> — the auth resolution, the
+     per-tenant rate limiting, the session lifecycle and the sealed pause/resume
+     convention all come from the base package. That base was extracted from this server
+     in the first place, and then folded back rather than forked, so there is one
+     implementation of these rules and Counsel is its first consumer. Adopting it also
+     brought protocol currency for free: the same endpoint serves clients on both sides of
+     the 2026-07-28 transport change, so nothing in the field had to move.</p>
+
+  <h2>What it runs on</h2>
+
+  <p>An ECS Fargate service behind an HTTP API Gateway, with Postgres holding
+     schema-per-tenant checkpoints and Valkey holding the shared rate-limit counters.
+     Everything stateful that can be managed is managed and sits outside the VPC, reached
+     over TLS rather than through private endpoints — which keeps the network simple
+     enough to reason about and takes NAT off the bill.</p>
+
+  <figure class="bt-figure bt-figure-wide"><img src="../assets/diagrams/atlas-counsel-infra.jpg" alt="Infrastructure: pluggable backends behind one protocol each, the Terraform-provisioned AWS deployment across VPC and managed services, the CI/CD pipeline, and the Docker Compose local development stack." width="1300" height="1008" loading="lazy" decoding="async"/>
+<figcaption class="bt-figcaption">Onboarding a customer is one Cognito app client and one row — no redeploy, and nothing per-tenant in the Terraform.</figcaption></figure>
+
+  <p>The property worth calling out is the onboarding cost. Adding a customer is one
+     Cognito app client and one DynamoDB row; nothing per-tenant lives in the Terraform,
+     so there is no redeploy and no plan to review. A row can also be written live,
+     off-plan, which is what makes onboarding an API call rather than an engineering
+     task.</p>
+
+  <h2>What it is not</h2>
+
+  <p>The corpus is deliberately small and fully synthetic: eight documents, twenty-four
+     citable spans, eight golden question/answer items, and four planted hard cases
+     designed to break a naive implementation — a cross-document contradiction, a
+     near-duplicate threshold that tests reranker precision, an unanswerable question with
+     no supporting span, and a purchase split into smaller pieces to test policy reasoning
+     rather than lookup.</p>
+
+  <p>That is a limitation and also the point. The corpus is template-driven with no model
+     calls and no network, so it produces byte-identical output for the same inputs. That
+     determinism is what makes the evaluation numbers comparable run over run, and what
+     keeps the repository safe to publish. Numbers from a corpus that changes underneath
+     you are not measurements.</p>
+
+  <h2>Further reading</h2>
+  <ul>
+    <li><a href="../blog/eng/atlas-counsel.html">Building ATLAS Counsel: grounding, escalation, and safety in a citation-first RAG agent</a> — the full write-up</li>
+    <li><a href="../blog/eng/atlas-counsel-mcp-v2-oauth.html">ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure</a></li>
+    <li><a href="../blog/eng/oauth-resource-server-pattern.html">No users table: the OAuth 2.0 resource server pattern, adapted</a></li>
+    <li><a href="scalable-mcp.html">scalable-mcp</a> — the server base extracted from this work</li>
+  </ul>
+
+</article>
+
+</body>
+</html>

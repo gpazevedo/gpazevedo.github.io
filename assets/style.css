@@ -61,7 +61,7 @@ section{position:relative;z-index:1}
 
 #about{padding-top:4rem}
 #about .si{padding-top:9rem}
-#blog{background:var(--navy-m);border-top:.5px solid var(--border)}
+#work{background:var(--navy-m);border-top:.5px solid var(--border)}
 #contact{border-top:.5px solid var(--border)}
 
 /* ARCHITECT CARD */
@@ -95,6 +95,54 @@ section{position:relative;z-index:1}
 .blog-post-meta{font-size:.72rem;color:var(--muted)}
 .blog-empty{border:.5px dashed var(--border);border-radius:6px;padding:1.5rem 1.25rem;
   font-size:.85rem;color:var(--muted);text-align:center}
+
+/* ============================================================
+   WORK TABS — Blog / AI Projects / Demos
+   ============================================================ */
+
+/* Off-screen anchor targets so deep links (#blog, #ai-projects, #demos)
+   land below the fixed nav instead of under it. */
+.anchor-alias{display:block;position:absolute;visibility:hidden;scroll-margin-top:90px}
+
+.wt{margin-top:3rem}
+
+.wt-tabs{display:flex;gap:.35rem;flex-wrap:wrap;
+  border-bottom:.5px solid var(--border);padding-bottom:0;margin-bottom:2.5rem}
+.wt-tab{appearance:none;background:none;border:none;border-bottom:2px solid transparent;
+  font-family:var(--ff-b);font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--slate);cursor:pointer;padding:.7rem 1.1rem;margin-bottom:-1px;
+  display:inline-flex;align-items:center;gap:.5rem;
+  transition:color .2s,border-color .2s,background .2s;border-radius:4px 4px 0 0}
+.wt-tab:hover{color:var(--white);background:rgba(8,145,178,.06)}
+.wt-tab[aria-selected="true"]{color:var(--teal);border-bottom-color:var(--teal)}
+.wt-tab:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.wt-tab-count{font-family:var(--ff-m);font-size:.62rem;letter-spacing:.04em;
+  color:var(--muted);background:rgba(148,163,184,.1);
+  border-radius:999px;padding:.1em .5em;line-height:1.5}
+.wt-tab[aria-selected="true"] .wt-tab-count{color:var(--teal);background:rgba(8,145,178,.12)}
+
+.wt-panel[hidden]{display:none}
+.wt-panel:focus{outline:none}
+
+.blog-col-icon-proj{background:rgba(20,184,166,.12);color:var(--mint)}
+.blog-col-icon-demo{background:rgba(212,160,23,.12);color:var(--gold)}
+
+/* PROJECT + DEMO CARDS — extend .blog-post rather than restyle it */
+.card-head{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.card-status{font-family:var(--ff-m);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);border:.5px solid var(--border);border-radius:999px;padding:.12em .6em;white-space:nowrap}
+.card-status-todo{color:var(--gold);border-color:rgba(212,160,23,.35)}
+.card-stack{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.6rem}
+.card-chip{font-family:var(--ff-m);font-size:.62rem;letter-spacing:.04em;color:var(--slate);
+  background:rgba(148,163,184,.08);border-radius:3px;padding:.15em .5em}
+.card-links{display:flex;flex-wrap:wrap;gap:1rem;margin-top:.75rem}
+.card-link{font-size:.72rem;color:var(--teal);text-decoration:none;letter-spacing:.04em}
+.card-link:hover{text-decoration:underline}
+
+@media(max-width:768px){
+  .wt-tabs{gap:0;margin-bottom:1.75rem}
+  .wt-tab{padding:.6rem .7rem;font-size:.7rem;letter-spacing:.08em;flex:1 1 auto;justify-content:center}
+}
 
 /* FOOTER */
 footer{position:relative;z-index:1;border-top:.5px solid var(--border);padding:2rem 2.5rem;

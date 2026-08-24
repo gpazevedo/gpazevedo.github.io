@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="index, follow"/>
+<meta name="author" content="Gustavo Peixoto de Azevedo"/>
+<title>Buyer Team — AWS architecture, animated by negotiation strategy</title>
+<meta name="description" content="Step through a Buyer Team negotiation across the AWS architecture: Kraljic strategy, model tier, guardrails, approval gate, and the off-critical-path evaluation."/>
+<link rel="canonical" href="https://gpazevedo.github.io/demos/aws-architecture.html"/>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/demos/aws-architecture.html"/>
+<meta property="og:title" content="Buyer Team — AWS architecture, animated by negotiation strategy"/>
+<meta property="og:description" content="Step through a Buyer Team negotiation across the AWS architecture: Kraljic strategy, model tier, guardrails, approval gate, and the off-critical-path evaluation."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Buyer Team — AWS architecture, animated by negotiation strategy"/>
+<meta name="twitter:description" content="Step through a Buyer Team negotiation across the AWS architecture: Kraljic strategy, model tier, guardrails, approval gate, and the off-critical-path evaluation."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../blog/buyer-team-blog.css">
+<link rel="stylesheet" href="../blog/site-blog.css">
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="../index.html#demos">Demos</a></li>
+    <li><a href="../index.html#blog">Blog</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">&#9776;</span><span class="hb-close">&#10005;</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+<div class="breadcrumb"><a href="../index.html#demos">Demos</a> <span class="sep">&rsaquo;</span> <span class="current">AWS architecture by strategy</span></div>
+<div class="eyebrow"><span class="tag">Demo</span> <span class="dot">&middot;</span> <span>Buyer Team</span> <span class="dot">&middot;</span> <time datetime="2026-08-24">August 2026</time> <span class="dot">&middot;</span> <span>Interactive</span></div>
+<h1>The same architecture,<br>four <em>negotiation strategies</em></h1>
+
+<p class="deck">Step through a Buyer Team negotiation across the AWS architecture: Kraljic strategy, model tier, guardrails, approval gate, and the off-critical-path evaluation. Pick a strategy and a requisition value, then step or play
+through the run. The path is the same every time; what changes is which agents wake
+up, which model tier they call, and where the orchestrator checkpoints.</p>
+<hr>
+
+<!-- Buyer Team — animated AWS architecture player.
+     Paste into a post body. Inherits the site palette (--teal, --ink, --rule, …)
+     and falls back to its own values when a variable is not defined.
+     Requires the Sora + DM Mono families already loaded by the blog template. -->
+<figure class="bt-figure">
+<div class="ap" id="ap">
+
+  <div class="ap-bar">
+    <div class="ap-row">
+      <span class="ap-lab">Strategy</span>
+      <button class="ap-btn ap-strat" data-s="NON_CRITICAL" aria-pressed="false">NON_CRITICAL</button>
+      <button class="ap-btn ap-strat" data-s="LEVERAGE" aria-pressed="false">LEVERAGE</button>
+      <button class="ap-btn ap-strat" data-s="BOTTLENECK" aria-pressed="false">BOTTLENECK</button>
+      <button class="ap-btn ap-strat" data-s="STRATEGIC" aria-pressed="true">STRATEGIC</button>
+      <span class="ap-spacer"></span>
+      <span class="ap-lab">Value</span>
+      <span class="ap-seg">
+        <button class="ap-btn ap-val" data-v="low" aria-pressed="false">&le;$5k</button>
+        <button class="ap-btn ap-val" data-v="high" aria-pressed="true">&gt;$5k</button>
+      </span>
+    </div>
+    <div class="ap-row">
+      <button class="ap-btn ap-play" id="ap-play">&#9654;&nbsp; Play</button>
+      <button class="ap-btn" id="ap-step">Step &rsaquo;</button>
+      <button class="ap-btn" id="ap-back">&lsaquo; Back</button>
+      <button class="ap-btn" id="ap-reset">Reset</button>
+      <span class="ap-lab">Speed</span>
+      <span class="ap-seg">
+        <button class="ap-btn ap-spd" data-k="0.6" aria-pressed="false">0.6&times;</button>
+        <button class="ap-btn ap-spd" data-k="1" aria-pressed="true">1&times;</button>
+        <button class="ap-btn ap-spd" data-k="1.8" aria-pressed="false">1.8&times;</button>
+      </span>
+      <label class="ap-chk"><input type="checkbox" id="ap-cycle" checked> include cycle-back</label>
+      <span class="ap-spacer"></span>
+      <span class="ap-meter">agent LLM <b id="ap-cost">$0.0000</b></span>
+      <span class="ap-meter">judge <b id="ap-judge">$0.0000</b></span>
+      <span class="ap-meter">step <b id="ap-count">0/0</b></span>
+    </div>
+  </div>
+
+  <div class="ap-stage">
+    <svg id="ap-svg" role="img" aria-labelledby="ap-title ap-desc">
+      <title id="ap-title">Buyer Team AWS architecture, animated by negotiation strategy</title>
+      <desc id="ap-desc">A purchase requisition travels from Cognito authentication through the AgentCore
+      gateways, the Step Functions workflow, a Kraljic-selected negotiation agent on Amazon Bedrock,
+      the human approval gate, supplier delivery over SES, and the off-critical-path evaluation loop.</desc>
+    </svg>
+  </div>
+
+  <div class="ap-status" id="ap-statusbox">
+    <h4 id="ap-h">Ready &mdash; STR</h4>
+    <p id="ap-p">Press Play, or step through one stage at a time.</p>
+    <div class="ap-note" id="ap-note"></div>
+  </div>
+
+</div>
+<figcaption>
+  Cost figures are per-negotiation averages measured across a 23-negotiation end-to-end run
+  (<code>agent LLM</code> = the negotiation agents; <code>judge</code> = the cross-family
+  <code>EvalLLM</code> scoring pass, which runs off the critical path). Every spot and auction
+  negotiation in that sample was under $5k and therefore took the deterministic path, which is
+  why those quadrants measure $0.0000 of agent spend.
+</figcaption>
+</figure>
+
+<style>
+.ap{
+  --ap-sans: var(--sans, "Sora", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+  --ap-mono: var(--mono, "DM Mono", ui-monospace, SFMono-Regular, Menlo, monospace);
+  --ap-bg: var(--bg, #FBFAF8);
+  --ap-surface: var(--surface, #FFFFFF);
+  --ap-rule: var(--rule, #E4E0D8);
+  --ap-ink: var(--ink, #1D2A32);
+  --ap-ink-muted: var(--ink-muted, #5C6B75);
+  --ap-ink-faint: var(--ink-faint, #8C99A2);
+  --ap-teal: var(--teal, #0E8074);
+  --ap-teal-light: var(--teal-light, #E2F1EE);
+  --ap-amber: var(--amber, #C8881A);
+  --ap-amber-light: var(--amber-light, #FBF0DC);
+  --ap-coral: var(--coral, #B03A2E);
+  --ap-coral-light: var(--coral-light, #FBE9E6);
+  --ap-blue: var(--blue, #2A6FB0);
+  --ap-blue-light: var(--blue-light, #E6EFF7);
+}
+.bt-figure{max-width:1120px;margin:0 auto;}
+
+/* ── PLAYER SHELL ── */
+.ap{border:1px solid var(--ap-rule);border-radius:12px;overflow:hidden;background:var(--ap-surface);}
+
+/* ── CONTROL BAR ── */
+.ap-bar{background:#16273F;padding:12px 16px;display:flex;flex-direction:column;gap:10px;}
+.ap-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.ap-lab{font-family:var(--ap-mono);font-size:10px;font-weight:500;letter-spacing:.12em;
+  text-transform:uppercase;color:#8FA3BC;margin-right:2px;}
+.ap-spacer{flex:1 1 auto;}
+.ap-btn{font-family:var(--ap-sans);font-size:12.5px;font-weight:500;color:#DCE6F2;
+  background:transparent;border:1px solid #33465F;border-radius:999px;padding:6px 14px;
+  cursor:pointer;transition:background .15s,border-color .15s,color .15s;}
+.ap-btn:hover:not(:disabled){background:#22364F;}
+.ap-btn:disabled{opacity:.38;cursor:default;}
+.ap-btn[aria-pressed="true"]{background:#22364F;border-color:#4C6280;}
+.ap-strat[aria-pressed="true"]{color:#fff;border-color:transparent;}
+.ap-strat[data-s="NON_CRITICAL"][aria-pressed="true"]{background:#0E8074;}
+.ap-strat[data-s="LEVERAGE"][aria-pressed="true"]{background:#2A6FB0;}
+.ap-strat[data-s="BOTTLENECK"][aria-pressed="true"]{background:#B0791A;}
+.ap-strat[data-s="STRATEGIC"][aria-pressed="true"]{background:#9E2A32;}
+.ap-play{background:var(--ap-teal);border-color:var(--ap-teal);color:#fff;font-weight:600;}
+.ap-play:hover:not(:disabled){background:#0B6C62;}
+.ap-seg{display:inline-flex;border:1px solid #33465F;border-radius:8px;overflow:hidden;}
+.ap-seg .ap-btn{border:0;border-radius:0;padding:6px 12px;}
+.ap-seg .ap-btn+.ap-btn{border-left:1px solid #33465F;}
+.ap-chk{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#DCE6F2;cursor:pointer;}
+.ap-meter{font-family:var(--ap-mono);font-size:11.5px;color:#8FA3BC;white-space:nowrap;}
+.ap-meter b{color:#F0F5FA;font-weight:500;}
+
+/* ── STAGE ── */
+.ap-stage{padding:14px 12px 4px;background:var(--ap-surface);}
+.ap-stage svg{display:block;width:100%;height:auto;}
+
+/* ── SVG ── */
+.ap-node rect{fill:var(--ap-surface);stroke:var(--ap-rule);stroke-width:1.4;transition:fill .25s,stroke .25s;}
+.ap-node text{font-family:var(--ap-sans);fill:var(--ap-ink-muted);transition:fill .25s;}
+.ap-node .n-t{font-size:11px;font-weight:600;}
+.ap-node .n-s{font-size:9.2px;font-weight:400;fill:var(--ap-ink-faint);}
+.ap-node.dim{opacity:.42;}
+.ap-node.on rect{stroke-width:2.2;}
+.ap-node.on .n-t,.ap-node.on .n-s{fill:var(--ap-ink);}
+.ap-node.on .n-s{fill:var(--ap-ink-muted);}
+.ap-node.done rect{stroke-width:1.6;}
+.ap-node.skip rect{stroke-dasharray:3 3;}
+.ap-node.skip .n-t{text-decoration:line-through;}
+.ap-edge{fill:none;stroke:var(--ap-rule);stroke-width:1.4;transition:stroke .25s,stroke-width .25s;}
+.ap-edge.dash{stroke-dasharray:3 4;}
+.ap-edge.hot{stroke-width:2.6;stroke-dasharray:7 5;animation:apflow .9s linear infinite;}
+@keyframes apflow{to{stroke-dashoffset:-24;}}
+@media (prefers-reduced-motion: reduce){
+  .ap-edge.hot{animation:none;stroke-dasharray:none;}
+}
+.ap-band{fill:none;stroke:var(--ap-rule);stroke-width:1;stroke-dasharray:4 4;}
+.ap-band-t{font-family:var(--ap-mono);font-size:8.6px;letter-spacing:.1em;
+  text-transform:uppercase;fill:var(--ap-ink-faint);}
+
+/* ── STATUS ── */
+.ap-status{border-top:1px solid var(--ap-rule);padding:14px 18px 16px;
+  border-left:4px solid var(--ap-teal);background:var(--ap-surface);}
+.ap-status h4{margin:0 0 4px;font-size:14.5px;font-weight:600;color:var(--ap-ink);}
+.ap-status p{margin:0;font-size:13px;line-height:1.55;color:var(--ap-ink-muted);}
+.ap-status .ap-note{margin-top:7px;font-family:var(--ap-mono);font-size:10.5px;color:var(--ap-ink-faint);}
+figcaption{margin-top:.85rem;font-size:12px;line-height:1.6;color:var(--ap-ink-faint);}
+figcaption code{font-family:var(--ap-mono);font-size:11px;}
+@media (max-width:640px){
+  .ap-bar{padding:10px;}
+  .ap-lab{display:none;}
+  .ap-btn{padding:5px 10px;font-size:11.5px;}
+}
+</style>
+
+<script>
+(function () {
+  "use strict";
+
+  // ─────────────────────────────────────────── layout constants
+  var CW = 150, CH = 60, COLP = 176, ROWP = 130, X0 = 26, Y0 = 44, COLS = 6, ROWS = 4;
+  var W = X0 * 2 + (COLS - 1) * COLP + CW;
+  var H = Y0 + (ROWS - 1) * ROWP + CH + 26;
+
+  // ─────────────────────────────────────────── nodes (col, row)
+  var NODES = [
+    { id: "buyer",       c: 0, r: 0, t: "Buyer / Approver",  s: "requisitions & approvals", k: "actor" },
+    { id: "cognito",     c: 1, r: 0, t: "Amazon Cognito",    s: "JWT · M2M clients",        k: "sec" },
+    { id: "prrouter",    c: 2, r: 0, t: "PR Event Router",   s: "Lambda on DDB Streams",    k: "cmp" },
+    { id: "ingestgw",    c: 3, r: 0, t: "Ingest Gateway",    s: "AgentCore · Cedar",        k: "agc" },
+    { id: "interceptor", c: 4, r: 0, t: "Gateway Interceptor", s: "tenant_id injection",    k: "cmp" },
+    { id: "skillrt",     c: 5, r: 0, t: "Skill Runtime",     s: "tenant integration",       k: "agc" },
+
+    { id: "bideval",     c: 0, r: 1, t: "Node 5 — Bid Eval", s: "inline Python · no LLM",   k: "cmp" },
+    { id: "strategy",    c: 1, r: 1, t: "Strategy Agent",    s: "—",                        k: "agc" },
+    { id: "mcpservers",  c: 2, r: 1, t: "MCP Servers",       s: "x3 tool servers",          k: "agc" },
+    { id: "kraljic",     c: 3, r: 1, t: "Kraljic Classifier", s: "DefaultLLM · Nova Lite",  k: "agc" },
+    { id: "nodelambdas", c: 4, r: 1, t: "Node Lambdas",      s: "x7 step-invokers",         k: "cmp" },
+    { id: "sfn",         c: 5, r: 1, t: "Step Functions",    s: "procurement workflow",     k: "orc" },
+
+    { id: "approvalapi", c: 0, r: 2, t: "Approval API",      s: "API GW · Cognito auth",    k: "net" },
+    { id: "mcpgw",       c: 1, r: 2, t: "MCP Gateways",      s: "x3 · Cedar",               k: "agc" },
+    { id: "bedrock",     c: 2, r: 2, t: "Amazon Bedrock",    s: "—",                        k: "ml" },
+    { id: "guardrails",  c: 3, r: 2, t: "Bedrock Guardrails", s: "content + topic filters", k: "ml" },
+    { id: "dynamodb",    c: 4, r: 2, t: "Amazon DynamoDB",   s: "30 tables · checkpoints",  k: "db" },
+    { id: "sqs",         c: 5, r: 2, t: "Amazon SQS",        s: "7 queues + DLQs",          k: "msg" },
+
+    { id: "awardcomms",  c: 0, r: 3, t: "Award & Comms",     s: "Node 7 agent",             k: "agc" },
+    { id: "ses",         c: 1, r: 3, t: "Amazon SES",        s: "supplier email",           k: "msg" },
+    { id: "supplier",    c: 2, r: 3, t: "Supplier",          s: "quotes & confirmation",    k: "actor" },
+    { id: "evals",       c: 3, r: 3, t: "AgentCore Evals",   s: "EvalLLM · cross-family",   k: "ml" },
+    { id: "sagemaker",   c: 4, r: 3, t: "Ground Truth",       s: "SageMaker · labeling",   k: "ml" },
+    { id: "costexp",     c: 5, r: 3, t: "AWS Cost Explorer", s: "billed reconciliation",    k: "mgmt" }
+  ];
+
+  var TINT = {
+    actor: "#78909C", sec: "#DD344C", cmp: "#ED7100", agc: "#01A88D",
+    orc: "#E7157B", ml: "#01A88D", db: "#C925D1", msg: "#E7157B",
+    net: "#8C4FFF", mgmt: "#E7157B"
+  };
+
+  var EDGES = [
+    ["buyer", "cognito", 1], ["cognito", "prrouter", 1], ["prrouter", "ingestgw", 0],
+    ["ingestgw", "interceptor", 0], ["interceptor", "skillrt", 0], ["skillrt", "sfn", 0],
+    ["sfn", "nodelambdas", 0], ["sfn", "sqs", 1], ["nodelambdas", "kraljic", 0],
+    ["nodelambdas", "dynamodb", 1], ["kraljic", "guardrails", 0], ["guardrails", "bedrock", 0],
+    ["nodelambdas", "mcpservers", 0], ["mcpservers", "mcpgw", 1], ["mcpservers", "strategy", 0],
+    ["strategy", "bedrock", 0], ["strategy", "bideval", 0], ["bideval", "approvalapi", 0],
+    ["approvalapi", "strategy", 1], ["approvalapi", "awardcomms", 0], ["awardcomms", "ses", 0],
+    ["ses", "supplier", 0], ["supplier", "evals", 1], ["evals", "sagemaker", 1],
+    ["sagemaker", "costexp", 1]
+  ];
+
+  // ─────────────────────────────────────────── strategy table
+  // agent / judge = per-negotiation averages from the 23-negotiation e2e run.
+  var STRATS = {
+    NON_CRITICAL: { abbr: "NC",  play: "SPOT_BID",            agentName: "spot-bid",
+                    tier: "DefaultLLM",  model: "Nova Lite", agent: 0.0000, judge: 0.0025,
+                    fastPath: true,  sampled: true },
+    LEVERAGE:     { abbr: "LEV", play: "COMPETITIVE_AUCTION", agentName: "leverage",
+                    tier: "StrategyLLM", model: "Nova Pro",  agent: 0.0000, judge: 0.0025,
+                    fastPath: true,  sampled: true },
+    BOTTLENECK:   { abbr: "BN",  play: "PARTNERSHIP_RISK",    agentName: "bottleneck",
+                    tier: "StrategyLLM", model: "Nova Pro",  agent: 0.0102, judge: 0.0041,
+                    fastPath: false, sampled: true },
+    STRATEGIC:    { abbr: "STR", play: "PARTNERSHIP_VALUE",   agentName: "strategic",
+                    tier: "StrategyLLM", model: "Nova Pro",  agent: 0.0079, judge: 0.0020,
+                    fastPath: false, sampled: true }
+  };
+
+  // ─────────────────────────────────────────── state
+  var state = { strategy: "STRATEGIC", value: "high", speed: 1, cycle: true, i: 0, timer: null };
+
+  // ─────────────────────────────────────────── geometry helpers
+  var byId = {};
+  NODES.forEach(function (n) {
+    if (byId[n.id]) { throw new Error("duplicate node id: " + n.id); }
+    n.x = X0 + n.c * COLP; n.y = Y0 + n.r * ROWP;
+    n.cx = n.x + CW / 2; n.cy = n.y + CH / 2; n.x2 = n.x + CW; n.y2 = n.y + CH;
+    byId[n.id] = n;
+  });
+  EDGES.forEach(function (e) {
+    if (!byId[e[0]] || !byId[e[1]]) { throw new Error("edge references unknown node: " + e); }
+  });
+
+  var LANE = (ROWP - CH) / 2;
+
+  function route(a, b) {
+    if (a.r === b.r) {
+      return a.c < b.c ? [[a.x2, a.cy], [b.x, b.cy]] : [[a.x, a.cy], [b.x2, b.cy]];
+    }
+    if (a.c === b.c) {
+      return a.r < b.r ? [[a.cx, a.y2], [b.cx, b.y]] : [[a.cx, a.y], [b.cx, b.y2]];
+    }
+    var down = a.r < b.r;
+    var ly = down ? a.y2 + LANE : a.y - LANE;
+    return [[a.cx, down ? a.y2 : a.y], [a.cx, ly], [b.cx, ly], [b.cx, down ? b.y : b.y2]];
+  }
+
+  function poly(pts) {
+    return pts.map(function (p) { return p[0].toFixed(1) + "," + p[1].toFixed(1); }).join(" ");
+  }
+
+  // ─────────────────────────────────────────── build the SVG
+  var NS = "http://www.w3.org/2000/svg";
+  var svg = document.getElementById("ap-svg");
+
+  function el(tag, attrs) {
+    var e = document.createElementNS(NS, tag);
+    Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    return e;
+  }
+
+  function build() {
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    var keep = ["title", "desc"];
+    Array.prototype.slice.call(svg.childNodes).forEach(function (c) {
+      if (!c.tagName || keep.indexOf(c.tagName.toLowerCase()) === -1) { svg.removeChild(c); }
+    });
+
+    var gBand = el("g", {}), gEdge = el("g", {}), gNode = el("g", {});
+    svg.appendChild(gBand); svg.appendChild(gEdge); svg.appendChild(gNode);
+
+    [["Edge, identity & ingest", 0], ["Orchestration & agents", 1],
+     ["Model, tools & state", 2], ["Delivery & evaluation", 3]].forEach(function (b) {
+      var y = Y0 + b[1] * ROWP;
+      gBand.appendChild(el("text", {
+        x: X0, y: y - 9, "class": "ap-band-t"
+      })).textContent = b[0];
+    });
+
+    EDGES.forEach(function (e) {
+      var p = el("polyline", {
+        points: poly(route(byId[e[0]], byId[e[1]])),
+        "class": "ap-edge" + (e[2] ? " dash" : ""),
+        "data-e": e[0] + ">" + e[1]
+      });
+      gEdge.appendChild(p);
+    });
+
+    NODES.forEach(function (n) {
+      var g = el("g", { "class": "ap-node", "data-n": n.id });
+      g.appendChild(el("rect", {
+        x: n.x, y: n.y, width: CW, height: CH, rx: 9,
+        style: "stroke:" + TINT[n.k]
+      }));
+      var t = el("text", { x: n.cx, y: n.y + 25, "class": "n-t", "text-anchor": "middle" });
+      t.textContent = n.t;
+      var s = el("text", { x: n.cx, y: n.y + 41, "class": "n-s", "text-anchor": "middle" });
+      s.textContent = n.s;
+      g.appendChild(t); g.appendChild(s);
+      gNode.appendChild(g);
+    });
+  }
+
+  // ─────────────────────────────────────────── step programme
+  function steps() {
+    var S = STRATS[state.strategy];
+    var low = state.value === "low";
+    var deterministic = S.fastPath && low;
+    var out = [];
+
+    function add(o) { out.push(o); }
+
+    add({ n: ["buyer", "cognito"], e: "buyer>cognito", h: "Authenticate",
+          p: "The buyer or tenant obtains a Cognito JWT — Hosted UI for people, M2M client credentials for systems." });
+    add({ n: ["prrouter"], e: "cognito>prrouter", h: "Ingest the requisition",
+          p: "A DynamoDB Streams event on the PR table triggers the PR Event Router, which calls the Ingest Gateway's canonical ingest tool." });
+    add({ n: ["ingestgw"], e: "prrouter>ingestgw", h: "Authorize at the gateway",
+          p: "The Ingest Gateway evaluates the call against its Cedar policy set. On this gateway Cedar runs in LOG_ONLY — it records the decision without blocking." });
+    add({ n: ["interceptor"], e: "ingestgw>interceptor", h: "Inject the tenant",
+          p: "The shared REQUEST interceptor rewrites tenant_id from the JWT-verified claim before Cedar evaluates, so a caller cannot assert someone else's tenant." });
+    add({ n: ["skillrt"], e: "interceptor>skillrt", h: "Invoke the Skill Runtime",
+          p: "The authorized call is forwarded over SigV4 to the Skill Runtime, an AgentCore Runtime hosting the tenant integration plugins." });
+    add({ n: ["sfn"], e: "skillrt>sfn", h: "Start the workflow",
+          p: "The Skill Runtime starts the Step Functions state machine. From here the DAG owns control flow — agents supply judgment at fixed nodes and never plan the graph." });
+    add({ n: ["nodelambdas", "kraljic", "guardrails", "bedrock"], e: "nodelambdas>kraljic",
+          h: "Node 1 — Classify",
+          p: "The Kraljic classifier resolves the DefaultLLM tier (Nova Lite) from system-config and calls Bedrock through Guardrails. It returns the quadrant: " + state.strategy + "." });
+    add({ n: ["mcpservers", "mcpgw"], e: "nodelambdas>mcpservers", h: "Node 2 — Source suppliers",
+          p: "The master-data MCP server returns the qualified supplier set. Tool access runs through the MCP Gateways, where Cedar is enforcing rather than logging." });
+    add({ n: ["nodelambdas", "strategy"], e: "mcpservers>strategy", h: "Node 3 — Strategy router",
+          p: "A four-way conditional branch on the Kraljic quadrant. Exactly one Node 4 variant executes per negotiation — here, " + S.play + "." });
+
+    if (deterministic) {
+      add({ n: ["strategy"], skip: ["bedrock"], e: "mcpservers>strategy",
+            h: "Node 4x — Deterministic path",
+            p: "Spot and auction items under $5k skip the LLM entirely and settle on rules alone: roughly 5 seconds instead of 45, and zero agent inference spend.",
+            note: "LLM SKIPPED · agent cost $0.0000" });
+    } else {
+      add({ n: ["strategy", "guardrails", "bedrock"], e: "strategy>bedrock",
+            h: "Node 4x — Negotiate",
+            p: "The " + S.agentName + " agent runs on the " + S.tier + " tier (" + S.model +
+               "). Every call passes through Guardrails, and the runtime enforces the steering hooks rather than trusting the prompt to honour them.",
+            cost: "agent" });
+    }
+
+    add({ n: ["bideval"], e: "strategy>bideval", h: "Node 5 — Bid evaluation",
+          p: "Scoring is inline Python, not an agent. This node was an LLM once; it was replaced with deterministic code because bid comparison needs to be reproducible and cheap, not clever." });
+    add({ n: ["approvalapi", "buyer"], e: "bideval>approvalapi", h: "Node 6 — Approval gate",
+          p: "A human decides. The approver hits the Cognito-authorized Approval API; nothing reaches a supplier until that decision is recorded." });
+
+    if (state.cycle && !deterministic) {
+      add({ n: ["strategy", "bedrock"], e: "approvalapi>strategy", h: "Governed cycle-back",
+            p: "A rejection may send the negotiation back to Node 4x exactly once. The limit is enforced in code, not requested in a prompt, so it cannot be argued away.",
+            cost: "cycle" });
+    }
+
+    add({ n: ["awardcomms"], e: "approvalapi>awardcomms", h: "Node 7 — Award & comms",
+          p: "The award agent drafts supplier communications and the purchase order for the winning bid." });
+    add({ n: ["ses", "supplier"], e: "awardcomms>ses", h: "Notify the supplier",
+          p: "SES delivers the award and the PO. Bounces and complaints publish to an SNS topic rather than disappearing." });
+    add({ n: ["dynamodb"], e: "nodelambdas>dynamodb", h: "Persist & checkpoint",
+          p: "Every node writes a DynamoDB checkpoint with an idempotent contract, so a crashed runtime resumes at the last completed node instead of replaying from the top." });
+    add({ n: ["evals"], e: "supplier>evals", h: "Evaluate",
+          p: "AgentCore Evaluations scores the negotiation's reasoning off the critical path. The judge sits on a deliberately different model family from the agents, so it is not grading its own house style.",
+          cost: "judge" });
+    add({ n: ["sagemaker"], e: "evals>sagemaker", h: "Label",
+          p: "Transcripts feed SageMaker Ground Truth for human labeling and eval-dataset creation — the loop that lets scores mean something." });
+    add({ n: ["costexp"], e: "sagemaker>costexp", h: "Reconcile cost",
+          p: "EMF token and invocation counts are scaled to the billed total from Cost Explorer and attributed per tenant, which is what keeps the per-negotiation ceiling honest." });
+
+    return out;
+  }
+
+  var PROG = [];
+
+  // ─────────────────────────────────────────── rendering
+  function money(v) { return "$" + v.toFixed(4); }
+
+  function costsAt(i) {
+    var S = STRATS[state.strategy];
+    var agent = 0, judge = 0, unknown = false;
+    var low = state.value === "low";
+    var deterministic = S.fastPath && low;
+    for (var k = 0; k < i; k++) {
+      var c = PROG[k].cost;
+      if (c === "agent") {
+        if (S.fastPath && !deterministic) { unknown = true; } else { agent += S.agent; }
+      } else if (c === "cycle") {
+        if (S.fastPath && !deterministic) { unknown = true; } else { agent += S.agent * 0.5; }
+      } else if (c === "judge") { judge += S.judge; }
+    }
+    return { agent: agent, judge: judge, unknown: unknown };
+  }
+
+  function paint() {
+    var i = state.i, cur = i > 0 ? PROG[i - 1] : null;
+    var on = cur ? cur.n : [];
+    var skip = (cur && cur.skip) || [];
+
+    NODES.forEach(function (n) {
+      var g = svg.querySelector('[data-n="' + n.id + '"]');
+      g.setAttribute("class", "ap-node"
+        + (on.indexOf(n.id) > -1 ? " on" : "")
+        + (skip.indexOf(n.id) > -1 ? " skip" : "")
+        + (i > 0 && on.indexOf(n.id) === -1 ? " dim" : ""));
+      if (n.id === "strategy") {
+        g.querySelector(".n-s").textContent =
+          STRATS[state.strategy].agentName + " · " + STRATS[state.strategy].tier;
+      }
+      if (n.id === "bedrock") {
+        var S = STRATS[state.strategy];
+        var det = S.fastPath && state.value === "low";
+        g.querySelector(".n-s").textContent = det ? "not invoked" : S.model;
+      }
+    });
+
+    Array.prototype.forEach.call(svg.querySelectorAll(".ap-edge"), function (p) {
+      var dash = p.getAttribute("data-e");
+      var isDashed = EDGES.some(function (e) { return e[0] + ">" + e[1] === dash && e[2]; });
+      p.setAttribute("class", "ap-edge" + (isDashed ? " dash" : "")
+        + (cur && cur.e === dash ? " hot" : ""));
+    });
+
+    var c = costsAt(i);
+    document.getElementById("ap-cost").textContent = c.unknown ? "—" : money(c.agent);
+    document.getElementById("ap-judge").textContent = money(c.judge);
+    document.getElementById("ap-count").textContent = i + "/" + PROG.length;
+
+    var h = document.getElementById("ap-h"), p = document.getElementById("ap-p"),
+        note = document.getElementById("ap-note");
+    if (!cur) {
+      h.textContent = "Ready — " + STRATS[state.strategy].abbr;
+      p.textContent = "Press Play, or step through one stage at a time.";
+      note.textContent = "";
+    } else {
+      h.textContent = i + ". " + cur.h;
+      p.textContent = cur.p;
+      note.textContent = cur.note || "";
+      if (c.unknown && !cur.note) {
+        note.textContent = "AGENT COST NOT IN SAMPLE — no >$5k "
+          + (state.strategy === "LEVERAGE" ? "auction" : "spot") + " negotiation was measured";
+      }
+    }
+    document.getElementById("ap-back").disabled = i === 0;
+    document.getElementById("ap-step").disabled = i >= PROG.length;
+  }
+
+  function rebuild() {
+    PROG = steps();
+    if (state.i > PROG.length) { state.i = PROG.length; }
+    paint();
+  }
+
+  // ─────────────────────────────────────────── transport
+  function stop() {
+    if (state.timer) { clearInterval(state.timer); state.timer = null; }
+    document.getElementById("ap-play").innerHTML = "\u25B6\u00A0 Play";
+  }
+
+  function play() {
+    if (state.timer) { stop(); return; }
+    if (state.i >= PROG.length) { state.i = 0; }
+    document.getElementById("ap-play").innerHTML = "\u23F8\u00A0 Pause";
+    state.timer = setInterval(function () {
+      if (state.i >= PROG.length) { stop(); return; }
+      state.i++; paint();
+    }, 2000 / state.speed);
+  }
+
+  function press(sel, attr, val, fn) {
+    Array.prototype.forEach.call(document.querySelectorAll(sel), function (b) {
+      b.addEventListener("click", function () {
+        Array.prototype.forEach.call(document.querySelectorAll(sel), function (o) {
+          o.setAttribute("aria-pressed", String(o === b));
+        });
+        fn(b.getAttribute(attr));
+      });
+    });
+  }
+
+  press(".ap-strat", "data-s", null, function (v) {
+    state.strategy = v; state.i = 0; stop(); rebuild();
+  });
+  press(".ap-val", "data-v", null, function (v) {
+    state.value = v; state.i = 0; stop(); rebuild();
+  });
+  press(".ap-spd", "data-k", null, function (v) {
+    state.speed = parseFloat(v);
+    if (state.timer) { stop(); play(); }
+  });
+
+  document.getElementById("ap-play").addEventListener("click", play);
+  document.getElementById("ap-step").addEventListener("click", function () {
+    stop(); if (state.i < PROG.length) { state.i++; paint(); }
+  });
+  document.getElementById("ap-back").addEventListener("click", function () {
+    stop(); if (state.i > 0) { state.i--; paint(); }
+  });
+  document.getElementById("ap-reset").addEventListener("click", function () {
+    stop(); state.i = 0; paint();
+  });
+  document.getElementById("ap-cycle").addEventListener("change", function (ev) {
+    state.cycle = ev.target.checked; state.i = 0; stop(); rebuild();
+  });
+
+  build();
+  rebuild();
+
+  window.__AP__ = {
+    state: state, nodes: NODES, edges: EDGES, strats: STRATS,
+    steps: function () { return PROG; }, costsAt: costsAt, rebuild: rebuild,
+    dims: { W: W, H: H }
+  };
+})();
+</script>
+
+
+<p><a href="../projects/buyer-team.html">Read the Buyer Team project write-up &rarr;</a>
+   &nbsp;&middot;&nbsp;
+   <a href="pr-to-po.html">See the PR&nbsp;&rarr;&nbsp;PO workflow player &rarr;</a></p>
+
+</article>
+
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count" async src="../assets/count.js"></script>
+</body>
+</html>
