@@ -287,7 +287,7 @@
   <!-- ── SECTION 6 ── -->
   <h2>Alarms that actually do something</h2>
 
-  <p>Most observability implementations stop at "alert the on-call." Our design goal was to go further and map every alarm to a defined automated response — model rollback on a quality drop, auto-send disabled on a tone drop, negotiations halted on a governance breach. For most of this system's life that second half was unbuilt, and earlier versions of this post said so. It closed in August 2026: all five automated responses are now live Lambdas subscribed to the evaluation-alerts SNS topic, each verified end-to-end with a synthetic alarm payload.</p>
+  <p>Most observability implementations stop at "alert the on-call." Our design goal was to go further and map every alarm to a defined automated response — model-tier rollback on a quality drop, auto-send disabled on a tone drop, negotiations halted on a governance breach. For most of this system's life that second half was unbuilt, and earlier versions of this post said so. It closed in August 2026: all five automated responses are now live Lambdas subscribed to the evaluation-alerts SNS topic, each verified end-to-end with a synthetic alarm payload.</p>
 
   <p>The wiring is deliberately blunt. Every alarm in the repo publishes to the same shared topic, so all five remediation Lambdas receive every alarm notification and each one filters to exactly the alarm name it owns, acting only on the <code>ALARM</code> transition. Every action is a single DynamoDB <code>update_item</code> against the governance config — flip <code>auto_send_communications</code> off, set <code>negotiations_halted</code>, bump <code>cache_epoch</code>, swap the model tier map back to its previous snapshot.</p>
 
@@ -308,7 +308,7 @@
           <td>Negotiation Quality Drop</td>
           <td><span class="pill pill-log">live</span></td>
           <td><code>avg &lt; 0.60</code></td>
-          <td><span class="pill pill-rollback">model rollback</span></td>
+          <td><span class="pill pill-rollback">model-tier rollback</span></td>
         </tr>
         <tr>
           <td>Communication Tone Drop</td>
@@ -481,7 +481,7 @@
         <div class="tcard-icon icon-blue">⊕</div>
         <div class="tcard-title">Detection first, then actions</div>
       </div>
-      <p>Alarm-to-action pipelines require threshold calibration to avoid false rollbacks, so we built detection and severity routing first and wired the five automated responses afterward. Both halves are now live, with recovery deliberately left manual — nothing re-enables itself on the OK transition. The remaining weakness is underneath: the thresholds those actions fire on are untuned first-pass guesses, so the loop is closed but not yet calibrated.</p>
+      <p>Alarm-to-action pipelines require threshold calibration to avoid false model-tier rollbacks, so we built detection and severity routing first and wired the five automated responses afterward. Both halves are now live, with recovery deliberately left manual — nothing re-enables itself on the OK transition. The remaining weakness is underneath: the thresholds those actions fire on are untuned first-pass guesses, so the loop is closed but not yet calibrated.</p>
     </div>
   </div>
 

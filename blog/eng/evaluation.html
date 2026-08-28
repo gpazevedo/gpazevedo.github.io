@@ -183,7 +183,7 @@
   <!-- ── SECTION 4 ── -->
   <h2>The quality composite: a 25-point rubric</h2>
 
-  <p>The most important evaluation metric is the Negotiation Quality Composite — six components, each scored 0.0–1.0 by the judge, weighted equally, then averaged and scaled to a 25-point maximum. This is the single number that determines whether an automated model rollback fires.</p>
+  <p>The most important evaluation metric is the Negotiation Quality Composite — six components, each scored 0.0–1.0 by the judge, weighted equally, then averaged and scaled to a 25-point maximum. This is the single number that determines whether an automated model-tier rollback fires.</p>
 
   <div class="table-wrap">
     <table>
@@ -307,7 +307,7 @@ if override:
       <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
       <div class="pipe-body">
         <div class="pipe-title">pr-checks.yml — offline evals + live smoke checks</div>
-        <div class="pipe-desc">Offline: Kraljic rule-baseline, Bid Format and Governance Policy Compliance, bid-ranking rho, four strategy-quality Lambda evaluators, an auction price-model drift canary. Live: 24 fixed judge-smoke calls, plus a live Kraljic name-only run gated at 0.80. All judges run on the same model as staging and production.</div>
+        <div class="pipe-desc">Offline: Kraljic rule-baseline, Bid Format and Governance Policy Compliance, bid-ranking rho, four strategy-quality Lambda evaluators, an auction price-model drift check. Live: 24 fixed judge-smoke calls, plus a live Kraljic name-only run gated at 0.80. All judges run on the same model as staging and production.</div>
         <div class="pipe-pass">✓ pass → mergeable</div>
         <div class="pipe-fail">✗ fail → blocked + eval report in PR comment</div>
       </div>

@@ -190,7 +190,7 @@
         <tr class="row-critical">
           <td>ASI10 · Rogue Agents</td>
           <td>Agent deviates due to model drift or cache miss</td>
-          <td>Continuous online evaluation + DynamoDB system-config rollback + Automated Reasoning re-check on the award path</td>
+          <td>Continuous online evaluation + DynamoDB model-tier rollback + Automated Reasoning re-check on the award path</td>
         </tr>
       </tbody>
     </table>
@@ -688,7 +688,7 @@
 
   <div class="callout-atlas">
     <div class="callout-label">Fail-closed guardrail wiring</div>
-    <p>REQ-S203 above covers a guardrail that's <em>unavailable</em>. A second control covers a guardrail that was never <em>configured</em> in the first place: every deployed (primary and canary) agent runtime sets <code>GUARDRAIL_REQUIRED=true</code>, and the guardrail-wiring code raises rather than returning an empty config when required-but-unconfigured. Because every agent constructs its model at process-import time, that raise crashes the process before it binds its port — a deploy that loses its Guardrail simply doesn't come up, instead of serving a single unprotected request. A CloudWatch alarm on the underlying metric watches for the misconfiguration case.</p>
+    <p>REQ-S203 above covers a guardrail that's <em>unavailable</em>. A second control covers a guardrail that was never <em>configured</em> in the first place: every deployed (primary and variant) agent runtime sets <code>GUARDRAIL_REQUIRED=true</code>, and the guardrail-wiring code raises rather than returning an empty config when required-but-unconfigured. Because every agent constructs its model at process-import time, that raise crashes the process before it binds its port — a deploy that loses its Guardrail simply doesn't come up, instead of serving a single unprotected request. A CloudWatch alarm on the underlying metric watches for the misconfiguration case.</p>
   </div>
 
   <div class="callout-atlas">

@@ -6,7 +6,7 @@
 <meta name="robots" content="index, follow">
 <meta name="author" content="Gustavo Peixoto de Azevedo">
 <title>The cost architecture of an autonomous procurement agent — Gustavo Azevedo</title>
-<meta name="description" content="How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured."/>
+<meta name="description" content="How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated model-tier rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured."/>
 <link rel="canonical" href="https://gpazevedo.github.io/blog/eng/cost-architecture.html"/>
 <link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
 <meta name="theme-color" content="#0F172A"/>
@@ -15,7 +15,7 @@
 <meta property="og:url" content="https://gpazevedo.github.io/blog/eng/cost-architecture.html"/>
 <meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
 <meta property="og:title" content="The cost architecture of an autonomous procurement agent"/>
-<meta property="og:description" content="How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured."/>
+<meta property="og:description" content="How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated model-tier rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured."/>
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-08-19T00:00:00+00:00"/>
@@ -27,10 +27,10 @@
 
 <meta name="twitter:card" content="summary"/>
 <meta name="twitter:title" content="The cost architecture of an autonomous procurement agent"/>
-<meta name="twitter:description" content="How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured."/>
+<meta name="twitter:description" content="How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated model-tier rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"The cost architecture of an autonomous procurement agent","description":"How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured.","datePublished":"2026-08-19","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/cost-architecture.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/cost-architecture.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"The cost architecture of an autonomous procurement agent","description":"How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated model-tier rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured.","datePublished":"2026-08-19","dateModified":"2026-08-19","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/cost-architecture.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/cost-architecture.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"The cost architecture of an autonomous procurement agent","item":"https://gpazevedo.github.io/blog/eng/cost-architecture.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -205,7 +205,7 @@
     <div class="tcard">
       <div class="tcard-head">
         <div class="tcard-icon icon-blue">⊙</div>
-        <div class="tcard-title">An automated rollback safety net</div>
+        <div class="tcard-title">An automated model-tier rollback safety net</div>
       </div>
       <p>Every human tier promotion is now snapshotted to a previous-tier record in system-config before it takes effect. If the live Negotiation Quality eval score later drops under 0.60, a remediation Lambda restores the prior tier map automatically — and every warm agent picks up the change within 30 seconds via a config-epoch watch in <code>DynamicAgentFactory</code>, no container restart required. The tier ladder now tunes itself upward on evidence and reverts itself downward on regression, both without a deploy.</p>
     </div>
@@ -496,7 +496,7 @@
   <h2>Summary</h2>
 
   <p>
-    What's real and live: a 3-tier Nova model ladder that's been actively pruned toward fewer LLM calls, not more of them, each change driven by eval evidence, config-driven so it ships without a redeploy, and backed by an automated rollback that reverts a bad promotion on its own; a prompt cache that covers the system prompt on the Nova fleet, with cross-tenant isolation designed in at the build boundary rather than patrolled at request time, measured at a ~97% hit rate and now confirmed at scale (116.1K cache-read tokens against 275.5K uncached input across the first full live suite run); a Kraljic classifier that's short-circuited before it's invoked more often than it's actually called, with a cache key that now invalidates itself on both threshold changes and live accuracy regressions; and a context-compaction hook that keeps both ends of a truncated tool result so a running total or final status is never silently dropped. Batch inference and CUR-based per-tenant attribution stay deliberately deferred until <code>negotiation.total_cost_usd</code> — now verified against the real table and carrying its own <code>cost.usd</code> per-call breakdown — has the live volume to make building on top of it worthwhile; a dollar-denominated spike alarm shipped ahead of that, on the same untuned-flat-threshold terms as the token alarms.
+    What's real and live: a 3-tier Nova model ladder that's been actively pruned toward fewer LLM calls, not more of them, each change driven by eval evidence, config-driven so it ships without a redeploy, and backed by an automated model-tier rollback that reverts a bad promotion on its own; a prompt cache that covers the system prompt on the Nova fleet, with cross-tenant isolation designed in at the build boundary rather than patrolled at request time, measured at a ~97% hit rate and now confirmed at scale (116.1K cache-read tokens against 275.5K uncached input across the first full live suite run); a Kraljic classifier that's short-circuited before it's invoked more often than it's actually called, with a cache key that now invalidates itself on both threshold changes and live accuracy regressions; and a context-compaction hook that keeps both ends of a truncated tool result so a running total or final status is never silently dropped. Batch inference and CUR-based per-tenant attribution stay deliberately deferred until <code>negotiation.total_cost_usd</code> — now verified against the real table and carrying its own <code>cost.usd</code> per-call breakdown — has the live volume to make building on top of it worthwhile; a dollar-denominated spike alarm shipped ahead of that, on the same untuned-flat-threshold terms as the token alarms.
   </p>
 
   <p>
