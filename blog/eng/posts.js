@@ -13,8 +13,8 @@ window.engPosts = [
   {
     "slug": "deployment-rollout-rollback",
     "file": "deployment-rollout-rollback.html",
-    "title": "Shipping Agents Safely: deployment, rollout, and rollback",
-    "description": "How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback.",
+    "title": "Shipping Agents Safely: deployment, rollout, and recovery",
+    "description": "How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and the two unrelated mechanisms that were both once called rollback.",
     "tags": ["Deployment", "GitOps"],
     "date": "2026-08-19",
     "readingTime": 23
@@ -50,7 +50,7 @@ window.engPosts = [
     "slug": "cost-architecture",
     "file": "cost-architecture.html",
     "title": "The cost architecture of an autonomous procurement agent",
-    "description": "How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured.",
+    "description": "How Buyer Team keeps an AI procurement negotiation cheap — a 3-tier Nova model ladder with an automated model-tier rollback safety net, prompt caching with cross-tenant isolation designed in at the build boundary, a self-invalidating Kraljic classification cache, and context compaction — plus what a full live end-to-end suite actually costs, measured.",
     "tags": ["Cost Architecture", "FinOps"],
     "date": "2026-08-19",
     "readingTime": 18
