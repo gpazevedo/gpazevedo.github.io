@@ -1,0 +1,37 @@
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  naming:
+    # "canary" and "rollback" each named three unrelated Buyer Team mechanisms.
+    # The posts now qualify every use; this keeps a bare one from coming back —
+    # including in index.html, rss.xml or posts.js, which repeat post titles and
+    # descriptions and are the surfaces that actually went stale once.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Naming gate
+        run: python3 scripts/check_naming.py
+
+  links:
+    # posts.js drives the blog index, so an entry pointing at a missing file
+    # renders a dead card. Cheap to assert, and stdlib-only.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: posts.js entries resolve
+        run: |
+          python3 - <<'PY'
+          import json, re, sys
+          from pathlib import Path
+          src = Path("blog/eng/posts.js").read_text()
+          entries = json.loads(re.search(r"\[[\s\S]*\]", src).group(0))
+          missing = [e["file"] for e in entries if not (Path("blog/eng") / e["file"]).exists()]
+          if missing:
+              sys.exit("posts.js references missing files: " + ", ".join(missing))
+          print(f"posts.js ok — {len(entries)} entries all resolve")
+          PY

@@ -265,7 +265,7 @@ Prod (manual, SRE): verify gate green for this exact SHA
 
   <h2>Real exposure control: tenant-scoped variant routing</h2>
 
-  <p>The observation window catches operational regressions fast, but it can't answer a different question: does a <em>behavioral</em> change — a model swap, a rewritten prompt, a new threshold — actually negotiate better for real tenants, without exposing every tenant to it at once? That needs exposure control, and since AgentCore won't give it at the traffic layer, this is built one layer up: in the same config-driven registry (<code>{env}-system-config</code>) that already resolves which runtime serves each agent invocation. Each agent has a real sibling <em>canary</em> Runtime in Terraform, deployable independently, that these mechanisms route to.</p>
+  <p>The observation window catches operational regressions fast, but it can't answer a different question: does a <em>behavioral</em> change — a model swap, a rewritten prompt, a new threshold — actually negotiate better for real tenants, without exposing every tenant to it at once? That needs exposure control, and since AgentCore won't give it at the traffic layer, this is built one layer up: in the same config-driven registry (<code>{env}-system-config</code>) that already resolves which runtime serves each agent invocation. Each agent has a real sibling <em>variant</em> Runtime in Terraform, deployable independently, that these mechanisms route to.</p>
 
   <p>The resolver that maps a logical agent name to a runtime ARN layers three additive mechanisms on top of that base lookup:</p>
 
@@ -283,7 +283,7 @@ Prod (manual, SRE): verify gate green for this exact SHA
   </div>
 
   <div class="callout">
-    <div class="callout-label">A third thing, also called "canary"</div>
+    <div class="callout-label">A third thing, once also called "canary"</div>
     <p>As of August 2026 there's a third, unrelated mechanism with the same name: an hourly synthetic-transaction canary Lambda that drives one real negotiation through the full six-node orchestrator under a dedicated tenant and alarms if it stops passing. It's a production-health probe, not a deploy mechanism — it isn't wired into <code>dev-deploy.yml</code> or <code>prod-deploy.yml</code>, doesn't feed the observation window, and doesn't gate or trigger either the roll-forward or the model-tier rollback described in this post. Three unrelated things sharing one word is exactly the confusion this post exists to head off, and the codebase has since settled it: this probe keeps the bare word &mdash; AWS names the primitive, so it cannot yield it &mdash; while the deploy gate is the <em>observation window</em> and the tenant mechanism is <em>variant routing</em>.</p>
   </div>
 
@@ -396,7 +396,7 @@ Prod (manual, SRE): verify gate green for this exact SHA
 
   <h3>It removes the "instances" you would normally roll out — and the traffic split with them</h3>
 
-  <p>In a traditional canary you shift traffic across a pool of instances you sized yourself. AgentCore has no instances to size, and no fractional traffic routing at the microVM level. It provisions a <strong>dedicated microVM per session</strong> and scales horizontally as a fully managed service; there is no per-instance concurrency to tune and no fleet to drain, but also no traffic-layer dial to turn. That's why the production "canary" is a monitoring window rather than an exposure slice, and why real exposure control had to be built one layer up.</p>
+  <p>In a traditional canary you shift traffic across a pool of instances you sized yourself. AgentCore has no instances to size, and no fractional traffic routing at the microVM level. It provisions a <strong>dedicated microVM per session</strong> and scales horizontally as a fully managed service; there is no per-instance concurrency to tune and no fleet to drain, but also no traffic-layer dial to turn. That's why the production gate is an <em>observation window</em> rather than an exposure slice, and why real exposure control had to be built one layer up.</p>
 
   <p>Capacity is governed instead by an account-level <strong>active-session quota</strong> — 1,000 in us-east-1 and us-west-2, 500 elsewhere. At the planned ceiling of ~100 concurrent negotiations consuming roughly ten sessions each, the default is exactly consumed at full load with zero headroom, so the production runbook calls for requesting an increase to <strong>&ge;1,500</strong>. That is a documented recommendation, not a quota that has been raised. Per-tenant fairness is enforced upstream by the Step Functions orchestrator's admission control, not by the runtime scheduler, which does not partition slots by tenant.</p>
 
