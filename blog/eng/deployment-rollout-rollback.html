@@ -6,7 +6,7 @@
 <meta name="robots" content="index, follow">
 <meta name="author" content="Gustavo Peixoto de Azevedo">
 <title>Shipping Agents Safely — Gustavo Azevedo</title>
-<meta name="description" content="How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback."/>
+<meta name="description" content="How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and the two unrelated mechanisms that were both once called rollback."/>
 <link rel="canonical" href="https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"/>
 <link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
 <meta name="theme-color" content="#0F172A"/>
@@ -14,8 +14,8 @@
 <meta property="og:type" content="article"/>
 <meta property="og:url" content="https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"/>
 <meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
-<meta property="og:title" content="Shipping Agents Safely: deployment, rollout, and rollback"/>
-<meta property="og:description" content="How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback."/>
+<meta property="og:title" content="Shipping Agents Safely: deployment, rollout, and recovery"/>
+<meta property="og:description" content="How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and the two unrelated mechanisms that were both once called rollback."/>
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-05-31T00:00:00+00:00"/>
@@ -26,11 +26,11 @@
 <meta property="article:tag" content="GitOps"/>
 
 <meta name="twitter:card" content="summary"/>
-<meta name="twitter:title" content="Shipping Agents Safely: deployment, rollout, and rollback"/>
-<meta name="twitter:description" content="How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback."/>
+<meta name="twitter:title" content="Shipping Agents Safely: deployment, rollout, and recovery"/>
+<meta name="twitter:description" content="How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and the two unrelated mechanisms that were both once called rollback."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Shipping Agents Safely: deployment, rollout, and rollback","description":"How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and two different things both called rollback.","datePublished":"2026-05-31","dateModified":"2026-08-23","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Shipping Agents Safely: deployment, rollout, and recovery","description":"How a multi-agent procurement platform deploys: immutable promotion, a monitoring-only observation window, tenant-scoped variant routing, and the two unrelated mechanisms that were both once called rollback.","datePublished":"2026-05-31","dateModified":"2026-08-23","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Shipping Agents Safely","item":"https://gpazevedo.github.io/blog/eng/deployment-rollout-rollback.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -77,14 +77,14 @@
   </div>
 
   <!-- ── TITLE ── -->
-  <h1>Shipping agents safely<br>deployment, rollout, and <em>rollback</em></h1>
+  <h1>Shipping agents safely<br>deployment, rollout, and <em>recovery</em></h1>
   <p class="deck">Deploying a fleet of LLM-driven agents is not the same problem as deploying a stateless web service. When output quality can degrade in ways a health check will never catch, the release pipeline has to treat negotiation quality as a first-class signal — sitting right alongside error rate and latency.</p>
 
   <hr>
 
   <p>A conventional canary asks one question: is the new version healthy? For an agent system that question is necessary but nowhere near sufficient. A bad agent deploy can return HTTP 200, respond in under a second, and still negotiate badly — concede too early, leak a competitor's price, misread a Kraljic quadrant. None of that shows up on a liveness probe. So the entire release model is built around a second question the pipeline asks continuously: is the new version <em>good</em>?</p>
 
-  <p>This is how Buyer Team, an autonomous multi-agent procurement negotiation system, handles deployment, gradual rollout, and rollback, and where AWS Bedrock AgentCore fits into each stage.</p>
+  <p>This is how Buyer Team, an autonomous multi-agent procurement negotiation system, handles deployment, gradual rollout, and recovery, and where AWS Bedrock AgentCore fits into each stage.</p>
 
   <div class="callout">
     <div class="callout-label">What is actually running, as of August 2026</div>
@@ -156,7 +156,7 @@
 
   <p>Four details make this more than a generic CI/CD diagram.</p>
 
-  <p><strong>Immutable promotion, with one asterisk.</strong> Images are built once during the dev deploy and the <em>same</em> artifact is copied into production ECR. Nothing is rebuilt, so what the gate evaluated is bit-for-bit what would serve production traffic. Production repositories are forced to <code>IMMUTABLE</code> regardless of the per-repo default, and a lifecycle policy retains the last ten tagged images so a rollback target stays pullable. The asterisk: <strong>dev repositories are <code>MUTABLE</code></strong>, so within dev the retention window is a floor rather than a guarantee — a re-pushed identical tag overwrites the image it replaces. The promotion step itself is retry-safe by digest comparison: a matching digest is skipped, a mismatched one hard-fails rather than overwriting.</p>
+  <p><strong>Immutable promotion, with one asterisk.</strong> Images are built once during the dev deploy and the <em>same</em> artifact is copied into production ECR. Nothing is rebuilt, so what the gate evaluated is bit-for-bit what would serve production traffic. Production repositories are forced to <code>IMMUTABLE</code> regardless of the per-repo default, and a lifecycle policy retains the last ten tagged images so a roll-forward target stays pullable. The asterisk: <strong>dev repositories are <code>MUTABLE</code></strong>, so within dev the retention window is a floor rather than a guarantee — a re-pushed identical tag overwrites the image it replaces. The promotion step itself is retry-safe by digest comparison: a matching digest is skipped, a mismatched one hard-fails rather than overwriting.</p>
 
   <p><strong>Evals are a gate, not a report.</strong> PR checks run three separate offline evaluation jobs before merge — the structural and ground-truth suite, a directional LLM-judge smoke check with a per-strategy consistency run, and a live Kraljic accuracy gate with a 0.80 floor. Promotion to production is then blocked unless the weekly judge suite has a green run <em>against the exact SHA being promoted</em>, updated within eight days. Quality is checked before exposure, not discovered after.</p>
 
@@ -184,9 +184,9 @@ Prod (manual, SRE): verify gate green for this exact SHA
        → copy dev images to prod ECR → plan → apply
        → observe → per-quadrant smoke → confirm or roll forward</code></pre>
 
-  <h2>Gradual rollout: the production canary</h2>
+  <h2>Gradual rollout: the observation window</h2>
 
-  <p>A constraint worth being upfront about: AgentCore Runtimes have no fractional traffic routing — there is no microVM-level traffic split, so a true "send 10% of traffic to the new version" canary can't be built on top of it. Every image is promoted to production ECR and deployed to <em>every</em> Runtime at once. What this system calls the "canary" is therefore a <strong>monitoring-only observation window</strong>, not a traffic slice: it's a structured confirmation gate before rollout is declared complete, not a way to shrink the blast radius of a bad deploy.</p>
+  <p>A constraint worth being upfront about: AgentCore Runtimes have no fractional traffic routing — there is no microVM-level traffic split, so a true "send 10% of traffic to the new version" canary can't be built on top of it. Every image is promoted to production ECR and deployed to <em>every</em> Runtime at once. What this system once called the "canary" is therefore named the <strong>observation window</strong> &mdash; monitoring-only, not a traffic slice: it's a structured confirmation gate before rollout is declared complete, not a way to shrink the blast radius of a bad deploy.</p>
 
   <ol>
     <li><strong>Deploy to all Runtimes at once.</strong> There is no partial fleet — the new image is live everywhere the moment the apply completes.</li>
@@ -203,12 +203,12 @@ Prod (manual, SRE): verify gate green for this exact SHA
     <li><strong>One of the six is not live protection in production.</strong> <code>eval-kraljic-accuracy</code> is fed by a daily accuracy harness pinned to the <code>dev</code> environment — nothing emits that metric in prod. There it sits at <code>INSUFFICIENT_DATA</code>, so the window watches it for a carried-over <code>ALARM</code> state rather than for anything happening during the window itself. Pointing the harness at prod is what would make it protective.</li>
   </ul>
 
-  <p>The inclusion of eval quality in the observation window is still the important idea. By scoring negotiation quality <em>during</em> the window, a regression that a conventional health check would wave straight through gets caught fast — but it's caught while live on 100% of production traffic, not a contained slice. Detection-and-rollback speed is the safety lever here, not reduced exposure.</p>
+  <p>The inclusion of eval quality in the observation window is still the important idea. By scoring negotiation quality <em>during</em> the window, a regression that a conventional health check would wave straight through gets caught fast — but it's caught while live on 100% of production traffic, not a contained slice. Detection-and-roll-forward speed is the safety lever here, not reduced exposure.</p>
 
   <div class="callout">
     <div class="callout-label">Scope boundary — the smoke test still needs data prod does not have</div>
-    <p>The per-quadrant smoke job runs a real all-four-quadrant negotiation test. It used to be built around a fixed dev fixture tenant with a <em>pre-seeded</em> non-critical item, which made it structurally unable to pass anywhere else; all four quadrants now seed and tear down their own items, so the suite is environment-portable. The sharper problem was the failure <em>mode</em>: on an unseeded environment the job failed like a quadrant regression, and in this pipeline a smoke failure fires the roll-forward path — so an environment that was merely empty would have presented as a bad release and triggered a rollback. A preflight fixture now checks the tenant row and the four categories' suppliers up front and fails with <code>SMOKE FIXTURE MISSING … NOT a quadrant regression</code> plus the exact seeding command.</p>
-    <p>What is left is genuine provisioning, and it stays manual on purpose: one-time tenant config rows plus category and supplier master data for the four quadrants. Seeding is <em>not</em> a pipeline step because the seed script writes the whole <code>governance</code> and <code>model</code> config groups — running it on every promotion would overwrite prod governance and clobber <code>model/default</code> and <code>model/previous</code>, the exact rows the model-rollback action below restores from. A provisioning step that silently disarms a rollback mechanism does not belong in the deploy path.</p>
+    <p>The per-quadrant smoke job runs a real all-four-quadrant negotiation test. It used to be built around a fixed dev fixture tenant with a <em>pre-seeded</em> non-critical item, which made it structurally unable to pass anywhere else; all four quadrants now seed and tear down their own items, so the suite is environment-portable. The sharper problem was the failure <em>mode</em>: on an unseeded environment the job failed like a quadrant regression, and in this pipeline a smoke failure fires the roll-forward path — so an environment that was merely empty would have presented as a bad release and triggered a roll-forward. A preflight fixture now checks the tenant row and the four categories' suppliers up front and fails with <code>SMOKE FIXTURE MISSING … NOT a quadrant regression</code> plus the exact seeding command.</p>
+    <p>What is left is genuine provisioning, and it stays manual on purpose: one-time tenant config rows plus category and supplier master data for the four quadrants. Seeding is <em>not</em> a pipeline step because the seed script writes the whole <code>governance</code> and <code>model</code> config groups — running it on every promotion would overwrite prod governance and clobber <code>model/default</code> and <code>model/previous</code>, the exact rows the model-tier rollback action below restores from. A provisioning step that silently disarms a model-tier rollback mechanism does not belong in the deploy path.</p>
   </div>
 
   <p>Getting real exposure control for a <em>behavioral</em> change — a model swap, a prompt rewrite, a threshold tweak — against real tenant traffic takes a different mechanism, covered next.</p>
@@ -260,12 +260,12 @@ Prod (manual, SRE): verify gate green for this exact SHA
   <line class="arr" x1="430" y1="342" x2="466" y2="342" marker-end="url(#cr-arrow)"/>
   </g>
   </svg>
-  <figcaption class="bt-figcaption">Top: the deploy-time confirmation gate, which ends in either a confirmed rollout or a roll-forward to the last good image. Bottom: the runtime quality loop, which fires <b>without a deploy</b> and changes configuration rather than images. Two different mechanisms that both get called "rollback".</figcaption>
+  <figcaption class="bt-figcaption">Top: the deploy-time confirmation gate, which ends in either a confirmed rollout or a roll-forward to the last good image. Bottom: the runtime quality loop, which fires <b>without a deploy</b> and changes configuration rather than images. Two different mechanisms that were both once called "rollback" &mdash; now the roll-forward and the model-tier rollback.</figcaption>
   </figure>
 
   <h2>Real exposure control: tenant-scoped variant routing</h2>
 
-  <p>The observation window catches operational regressions fast, but it can't answer a different question: does a <em>behavioral</em> change — a model swap, a rewritten prompt, a new threshold — actually negotiate better for real tenants, without exposing every tenant to it at once? That needs exposure control, and since AgentCore won't give it at the traffic layer, this is built one layer up: in the same config-driven registry (<code>{env}-system-config</code>) that already resolves which runtime serves each agent invocation. Each agent has a real sibling <em>canary</em> Runtime in Terraform, deployable independently, that these mechanisms route to.</p>
+  <p>The observation window catches operational regressions fast, but it can't answer a different question: does a <em>behavioral</em> change — a model swap, a rewritten prompt, a new threshold — actually negotiate better for real tenants, without exposing every tenant to it at once? That needs exposure control, and since AgentCore won't give it at the traffic layer, this is built one layer up: in the same config-driven registry (<code>{env}-system-config</code>) that already resolves which runtime serves each agent invocation. Each agent has a real sibling <em>variant</em> Runtime in Terraform, deployable independently, that these mechanisms route to.</p>
 
   <p>The resolver that maps a logical agent name to a runtime ARN layers three additive mechanisms on top of that base lookup:</p>
 
@@ -279,34 +279,34 @@ Prod (manual, SRE): verify gate green for this exact SHA
 
   <div class="callout">
     <div class="callout-label">The honest limit</div>
-    <p>This is an <strong>operator-driven</strong> mechanism. There is no automatic analysis of the shadow agreement rate and no automatic promotion or rollback of a variant — a human reads the comparison and decides. It buys real exposure control on a platform that offers none; it does not buy an automated experiment pipeline. It is also a second thing called "canary", which is why this post keeps the two apart: the deploy-time observation window confirms a build is safe to run at all; variant routing confirms a specific behavioral change is actually good, against real tenant traffic, before every tenant sees it.</p>
+    <p>This is an <strong>operator-driven</strong> mechanism. There is no automatic analysis of the shadow agreement rate and no automatic promotion or unpinning of a variant — a human reads the comparison and decides. It buys real exposure control on a platform that offers none; it does not buy an automated experiment pipeline. It is also a second thing called "canary", which is why this post keeps the two apart: the deploy-time observation window confirms a build is safe to run at all; variant routing confirms a specific behavioral change is actually good, against real tenant traffic, before every tenant sees it.</p>
   </div>
 
   <div class="callout">
-    <div class="callout-label">A third thing, also called "canary"</div>
-    <p>As of August 2026 there's a third, unrelated mechanism with the same name: an hourly synthetic-transaction canary Lambda that drives one real negotiation through the full six-node orchestrator under a dedicated tenant and alarms if it stops passing. It's a production-health probe, not a deploy mechanism — it isn't wired into <code>dev-deploy.yml</code> or <code>prod-deploy.yml</code>, doesn't feed the observation window, and doesn't gate or trigger either rollback path described in this post. Three unrelated things sharing one word in the same codebase is exactly the confusion this post exists to head off: not this canary, not that canary, a third one.</p>
+    <div class="callout-label">A third thing, once also called "canary"</div>
+    <p>As of August 2026 there's a third, unrelated mechanism with the same name: an hourly synthetic-transaction canary Lambda that drives one real negotiation through the full six-node orchestrator under a dedicated tenant and alarms if it stops passing. It's a production-health probe, not a deploy mechanism — it isn't wired into <code>dev-deploy.yml</code> or <code>prod-deploy.yml</code>, doesn't feed the observation window, and doesn't gate or trigger either the roll-forward or the model-tier rollback described in this post. Three unrelated things sharing one word is exactly the confusion this post exists to head off, and the codebase has since settled it: this probe keeps the bare word &mdash; AWS names the primitive, so it cannot yield it &mdash; while the deploy gate is the <em>observation window</em> and the tenant mechanism is <em>variant routing</em>.</p>
   </div>
 
-  <h2>Rollback: two mechanisms, one word</h2>
+  <h2>Recovery: two mechanisms, and only one keeps the word</h2>
 
-  <p>If either confirmation gate fails — the observation window or the quadrant smoke — the pipeline rolls <em>forward</em> to the previous known-good SHA, with a target of completing within <strong>five minutes</strong> of failure detection. Mechanically it is unglamorous, which is the point: the <code>plan</code> job snapshotted the previous image-tag map before overwriting it, so recovery is restoring that snapshot and running <code>terraform apply</code> against images already sitting in ECR. No separate rollback artifact, no new variables on the recovery path.</p>
+  <p>If either confirmation gate fails — the observation window or the quadrant smoke — the pipeline rolls <em>forward</em> to the previous known-good SHA, with a target of completing within <strong>five minutes</strong> of failure detection. Mechanically it is unglamorous, which is the point: the <code>plan</code> job snapshotted the previous image-tag map before overwriting it, so recovery is restoring that snapshot and running <code>terraform apply</code> against images already sitting in ECR. No separate recovery artifact, no new variables on the recovery path.</p>
 
   <p>The mechanism has one cold-start hole, and it is why "cut one release" is still on this post's to-do list. The snapshot only exists if there was a previous deploy. On production's <em>first</em> promotion there is nothing to restore, and the workflow says so plainly instead of failing obscurely — it errors with "there is no previous prod deploy to roll forward to" and stops for manual intervention. The first release is the one that runs without a net; every release after it inherits one.</p>
 
   <p>One deliberate asymmetry: the roll-forward step runs on the <em>unprotected</em> GitHub environment rather than the branch-restricted production one. Gating automatic recovery behind a second human approval would blow the five-minute bound — so the deploy is protected and the recovery is not.</p>
 
-  <p>There is a second, quieter mechanism that also gets called rollback, and it is <strong>not the same thing</strong>. Each evaluator is bound to a threshold, an alarm, and an automated action; when the negotiation-quality composite drops below 0.60, an alarm fires a remediation Lambda that restores the previous model-tier mapping in DynamoDB and bumps a <code>model_epoch</code> counter. Agents re-check that counter on a 30-second TTL, so already-warm execution environments pick up the change in about half a minute instead of never. No image moves. No deploy happens. It can fire on a completely stable codebase — model drift, a bad config change, an upstream data issue — which is exactly the class of problem it exists for.</p>
+  <p>There is a second, quieter mechanism &mdash; the <strong>model-tier rollback</strong> &mdash; and it is <strong>not the same thing</strong>. Each evaluator is bound to a threshold, an alarm, and an automated action; when the negotiation-quality composite drops below 0.60, an alarm fires a remediation Lambda that restores the previous model-tier mapping in DynamoDB and bumps a <code>model_epoch</code> counter. Agents re-check that counter on a 30-second TTL, so already-warm execution environments pick up the change in about half a minute instead of never. No image moves. No deploy happens. It can fire on a completely stable codebase — model drift, a bad config change, an upstream data issue — which is exactly the class of problem it exists for.</p>
 
   <div class="callout">
     <div class="callout-label">A naming wrinkle, now settled</div>
-    <p>The evaluation threshold table labels this action <code>Model rollback</code>; the operational runbook calls it <code>Configuration rollback</code>. Earlier versions of this post said the two names described one forward-deploy mechanism. They don't. As built, the runbook is right: it is a <strong>configuration</strong> rollback of the model-tier map, with no relationship to the deploy pipeline's roll-forward beyond sharing a word. Rolling the <em>image</em> back is still a manual dispatch.</p>
+    <p>The evaluation threshold table once labelled this action <code>Model rollback</code> and the operational runbook called it <code>Configuration rollback</code>; the codebase now uses one name for it, <code>model-tier rollback</code>. Earlier versions of this post said the two names described one forward-deploy mechanism. They don't: it restores the model-tier map in DynamoDB, with no relationship to the deploy pipeline's roll-forward beyond sharing a recovery instinct. Rolling the <em>image</em> back is still a manual dispatch.</p>
   </div>
 
   <p>That closed loop now has all five of its actions built, deployed to dev, and verified end-to-end against synthetic alarm events — a state it reached only in mid-August 2026, after more than a month during which the alarms existed but drove nothing, and a stretch where they were deleted outright as an unsubscribed cost line:</p>
 
   <div class="layer-stack">
     <div class="layer l1">
-      <div class="layer-meta"><div class="layer-num">&lt; 0.60</div><div class="layer-name">Negotiation Quality</div><div class="layer-src">model tier rollback</div></div>
+      <div class="layer-meta"><div class="layer-num">&lt; 0.60</div><div class="layer-name">Negotiation Quality</div><div class="layer-src">model-tier rollback</div></div>
       <p>Restores the previous tier map and bumps <code>model_epoch</code>; warm agents re-resolve within ~30s.</p>
     </div>
     <div class="layer l2">
@@ -396,7 +396,7 @@ Prod (manual, SRE): verify gate green for this exact SHA
 
   <h3>It removes the "instances" you would normally roll out — and the traffic split with them</h3>
 
-  <p>In a traditional canary you shift traffic across a pool of instances you sized yourself. AgentCore has no instances to size, and no fractional traffic routing at the microVM level. It provisions a <strong>dedicated microVM per session</strong> and scales horizontally as a fully managed service; there is no per-instance concurrency to tune and no fleet to drain, but also no traffic-layer dial to turn. That's why the production "canary" is a monitoring window rather than an exposure slice, and why real exposure control had to be built one layer up.</p>
+  <p>In a traditional canary you shift traffic across a pool of instances you sized yourself. AgentCore has no instances to size, and no fractional traffic routing at the microVM level. It provisions a <strong>dedicated microVM per session</strong> and scales horizontally as a fully managed service; there is no per-instance concurrency to tune and no fleet to drain, but also no traffic-layer dial to turn. That's why the production gate is an <em>observation window</em> rather than an exposure slice, and why real exposure control had to be built one layer up.</p>
 
   <p>Capacity is governed instead by an account-level <strong>active-session quota</strong> — 1,000 in us-east-1 and us-west-2, 500 elsewhere. At the planned ceiling of ~100 concurrent negotiations consuming roughly ten sessions each, the default is exactly consumed at full load with zero headroom, so the production runbook calls for requesting an increase to <strong>&ge;1,500</strong>. That is a documented recommendation, not a quota that has been raised. Per-tenant fairness is enforced upstream by the Step Functions orchestrator's admission control, not by the runtime scheduler, which does not partition slots by tenant.</p>
 
@@ -404,7 +404,7 @@ Prod (manual, SRE): verify gate green for this exact SHA
 
   <p>Earlier versions of this post claimed every Runtime is launched with <code>DEPLOY_VERSION</code>, <code>ENVIRONMENT</code> and <code>GIT_SHA</code> injected. Only <code>ENVIRONMENT</code> is real (the Skill Runtime also gets its state-machine ARN); there is no <code>GIT_SHA</code> or <code>DEPLOY_VERSION</code> environment variable anywhere in the infrastructure.</p>
 
-  <p>The traceability guarantee still holds — it is just delivered differently, and arguably better. <strong>Every image tag is the commit SHA</strong>, so a Runtime's container URI <em>is</em> its provenance, and the committed tag map records which SHA every component is pinned to. Separately, <code>GitSHA</code> is set in Terraform's <code>default_tags</code>, so every managed AWS resource carries the commit it was applied from. Rollback stays auditable because the artifact identity and the commit identity are the same string, not because a process announces its own version.</p>
+  <p>The traceability guarantee still holds — it is just delivered differently, and arguably better. <strong>Every image tag is the commit SHA</strong>, so a Runtime's container URI <em>is</em> its provenance, and the committed tag map records which SHA every component is pinned to. Separately, <code>GitSHA</code> is set in Terraform's <code>default_tags</code>, so every managed AWS resource carries the commit it was applied from. Roll-forward stays auditable because the artifact identity and the commit identity are the same string, not because a process announces its own version.</p>
 
   <h3>Its evaluations are sampled monitoring — not the gate, and not the trigger</h3>
 
@@ -433,7 +433,7 @@ Prod (manual, SRE): verify gate green for this exact SHA
   <div class="layer-stack">
     <div class="layer l1">
       <div class="layer-meta"><div class="layer-num">01</div><div class="layer-name">Build once, promote immutably</div><div class="layer-src">ECR &middot; semver</div></div>
-      <p>The artifact dev built is the artifact production would run, untouched, so rollback is redeploying a known-good image that already exists. Production repositories are forced immutable and retain the last ten tags; dev's are mutable, which is a real caveat on dev rollback targets rather than a footnote.</p>
+      <p>The artifact dev built is the artifact production would run, untouched, so recovery is redeploying a known-good image that already exists. Production repositories are forced immutable and retain the last ten tags; dev's are mutable, which is a real caveat on dev roll-forward targets rather than a footnote.</p>
     </div>
     <div class="layer l2">
       <div class="layer-meta"><div class="layer-num">02</div><div class="layer-name">Gate on quality, not just liveness</div><div class="layer-src">custom judges + ground truth</div></div>
@@ -445,7 +445,7 @@ Prod (manual, SRE): verify gate green for this exact SHA
     </div>
   </div>
 
-  <p>AgentCore is woven through all three, though not always in the role you would expect. It is the target the pipeline deploys to; the managed runtime whose absent fractional routing is precisely why the deploy-time canary is a monitoring window rather than an exposure slice; the platform whose full-replace update semantics turn "I'll just patch one field" into an outage; and a sampled evaluation service that is genuinely useful and genuinely <em>not</em> the thing holding the release gate. The scores that gate and remediate are the ones this codebase computes itself.</p>
+  <p>AgentCore is woven through all three, though not always in the role you would expect. It is the target the pipeline deploys to; the managed runtime whose absent fractional routing is precisely why the deploy-time observation window is a monitoring window rather than an exposure slice; the platform whose full-replace update semantics turn "I'll just patch one field" into an outage; and a sampled evaluation service that is genuinely useful and genuinely <em>not</em> the thing holding the release gate. The scores that gate and remediate are the ones this codebase computes itself.</p>
 
   <div class="tradeoff-grid">
     <div class="tcard">
@@ -453,7 +453,7 @@ Prod (manual, SRE): verify gate green for this exact SHA
         <div class="tcard-icon icon-teal">&#10003;</div>
         <div class="tcard-title">Deterministic release plumbing</div>
       </div>
-      <p>Immutable images, semver tags, SHA-as-artifact-identity, split plan/apply, and forward-only rollback — the parts that must be boring and reproducible are exactly that, and the recovery path deliberately reuses the deploy path so it introduces no new variables.</p>
+      <p>Immutable images, semver tags, SHA-as-artifact-identity, split plan/apply, and forward-only recovery — the parts that must be boring and reproducible are exactly that, and the recovery path deliberately reuses the deploy path so it introduces no new variables.</p>
     </div>
     <div class="tcard">
       <div class="tcard-head">
@@ -467,7 +467,7 @@ Prod (manual, SRE): verify gate green for this exact SHA
   <div class="callout">
     <div class="callout-label">What would make this real</div>
     <p>Three things were on this list. One is now done: the gate decision is made and in code — calibration is advisory while the panel is synthetic, judge consistency still blocks, and the labelling pipeline became an upgrade path rather than a blocker.</p>
-    <p>Two remain. <strong>Seed a production smoke tenant</strong> — tenant config rows plus category and supplier master data for the four quadrants — so the quadrant test fails for regressions rather than for emptiness. Then <strong>cut one release</strong>, because a promotion path with zero runs is a design, not a pipeline, and because the first release is the one that establishes the rollback target every later release depends on.</p>
+    <p>Two remain. <strong>Seed a production smoke tenant</strong> — tenant config rows plus category and supplier master data for the four quadrants — so the quadrant test fails for regressions rather than for emptiness. Then <strong>cut one release</strong>, because a promotion path with zero runs is a design, not a pipeline, and because the first release is the one that establishes the roll-forward target every later release depends on.</p>
     <p>Both are blocked on the same unglamorous fact, and it is worth saying out loud rather than filing under "zero runs": as of 2026-08-19 there is no production environment to seed. No production Terraform state, no production tables, no production image repositories. The pipeline's first run would also be production's first apply. Everything in this post is built and most of it is now verified in dev; none of it has been proven under the conditions it was built for.</p>
   </div>
 
