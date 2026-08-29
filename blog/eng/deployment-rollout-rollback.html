@@ -284,7 +284,7 @@ Prod (manual, SRE): verify gate green for this exact SHA
 
   <div class="callout">
     <div class="callout-label">A third thing, once also called "canary"</div>
-    <p>As of August 2026 there's a third, unrelated mechanism with the same name: an hourly synthetic-transaction canary Lambda that drives one real negotiation through the full six-node orchestrator under a dedicated tenant and alarms if it stops passing. It's a production-health probe, not a deploy mechanism — it isn't wired into <code>dev-deploy.yml</code> or <code>prod-deploy.yml</code>, doesn't feed the observation window, and doesn't gate or trigger either the roll-forward or the model-tier rollback described in this post. Three unrelated things sharing one word is exactly the confusion this post exists to head off, and the codebase has since settled it: this probe keeps the bare word &mdash; AWS names the primitive, so it cannot yield it &mdash; while the deploy gate is the <em>observation window</em> and the tenant mechanism is <em>variant routing</em>.</p>
+    <p>As of August 2026 there's a third, unrelated mechanism with the same name: a daily synthetic-transaction canary Lambda (moved off an hourly cadence on 2026-08-25 — each run drives a real negotiation end-to-end, ~$0.60) that drives one real negotiation through the full six-node orchestrator under a dedicated tenant and alarms if that day's run doesn't pass. It's a production-health probe, not a deploy mechanism — it isn't wired into <code>dev-deploy.yml</code> or <code>prod-deploy.yml</code>, doesn't feed the observation window, and doesn't gate or trigger either the roll-forward or the model-tier rollback described in this post. Three unrelated things sharing one word is exactly the confusion this post exists to head off, and the codebase has since settled it: this probe keeps the bare word &mdash; AWS names the primitive, so it cannot yield it &mdash; while the deploy gate is the <em>observation window</em> and the tenant mechanism is <em>variant routing</em>.</p>
   </div>
 
   <h2>Recovery: two mechanisms, and only one keeps the word</h2>
@@ -414,13 +414,15 @@ Prod (manual, SRE): verify gate green for this exact SHA
 
   <div class="callout">
     <div class="callout-label">The honest limit</div>
-    <p>At last check the AgentCore online-eval namespace had seen <strong>zero sampled sessions</strong>, and the exact metric name remains unconfirmed until real traffic flows — both alarms sit on <code>treat_missing_data = notBreaching</code> so they stay inert rather than firing on absence. It is provisioned, not yet proven. The custom <code>evals/</code> package is the real harness today, and saying otherwise would credit a managed service for work the codebase is doing itself.</p>
+    <p>The namespace sat at <strong>zero sampled sessions for 17 days</strong>, and it wasn't a traffic problem: every <code>service_names</code> filter on the six online-eval configs was set to the app-level agent name (e.g. <code>"kraljic-classifier"</code>) instead of the AgentCore-required <code>"&lt;runtime-name&gt;.&lt;endpoint-name&gt;"</code> form, so the filter matched zero spans no matter how much traffic ran. Fixed 2026-08-29 across all six configs; both alarms still sit on <code>treat_missing_data = notBreaching</code> so they stay inert rather than firing on absence, and a real <code>score</code> datapoint from post-fix traffic is still unconfirmed. The custom <code>evals/</code> package remains the real harness today, and saying otherwise would credit a managed service for work the codebase is doing itself.</p>
   </div>
 
   <div class="callout">
     <div class="callout-label">Operational prerequisite</div>
     <p>CloudWatch Transaction Search must be enabled on the account, because AgentCore Evaluations reads agent traces to score sessions. Without it, neither on-demand nor online evaluations can run — and that half of the quality picture goes blind. It is also, at 100% sampling, dev's single largest CloudWatch cost line, billed even while the environment sits idle — so the dev VPC pause script deliberately withdraws it and the restore script puts it back. A scoped exception, safe only because nothing that depends on it runs during the pause.</p>
   </div>
+
+  <p>The pause/restore scripts themselves picked up two reliability fixes worth naming. <code>stop-canary</code> raised <code>ConflictException</code> on an already-stopped Synthetics canary, which — under <code>set -euo pipefail</code> — aborted <code>release_vpc.sh</code> after its alarm sweep but before the Terraform teardown, leaving dev both blind and still billing NAT/EIP/endpoints; both scripts now check the Synthetics canary's state before calling stop or start. And both now hold the Terraform state lock for their entire run, so a concurrent <code>terraform apply</code> can't interleave with a pause or restore mid-flight.</p>
 
   <h3>It even constrains where you can deploy</h3>
 

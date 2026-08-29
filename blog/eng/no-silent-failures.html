@@ -361,6 +361,10 @@
     <p>Nine scheduled Lambdas — including the heartbeat itself — failed every invocation for missing the ADOT layer their shared package needs, measured at 720 invocations and 720 errors in a 4-hour window on the outbox poller alone. Four of the five related alarms sat in ALARM unnoticed because the heartbeat that should have escalated them was one of the nine that were down.</p>
   </div>
 
+  <h3>A pause can erase an alarm's own memory</h3>
+
+  <p>The dev-cost VPC pause deletes every CloudWatch alarm and the restore recreates them from a snapshot — necessary, because alarms bill regardless of state. But CloudWatch offers no API to recreate an alarm already <em>in</em> ALARM; delete and recreate always comes back as <code>INSUFFICIENT_DATA</code>, with no memory of what it was watching or why it fired. Reproduced live on 2026-08-27: an adversarial-robustness error alarm had real error datapoints in its metric history but zero ALARM transitions recorded — a pause/restore cycle had silently eaten the state in between. This module can't preserve what the API won't let it preserve, so the fix doesn't try — it surfaces the loss instead: a warning naming every alarm about to lose its ALARM state before the pause deletes anything, and a follow-up note after restore naming exactly which recreated alarms need a human to recheck whether the condition that tripped them is still live. Same principle as the rest of this section — a gap that can't be closed gets called out loudly rather than left quiet.</p>
+
   <hr>
 
   <h2>A failure's journey through the five tools</h2>
