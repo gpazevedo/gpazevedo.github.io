@@ -50,6 +50,8 @@ ALLOWED = [
     # --- not prose ---
     r"pill-rollback",  # CSS class
     r"deployment-rollout-rollback",  # published slug: indexed, must not move
+    r"<code>stop-canary</code>",  # aws synthetics subcommands — AWS names the primitive
+    r"<code>start-canary</code>",
 ]
 ALLOWED_RE = re.compile("|".join(ALLOWED))
 BARE_RE = re.compile(r"canary|rollback", re.IGNORECASE)
