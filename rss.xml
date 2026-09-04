@@ -6,7 +6,17 @@
   <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
   <language>en-us</language>
-  <lastBuildDate>Wed, 19 Aug 2026 00:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Thu, 03 Sep 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>Adopting Floci: the tests that used to cost a NAT Gateway</title>
+      <link>https://gpazevedo.github.io/blog/eng/floci-offline-aws.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/floci-offline-aws.html</guid>
+      <pubDate>Thu, 03 Sep 2026 00:00:00 +0000</pubDate>
+      <description>Why we put a local AWS emulator in the test suite: moto cannot invoke a Lambda container off an EventBridge rule, and the alternative was restoring the dev VPC.</description>
+      <category>Testing</category>
+      <category>Local Emulation</category>
+      <category>AWS</category>
+    </item>
     <item>
       <title>No users table: the OAuth 2.0 resource server pattern, adapted</title>
       <link>https://gpazevedo.github.io/blog/eng/oauth-resource-server-pattern.html</link>
