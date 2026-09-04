@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Adopting Floci: the tests that used to cost a NAT Gateway — Gustavo Azevedo</title>
+<meta name="description" content="Why we put a local AWS emulator in the test suite: moto cannot invoke a Lambda container off an EventBridge rule, and the alternative was restoring the dev VPC."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/floci-offline-aws.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/floci-offline-aws.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Adopting Floci: the tests that used to cost a NAT Gateway"/>
+<meta property="og:description" content="Why we put a local AWS emulator in the test suite: moto cannot invoke a Lambda container off an EventBridge rule, and the alternative was restoring the dev VPC."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-09-03T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-09-03T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Testing"/>
+<meta property="article:tag" content="Local Emulation"/>
+<meta property="article:tag" content="AWS"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Adopting Floci: the tests that used to cost a NAT Gateway"/>
+<meta name="twitter:description" content="Why we put a local AWS emulator in the test suite: moto cannot invoke a Lambda container off an EventBridge rule, and the alternative was restoring the dev VPC."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Adopting Floci: the tests that used to cost a NAT Gateway","description":"Why we put a local AWS emulator in the test suite: moto cannot invoke a Lambda container off an EventBridge rule, and the alternative was restoring the dev VPC.","datePublished":"2026-09-03","dateModified":"2026-09-03","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/floci-offline-aws.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/floci-offline-aws.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Adopting Floci: the tests that used to cost a NAT Gateway","item":"https://gpazevedo.github.io/blog/eng/floci-offline-aws.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+/* ── STAT ROW ── */
+.stat-row { display: flex; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; margin: 1.75rem 0; }
+.stat-cell { flex: 1; background: var(--surface); padding: 1.25rem 1rem; text-align: center; }
+.stat-num { font-family: var(--serif); font-size: 2.4rem; color: var(--amber); line-height: 1; margin-bottom: 6px; }
+.stat-label { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+/* ── VERDICT BANNER ── */
+.verdict { background: var(--teal-light); border: 1px solid var(--teal); border-radius: 10px; padding: 1.5rem 1.75rem; margin: 1.75rem 0; display: flex; align-items: center; gap: 1.25rem; }
+.verdict-badge { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; background: var(--teal); color: var(--teal-light); padding: 4px 10px; border-radius: 4px; flex-shrink: 0; }
+.verdict-text { font-size: 14px; font-weight: 300; color: var(--ink); line-height: 1.55; }
+.verdict-text strong { font-weight: 600; }
+@media (max-width: 600px) {
+  .stat-row { flex-direction: column; }
+  .verdict { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+}
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Adopting Floci</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <time datetime="2026-09-03">September 2026</time>
+    <span class="dot">·</span>
+    <span>14 min read</span>
+  </div>
+
+  <h1>Adopting Floci: the tests that used to <em>cost a NAT Gateway</em></h1>
+
+  <p class="deck">Our SAP integration is a chain of event-driven hops — a poller emits, EventBridge routes, a Lambda ingests, Step Functions negotiates, SQS drains. Every hop was untestable without real AWS, because the one thing <code>moto</code> cannot do is invoke a Lambda <em>container</em> off a rule. So we ran a spike against a local emulator and measured what it actually does.</p>
+
+  <p>Buyer Team's dev account runs with its paid networking released most of the time. A NAT Gateway and three interface VPC endpoints sit behind a <code>release_vpc.sh</code> / <code>restore_vpc.sh</code> pair, and they stay released because the alternative is paying hourly for a lab that is idle most days. That is a good trade until a test needs them.</p>
+
+  <p>And the SAP loop's tests needed them constantly. Not because the handler logic is hard — that is ordinary unit-test material — but because the parts worth testing are the <em>joints</em>. Does the rule's source pattern actually filter? Does <code>maxReceiveCount</code> really redrive to the DLQ on the third receive, or only on the fourth? Does a Step Functions Task state genuinely invoke its target, or did we misspell an ARN in a place Terraform validates but never exercises? None of those are answerable in-process.</p>
+
+  <div class="stat-row">
+    <div class="stat-cell">
+      <div class="stat-num">9</div>
+      <div class="stat-label">offline chain tests</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num">0</div>
+      <div class="stat-label">AWS credentials needed</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num">0</div>
+      <div class="stat-label">source changes required</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <h2>Why moto was not enough</h2>
+
+  <p><code>moto</code> is excellent and we use it heavily, and the limitation is narrower than "it's a fake." moto can genuinely run a Lambda in Docker — its backend shells out to <code>docker_client.containers.run</code> for a direct <code>invoke</code>. What it does not implement is <em>Lambda as an EventBridge rule target</em>. Put an event on a bus whose rule targets a function, and moto 5.2.2 does this:</p>
+
+  <pre><code>File "moto/events/models.py", line 202, in send_to_targets
+    raise NotImplementedError(f"Expr not defined for {type(self)}")
+NotImplementedError: Expr not defined for &lt;class 'moto.events.models.Rule'&gt;</code></pre>
+
+  <p>Reading <code>send_to_targets</code> explains why: it dispatches on the target ARN's service and handles CloudWatch Logs, SQS, an events archive, a cross-account event bus, and API destinations. Lambda is not in the chain, so it falls through to the <code>else</code>. The gap is not container execution — it is cross-service <em>delivery</em>. moto models each service well and is deliberately conservative about wiring them to each other, which is exactly the thing our chain is made of.</p>
+
+  <p>So the event-driven half of the chain fell through to <code>tests/integration/</code>, which hits real us-east-1. Which means credentials, and it means <code>restore_vpc.sh</code>: a targeted Terraform apply that provisions a fresh NAT Gateway and Elastic IP, resumes the schedules, and re-arms every dev alarm. It works fine. It is just an absurd amount of ceremony to answer "does the rule fire".</p>
+
+  <p>There is a second, less obvious cost. The restore cycle hands the NAT a <em>new</em> public egress IP each time, and the release/restore round trip resets alarm state — a rare-signal alarm comes back <code>INSUFFICIENT_DATA</code> and has to re-earn its datapoints. Running the VPC up and down to test a routing rule quietly degrades the observability we built for actual incidents.</p>
+
+  <blockquote>
+    <p>"The tests we most wanted to run were the ones with the highest fixed cost to run at all."</p>
+  </blockquote>
+
+  <hr>
+
+  <h2>The bill was two months old</h2>
+
+  <p>It would be tidy to say the SAP integration created this problem. It did not. It made an existing one impossible to keep deferring, and the distinction matters for what we ended up building.</p>
+
+  <p>The joints Floci covers are not SAP-shaped. Saga compensation, the circuit breaker, the outbox poller, the A2A dead-letter opt-in — those are Step Functions Task states and SQS redrive policies, exactly the constructs this suite exercises, and every one of them was live-only long before SAP was a work item. Dated by when each live test file first landed:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Window</th>
+          <th>New live-only test files</th>
+          <th>SAP?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>13 Jun &ndash; 2 Jul</td>
+          <td><strong>17</strong> — incl. saga compensation, circuit breaker, outbox poller, A2A DLQ</td>
+          <td>None</td>
+        </tr>
+        <tr>
+          <td>2 Jul &ndash; 1 Sep</td>
+          <td>0</td>
+          <td>—</td>
+        </tr>
+        <tr class="row-gov">
+          <td>2&ndash;3 Sep</td>
+          <td><strong>7 in three days</strong></td>
+          <td>All of them</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Seventeen live-only files accumulated across three weeks in June, each paying the NAT tax on every run. Then the ledger sat still for two months. The SAP work did not introduce the first untestable joint — it added seven more in three days, and Floci went in on 2 September, the same day the first of them landed. The economics had justified this since June; what changed in September was the <em>rate</em>, and a cost you have been quietly absorbing becomes a decision the moment it starts compounding.</p>
+
+  <div class="callout">
+    <div class="callout-label">The debt that is left</div>
+    <p>Being precise about this changes what you build. "We need a local emulator for SAP" would have justified something SAP-shaped. What we actually needed had been justified since June — so the rig is generic (the compose file, the client fixtures, the in-memory <code>deploy_lambda</code> that takes any handler source), even though the only suite written on top of it so far is the SAP one. The June chains still run live. Porting the redrive and Task-state half of them is now a small job rather than a project, and it is the obvious next withdrawal from this account.</p>
+    <p>Not all seventeen, though. The agent-driven ones — anything that reaches Bedrock or the AgentCore data plane — can never move here, for the reasons in the table above. That boundary does not shift just because the rig got easier to use.</p>
+  </div>
+
+  <hr>
+
+  <h2>The spike: measure, don't read the README</h2>
+
+  <p>Floci (<code>floci/floci</code>, MIT-licensed, listening on port 4566) is a local AWS emulator in the LocalStack lineage. The interesting claim is that it runs Lambda as <em>real containers</em> rather than in-process handlers. That is exactly the ceiling we had hit, so it was worth a day.</p>
+
+  <p>We did not evaluate it from the documentation. We stood it up and drove Buyer Team's own patterns through it — the specific conditional writes, redrive policies and rules our code depends on — and wrote down what happened. The results below are measured, not claimed.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Surface</th>
+          <th>Result</th>
+          <th>What we actually drove through it</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>DynamoDB</td>
+          <td>Works</td>
+          <td><code>attribute_not_exists</code> and optimistic-lock conditions raise a real <code>ConditionalCheckFailedException</code>; <code>begins_with</code> queries; nested-map <code>SET</code>; <code>Decimal</code> typing</td>
+        </tr>
+        <tr>
+          <td>SQS</td>
+          <td>Works</td>
+          <td><code>RedrivePolicy</code> with <code>maxReceiveCount=3</code> → exactly three receives, then DLQ</td>
+        </tr>
+        <tr>
+          <td>Lambda</td>
+          <td>Works</td>
+          <td>Real <code>public.ecr.aws/lambda/python:3.14</code> container. ~36s first invoke while the image pulls, warm after</td>
+        </tr>
+        <tr>
+          <td>EventBridge</td>
+          <td>Works</td>
+          <td>Custom bus + pattern rule → Lambda; non-matching events filtered; <code>rate(1 minute)</code> fires at ~61s</td>
+        </tr>
+        <tr>
+          <td>Step Functions</td>
+          <td>Works</td>
+          <td>Execution reaches <code>SUCCEEDED</code> and the Task state genuinely invoked its Lambda</td>
+        </tr>
+        <tr>
+          <td>CloudWatch (custom)</td>
+          <td>Works</td>
+          <td><code>procurement/cost</code> custom metrics round-trip</td>
+        </tr>
+        <tr class="row-quality">
+          <td>CloudWatch (<code>AWS/*</code>)</td>
+          <td>Stub</td>
+          <td>No service metrics are synthesised — alarms store, then sit at <code>INSUFFICIENT_DATA</code> forever</td>
+        </tr>
+        <tr class="row-quality">
+          <td>Bedrock Runtime</td>
+          <td>Stub</td>
+          <td>Returns a canned string. Our six agents cannot run here at all</td>
+        </tr>
+        <tr class="row-quality">
+          <td>AgentCore data plane</td>
+          <td>Stub</td>
+          <td>Control plane returns real ARNs; the data plane returns a canned response, so AWS's SAP MCP container can never execute</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>That split is the whole adoption decision in one table. The stubbed column is not a gap to work around — it is the boundary of what this tool is allowed to claim, and we drew the suite's scope to match it exactly.</p>
+
+  <hr>
+
+  <h2>The part that surprised us: no source changes</h2>
+
+  <p>The usual tax on a local emulator is an endpoint seam — every client constructor grows an <code>endpoint_url</code> parameter that is <code>None</code> in production, and you carry that fork forever. We had budgeted for it in <code>lambda_core.client()</code>.</p>
+
+  <p>It was not needed. Floci injects <code>AWS_ENDPOINT_URL</code> into the Lambda containers it launches, and botocore honours that environment variable natively. Handler code that builds clients the ordinary way is already pointed at the emulator, with no knowledge that it is one.</p>
+
+  <div class="callout">
+    <div class="callout-label">Why this matters more than convenience</div>
+    <p>A test-only code path in production code is a place where the tested thing and the shipped thing diverge. Zero source changes means the handler running under Floci is byte-identical to the handler running in us-east-1. The emulator is a property of the environment, not of the code.</p>
+  </div>
+
+  <hr>
+
+  <h2>What we built</h2>
+
+  <p>The suite lives in <code>tests/floci/</code> and covers precisely the joints moto cannot reach: bus and source-filtered rule into a Lambda, a <code>rate(1 minute)</code> schedule firing, SQS redrive to DLQ after <code>maxReceiveCount</code>, and a Step Functions Task really running its target.</p>
+
+  <pre><code>docker compose -f tests/floci/docker-compose.yml up -d
+RUN_FLOCI=1 uv run pytest tests/floci -v
+docker compose -f tests/floci/docker-compose.yml down</code></pre>
+
+  <p>It is opt-in behind <code>RUN_FLOCI=1</code>, mirroring the existing <code>RUN_INTEGRATION</code> gate in the parent <code>conftest.py</code>. Default collection is unchanged — 55 tests before, 55 after — and the suite skips cleanly with a message telling you the compose command if Floci is not running. Nobody who does not want Docker in their loop has to have it.</p>
+
+  <p>Which left one problem: opt-in meant nothing ran it, so it was the only suite in the repo with no way to notice its own rot. It now runs nightly, and the guard is the interesting part — it is skipped while the dev environment is cost-paused by <code>release_vpc.sh</code>. That reads oddly at first, since this suite is the one thing that needs no NAT. But the pause is a statement that the environment is parked, and a nightly grinding through a parked window is the exact waste the release script exists to prevent; the daily FinOps poller is paused there for the same reason despite having no VPC dependency either.</p>
+
+  <p>The guard reads live state rather than a flag someone has to remember to set — the warm-floor rule that <code>release_vpc.sh</code> already toggles — so <code>restore_vpc.sh</code> re-arms the nightly with no extra step. A hand-maintained list of things that must not be forgotten is what produced our last heartbeat trap. It fails open in both directions: if the pause probe cannot reach AWS at all, the suite runs anyway, because being unable to reach AWS must never be what silently disables the one suite that does not need it.</p>
+
+  <pre><code>collect_ignore = []
+if not os.getenv("RUN_INTEGRATION"):
+    collect_ignore.append("integration")
+if not os.getenv("RUN_FLOCI"):
+    collect_ignore.append("floci")</code></pre>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">1</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Poller dedup guard</div>
+        <div class="pipe-desc">A PR already seen must not re-emit — the conditional write has to fail, for real.</div>
+        <div class="pipe-pass">✓ genuine <code>ConditionalCheckFailedException</code></div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">2</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Bus → rule → ingest</div>
+        <div class="pipe-desc">Publish on the SAP bus, then poll DynamoDB for the row the ingest handler is supposed to write.</div>
+        <div class="pipe-pass">✓ container starts, row appears</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">3</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Wrong source is filtered</div>
+        <div class="pipe-desc">The negative case the pattern exists for: unrelated traffic on the same bus must not reach ingest.</div>
+        <div class="pipe-pass">✓ no row written</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">4</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">The schedule fires</div>
+        <div class="pipe-desc">The <code>rate(1 minute)</code> both pollers run on. Takes ~60s by construction — you cannot fake the passage of a minute.</div>
+        <div class="pipe-pass">✓ fires at ~61s</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">5</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">PO export redrives to DLQ</div>
+        <div class="pipe-desc">A poisoned export must land in the DLQ after <em>exactly</em> <code>maxReceiveCount</code> attempts — the off-by-one is the whole test.</div>
+        <div class="pipe-pass">✓ three receives, then DLQ</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">6</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Step Functions Task really invokes</div>
+        <div class="pipe-desc">Not "execution succeeded" — we assert the target Lambda's side effect landed in the table.</div>
+        <div class="pipe-pass">✓ side effect observed</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <h2>Building the rig, one increment at a time</h2>
+
+  <p>The suite did not arrive whole, and it is more useful to read the path than the destination. Each step was small enough to validate on its own before the next one started, and each was shaped by something the emulator <em>requires</em> rather than something that went wrong. Taken in order, they are most of what you need to build one of these yourself.</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⊕</div>
+        <div class="tcard-title">1 · Name every run</div>
+      </div>
+      <p><strong>Constraint:</strong> Floci keeps state for the life of its container, so a long-lived emulator carries the previous run's resources into the next one — including a live <code>rate()</code> rule still firing into a table that has moved on. <strong>Increment:</strong> a session-scoped <code>run_id</code> suffixing every resource name. Isolation has to come from naming, because the backend offers none.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-blue">⊕</div>
+        <div class="tcard-title">2 · Share the emulator's network</div>
+      </div>
+      <p><strong>Constraint:</strong> the Lambda containers Floci launches join <em>Floci's</em> network, so a host port mapping is invisible from inside one. <strong>Increment:</strong> put the CAP mock on that same network behind an optional compose profile, listening on the port the Lambda actually dials rather than the one the image bakes in. This is what let a Lambda read the mock's OData surface with no ALB, certificate or VPC anywhere in the picture.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⊕</div>
+        <div class="tcard-title">3 · Tear down the pool, not the container</div>
+      </div>
+      <p><strong>Constraint:</strong> a graceful <code>docker compose down</code> lets Floci reap the warm-pool Lambda containers it started; killing it outright with <code>docker rm -f floci</code> does not, and they accumulate. <strong>Increment:</strong> teardown reaps the pool by name — <code>docker ps -aq --filter name=floci- | xargs -r docker rm -f</code>. The pipe rather than a <code>$(…)</code> substitution is deliberate: the ID list must word-split, which shellcheck flags as <code>SC2046</code>, and <code>xargs -r</code> makes the empty case a no-op for free.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <h2>Where we let real code in</h2>
+
+  <p>The handlers in this suite are written inline, in the test file, rather than importing the orchestrator's real modules. That is deliberate and it is the opposite of the usual advice, so it needs defending: this suite asserts <em>chain wiring</em>. Does the rule fire, does the redrive happen. The handler logic is unit-tested elsewhere, properly, and importing it here would only add a way for these tests to fail for reasons that have nothing to do with wiring.</p>
+
+  <p>There is exactly one exception. The SAP CSRF handshake was moved into <code>sap_client.sap_request</code> specifically so that no caller needs to know CSRF exists — and a claim like that deserves a test that exercises the real module, not a test-local reimplementation of the same handshake. So one fixture builds a deployment package containing the actual <code>orchestrator/sap_client.py</code> plus <code>httpx</code>, installed for the Lambda's real runtime target:</p>
+
+  <pre><code>uv pip install --target &lt;tmp&gt; \
+    --python-platform x86_64-manylinux2014 \
+    --python-version 3.14 \
+    --only-binary :all: httpx</code></pre>
+
+  <p>A Lambda then imports <code>sap_client</code> and drives a write against the CAP mock's OData V2 surface — the same surface AWS's SAP MCP server drives live. When that test goes red, the mock's write path or the client's handshake regressed. When the live run goes red and this one stays green, the problem is AWS's server or the deployed wiring. The two suites answer different questions, and keeping the boundary sharp is what makes either answer useful.</p>
+
+  <p>That decision paid off three weeks later, and not in a way we predicted. Migrating the direct-HTTP path to an S/4-shaped surface meant carrying an ETag from a <code>GET</code> onto the following <code>PATCH</code>, so a write would not come back <code>412</code> or <code>428</code>. The offline test surfaced something the documentation does not lead with: the V2 adapter demands <code>If-Match</code> <em>unconditionally</em> for an entity carrying <code>@odata.etag</code> — stricter than V4. Because the test drives the real <code>sap_client</code> rather than a local imitation of it, that constraint showed up as a failing assertion on a laptop instead of a <code>428</code> in a live run.</p>
+
+  <p>It also forced the test to get more honest. Its write path had been a collection <code>GET</code>; it is now a by-key <code>GET</code> immediately before the <code>PATCH</code>, same path string both times — mirroring <code>po_export_drain._close_requisition</code>'s actual idiom, because that is what gives the client's per-path ETag cache something to reuse. A fake that diverges from the caller it stands in for is the failure mode we keep guarding against; here the offline suite was the thing that caught it.</p>
+
+  <hr>
+
+  <h2>The honest limit</h2>
+
+  <p>We have been here before. Our legal-research service accumulated a class of bug where a test fake was <em>more permissive</em> than the real backend — every test green, production wrong, and nothing in CI able to tell the difference. An AWS emulator is that same hazard with a much larger surface area.</p>
+
+  <p>So the scope rule is written into the compose file and the suite's docstring, not just into someone's head. Bedrock, the AgentCore data plane, and alarms on <code>AWS/*</code> namespaces are explicitly <em>not</em> covered here, because Floci stubs them and a green test over a stub is worse than no test — it is a false negative with a checkmark next to it. <code>tests/integration/</code> against real AWS remains the source of truth for AWS behaviour.</p>
+
+  <div class="verdict">
+    <div class="verdict-badge">Adoption verdict</div>
+    <div class="verdict-text"><strong>Adopted, with the scope written down.</strong> Green on Floci means <em>the wiring is right</em> — it does not mean AWS agrees. That sentence is in the commit message, the compose file and the conftest docstring, because the day it stops being said out loud is the day the suite starts lying.</div>
+  </div>
+
+  <p>What we got for a day of spiking: the event-driven half of the SAP loop is now testable on a laptop, on a plane, with no credentials, no NAT Gateway, and no alarm state getting reset to prove that a routing rule routes. The live tests still exist and still run — they just no longer have to run to answer questions that were never really about AWS.</p>
+
+  <hr>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="failure-handling.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Designing for Failure in a Multi-Agent Procurement System</div>
+      </a>
+      <a href="durable-orchestration.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Pause for four days, resume in five seconds: durable execution</div>
+      </a>
+    </div>
+  </div>
+
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; September 2026</p>
+    <p>Based on the offline SAP-loop suite (impl PR #429; extended in #431&ndash;#433, the S/4 surface and ETag work in #437, and the nightly CI guard in #438) and a measured Floci 2.0.1 spike, 2 September 2026. From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> &mdash; an autonomous multi-agent procurement negotiation system.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

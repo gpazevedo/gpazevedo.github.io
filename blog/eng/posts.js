@@ -2,6 +2,15 @@
    Add one entry per file in this folder. Ties keep the order listed here. */
 window.engPosts = [
   {
+    "slug": "floci-offline-aws",
+    "file": "floci-offline-aws.html",
+    "title": "Adopting Floci: the tests that used to cost a NAT Gateway",
+    "description": "Why we put a local AWS emulator in the test suite: moto cannot invoke a Lambda container off an EventBridge rule, and the alternative was restoring the dev VPC.",
+    "tags": ["Testing", "Local Emulation", "AWS"],
+    "date": "2026-09-03",
+    "readingTime": 14
+  },
+  {
     "slug": "oauth-resource-server-pattern",
     "file": "oauth-resource-server-pattern.html",
     "title": "No users table: the OAuth 2.0 resource server pattern, adapted",
