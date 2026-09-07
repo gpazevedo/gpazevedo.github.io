@@ -2,6 +2,15 @@
    Add one entry per file in this folder. Ties keep the order listed here. */
 window.engPosts = [
   {
+    "slug": "specifying-and-measuring-ai-systems",
+    "file": "specifying-and-measuring-ai-systems.html",
+    "title": "Specifying and measuring an AI system",
+    "description": "A working method for specifying, instrumenting and evaluating systems that contain a model but are mostly ordinary software.",
+    "tags": ["AI systems"],
+    "date": "2026-09-06",
+    "readingTime": 11
+  },
+  {
     "slug": "floci-offline-aws",
     "file": "floci-offline-aws.html",
     "title": "Adopting Floci: the tests that used to cost a NAT Gateway",

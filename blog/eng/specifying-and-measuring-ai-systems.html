@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Specifying and measuring an AI system — Gustavo Azevedo</title>
+<meta name="description" content="A working method for specifying, instrumenting and evaluating systems that contain a model but are mostly ordinary software."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/specifying-and-measuring-ai-systems.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/specifying-and-measuring-ai-systems.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Specifying and measuring an AI system"/>
+<meta property="og:description" content="A working method for specifying, instrumenting and evaluating systems that contain a model but are mostly ordinary software."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-09-06T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-09-06T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="AI systems"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Specifying and measuring an AI system"/>
+<meta name="twitter:description" content="A working method for specifying, instrumenting and evaluating systems that contain a model but are mostly ordinary software."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Specifying and measuring an AI system","description":"A working method for specifying, instrumenting and evaluating systems that contain a model but are mostly ordinary software.","datePublished":"2026-09-06","dateModified":"2026-09-06","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/specifying-and-measuring-ai-systems.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/specifying-and-measuring-ai-systems.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Specifying and measuring an AI system","item":"https://gpazevedo.github.io/blog/eng/specifying-and-measuring-ai-systems.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+  /* Post-local: figures and requirement lines. Move to site-blog.css if reused. */
+  .fig { margin: 2rem 0 2.75rem; }
+  .fig .fig-frame {
+    background: #FAFAF8;
+    border: 1px solid rgba(15, 23, 42, .08);
+    border-radius: 12px;
+    padding: 1.25rem 1rem .75rem;
+  }
+  .fig svg { display: block; width: 100%; height: auto; font-family: 'Sora', sans-serif; }
+  .page h2 em { font-style: italic; color: var(--teal); }
+  /* Section 2: belongs / never belongs, side by side */
+  .spec-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.4rem 0 2.2rem;
+  }
+  @media (max-width: 640px) { .spec-grid { grid-template-columns: 1fr; } }
+  .spec-card {
+    border-radius: 10px;
+    padding: 1rem 1.1rem;
+    border: 1px solid rgba(15, 23, 42, .08);
+  }
+  .spec-card.yes { background: var(--green-light); border-color: rgba(0,0,0,0); }
+  .spec-card.no  { background: rgba(24, 95, 165, .05); }
+  .spec-card-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    margin-bottom: .6rem;
+  }
+  .spec-card.yes .spec-card-label { color: var(--green); }
+  .spec-card.no  .spec-card-label { color: var(--blue); }
+  .spec-card p {
+    font-family: var(--mono);
+    font-size: .78rem;
+    line-height: 1.55;
+    margin: 0 0 .55rem;
+  }
+  .spec-card p:last-child { margin-bottom: 0; }
+  .spec-card.no p { text-decoration: line-through; text-decoration-color: rgba(24,95,165,.5); opacity: .75; }
+  /* Section 3: numbered instrument labels */
+  .inst-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin: 2rem 0 .3rem;
+  }
+  .inst-label + p { margin-top: 0; }
+  /* Section 6: layer stack — step 5 sits on top of everything beneath it */
+  .stack { margin: 1.6rem 0 2rem; }
+  .stack-layer {
+    display: grid;
+    grid-template-columns: 2.4rem 1fr;
+    gap: .9rem;
+    align-items: baseline;
+    padding: .85rem 1.1rem;
+    border: 1px solid rgba(15, 23, 42, .08);
+    border-radius: 10px;
+    margin-bottom: .45rem;
+    background: #FAFAF8;
+  }
+  .stack-layer .n {
+    font-family: var(--mono);
+    font-size: .8rem;
+    color: var(--teal);
+    font-weight: 500;
+  }
+  .stack-layer p { margin: 0; font-size: .92rem; font-weight: 300; }
+  .stack-layer strong { font-weight: 600; color: var(--ink); }
+  .stack-layer.top { background: var(--blue-light); border-color: rgba(24, 95, 165, .25); }
+  .stack-layer.top .n { color: var(--blue); }
+  .stack-note {
+    font-family: var(--mono);
+    font-size: .72rem;
+    color: var(--blue);
+    text-align: center;
+    margin: .3rem 0 0;
+    letter-spacing: .02em;
+  }
+  .fig figcaption {
+    font-family: var(--mono);
+    font-size: .75rem;
+    letter-spacing: .02em;
+    color: var(--blue);
+    margin-top: .6rem;
+  }
+  .req {
+    font-family: var(--mono);
+    font-size: .82rem;
+    line-height: 1.6;
+    background: var(--green-light);
+    border-left: 3px solid var(--green);
+    border-radius: 0 8px 8px 0;
+    padding: .7rem 1rem;
+    margin: .8rem 0 1.8rem;
+  }
+  .req .kw { color: var(--green); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">AI systems</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>AI systems</span>
+    <span class="dot">·</span>
+    <time datetime="2026-09-06">September 2026</time>
+    <span class="dot">·</span>
+    <span>11 min read</span>
+  </div>
+
+  <h1>Specifying and measuring an <em>AI system</em></h1>
+  <p class="deck">A working method for systems that contain a model but are mostly not one.</p>
+
+  <div class="tldr">
+    <div class="tldr-label">TL;DR</div>
+    <p>Most software that "uses AI" is ordinary software with a model call somewhere in the middle. <strong>Shrink the nondeterministic surface to one function</strong>, specify everything on either side of it, and never let a quality claim into a design document.</p>
+    <p>Then measure: find ground truth you already hold, blind the judgements that need a human, ablate each layer, and <strong>report the number</strong> — including where it is bad — before building anything that acts on the output.</p>
+  </div>
+
+  <figure class="fig">
+    <div class="fig-frame">
+    <svg viewBox="0 0 680 380" role="img" aria-labelledby="fig1-title fig1-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="fig1-title">Extraction pipeline with one nondeterministic step</title>
+      <desc id="fig1-desc">Seven pipeline steps in sequence. Every step is deterministic except the model call, and model output must pass a validator before it is persisted; rejected output is counted.</desc>
+      <defs><marker id="arrow1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+      <g font-size="14" font-weight="500" text-anchor="middle">
+        <rect x="50" y="50" width="130" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+        <text x="115" y="68" fill="#444441" dominant-baseline="central">Fetch record</text>
+        <text x="115" y="88" fill="#5F5E5A" font-size="12" font-weight="400" dominant-baseline="central">source data</text>
+        <rect x="200" y="50" width="130" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+        <text x="265" y="68" fill="#444441" dominant-baseline="central">Render prompt</text>
+        <text x="265" y="88" fill="#5F5E5A" font-size="12" font-weight="400" dominant-baseline="central">versioned template</text>
+        <rect x="350" y="50" width="130" height="56" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+        <text x="415" y="68" fill="#712B13" dominant-baseline="central">Call model</text>
+        <text x="415" y="88" fill="#993C1D" font-size="12" font-weight="400" dominant-baseline="central">raw text out</text>
+        <rect x="500" y="50" width="130" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+        <text x="565" y="68" fill="#444441" dominant-baseline="central">Parse response</text>
+        <text x="565" y="88" fill="#5F5E5A" font-size="12" font-weight="400" dominant-baseline="central">text to structure</text>
+        <rect x="500" y="170" width="130" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+        <text x="565" y="188" fill="#085041" dominant-baseline="central">Validate</text>
+        <text x="565" y="208" fill="#0F6E56" font-size="12" font-weight="400" dominant-baseline="central">schema contract</text>
+        <rect x="350" y="170" width="130" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+        <text x="415" y="188" fill="#444441" dominant-baseline="central">Persist</text>
+        <text x="415" y="208" fill="#5F5E5A" font-size="12" font-weight="400" dominant-baseline="central">with provenance</text>
+        <rect x="200" y="170" width="130" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+        <text x="265" y="188" fill="#444441" dominant-baseline="central">Checkpoint</text>
+        <text x="265" y="208" fill="#5F5E5A" font-size="12" font-weight="400" dominant-baseline="central">resume on failure</text>
+        <rect x="490" y="270" width="150" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+        <text x="565" y="292" fill="#085041" dominant-baseline="central">Reject and count</text>
+      </g>
+      <g stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#arrow1)">
+        <line x1="180" y1="78" x2="198" y2="78"/>
+        <line x1="330" y1="78" x2="348" y2="78"/>
+        <line x1="480" y1="78" x2="498" y2="78"/>
+        <line x1="565" y1="106" x2="565" y2="168"/>
+        <line x1="500" y1="198" x2="482" y2="198"/>
+        <line x1="350" y1="198" x2="332" y2="198"/>
+        <line x1="565" y1="226" x2="565" y2="268"/>
+      </g>
+      <g font-size="12" fill="#5F5E5A" dominant-baseline="central">
+        <rect x="50" y="340" width="14" height="14" rx="3" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/><text x="72" y="347">Deterministic</text>
+        <rect x="180" y="340" width="14" height="14" rx="3" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/><text x="202" y="347">Nondeterministic</text>
+        <rect x="330" y="340" width="14" height="14" rx="3" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/><text x="352" y="347">Boundary contract</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Fig. 1 — The nondeterminism is confined to one box. Nothing reaches the store without passing the validator.</figcaption>
+  </figure>
+
+  <p>The usual conclusion about AI-containing systems is that the ordinary parts can be specified and tested as normal, and the AI part is a black box you just have to live with. That conclusion is wrong on both counts. The ordinary parts are larger and more consequential than they look, and the AI part is measurable — provided you build the instruments for measuring it before you build anything that depends on it.</p>
+
+  <p>This is the method I use. It applies to any pipeline that turns source data into model-generated records: extraction, classification, enrichment, graph construction.</p>
+
+  <h2>1. The line runs through each component, not between them</h2>
+
+  <p>The common mistake is to sort components into "AI parts" and "normal parts" and conclude that the AI parts can't be specified. That's too coarse.</p>
+
+  <p>Count the code in a typical inference component — say, one that extracts concepts from text. The model call is a handful of lines. Everything else is ordinary software: fetching the source record, rendering a versioned prompt template, calling with retry, timeout and backoff, parsing the response, validating it into typed objects, rejecting malformed output, persisting with provenance, and checkpointing so an interrupted run resumes.</p>
+
+  <p>That is the large majority of the component. It is fully deterministic, and it is exactly what a specification is good at. The nondeterminism is confined to one function that takes a rendered prompt and returns raw text.</p>
+
+  <p>Dex Horthy makes the same observation from the other side in his <a href="https://github.com/humanlayer/advanced-context-engineering-for-coding-agents/blob/main/ace-fca.md">notes on context engineering for coding agents</a>: a model call is a stateless function, context in and output out, so the context is the only lever you have on quality. He spends his effort on the input. This post spends it on what sits around the function, and the reason is the setting. A coding agent's output is checked for free by a compiler, a test suite and a maintainer. Model-generated records that go straight into a database get none of that, so the checking has to be built.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p><strong>Shrink the nondeterministic surface to a single function.</strong> Everything on either side of it is specifiable, and the boundary is a validation contract rather than a vague seam. If model output can reach your data store without passing through a validator, nondeterminism has leaked into the parts you believed were safe.</p>
+  </div>
+
+  <h2>2. What belongs in a specification — and what must never enter it</h2>
+
+  <h3>Real requirements are checkable</h3>
+
+  <p>A requirement for the deterministic scaffolding should describe something that goes wrong in practice and can be tested or gated. I write them in EARS-style constrained syntax ("WHEN <em>trigger</em> THE SYSTEM SHALL <em>response</em>"), though the notation matters less than the property of being checkable. Section 3 gives the six that matter most.</p>
+
+  <h3>Quality claims are not requirements</h3>
+
+  <div class="spec-grid">
+    <div class="spec-card yes">
+      <div class="spec-card-label">Belongs — checkable</div>
+      <p>WHEN a model response fails schema validation THE SYSTEM SHALL reject it and record the failure.</p>
+      <p>WHEN an extraction run is interrupted THE SYSTEM SHALL resume without reprocessing completed records.</p>
+    </div>
+    <div class="spec-card no">
+      <div class="spec-card-label">Never — a hypothesis</div>
+      <p>THE SYSTEM SHALL extract concepts accurately.</p>
+      <p>The extractor achieves high alignment against the controlled vocabulary.</p>
+    </div>
+  </div>
+
+  <p>The right-hand column is not a set of requirements. These are hypotheses. Written into a design document they acquire the appearance of settled decisions, and they are then quoted back as though they were established. If measuring exactly this is the point of your evaluation, a specification that quietly asserts the answer is the most damaging thing you can put in the repository.</p>
+
+  <blockquote><p>Quality lives in the evaluation as a measured number. It is asserted nowhere else.</p></blockquote>
+
+  <h3>Prefer executable invariants to prose</h3>
+
+  <p>A prose requirement says the system shall. A validator makes it so.</p>
+
+  <p>Where a rule is important enough to state, implement it as a constructor-level constraint: a record that cites no source fails to construct; a generated record without a model identifier fails to construct; an answer resting on inference fails to construct without a confidence and a caveat.</p>
+
+  <p>Two copies of a rule drift, and the copy that isn't executable is the one that goes stale. Where an invariant exists in code, the specification should point at it rather than restate it.</p>
+
+  <h3>Guard against spec rot</h3>
+
+  <p>Prompts change many times. A design document that describes the extraction method in prose describes version one forever while the code moves on.</p>
+
+  <p>Have the specification reference the prompt file rather than paraphrase its contents. The scaffolding around the prompt stays accurately described, and the method itself lives in exactly one place.</p>
+
+  <h2>3. Six instruments that make the AI part <em>tractable</em></h2>
+
+  <p>These are deterministic components whose whole purpose is to make the nondeterministic component measurable. They are the highest-value things to specify carefully, because every claim you later make depends on them.</p>
+
+  <figure class="fig">
+    <div class="fig-frame">
+    <svg viewBox="0 0 680 350" role="img" aria-labelledby="fig2-title fig2-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="fig2-title">Six instruments around the model call</title>
+      <desc id="fig2-desc">A four-step pipeline of prompt file, model call, validator and record store. Above it sit versioned prompts, cache and validation contract; below it sit provenance, resumability and separate declared and inferred fact types, each linked to the step it supports.</desc>
+      <defs><marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+      <g font-size="14" font-weight="500" text-anchor="middle" dominant-baseline="central">
+        <rect x="40" y="40" width="180" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+        <text x="130" y="58" fill="#085041">Versioned prompts</text><text x="130" y="78" fill="#0F6E56" font-size="12" font-weight="400">prompts are code</text>
+        <rect x="250" y="40" width="180" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+        <text x="340" y="58" fill="#085041">Cache</text><text x="340" y="78" fill="#0F6E56" font-size="12" font-weight="400">reproducible reruns</text>
+        <rect x="460" y="40" width="180" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+        <text x="550" y="58" fill="#085041">Validation contract</text><text x="550" y="78" fill="#0F6E56" font-size="12" font-weight="400">reject and count</text>
+        <rect x="50" y="150" width="130" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/><text x="115" y="172" fill="#444441">Prompt file</text>
+        <rect x="200" y="150" width="130" height="44" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/><text x="265" y="172" fill="#712B13">Call model</text>
+        <rect x="350" y="150" width="130" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/><text x="415" y="172" fill="#444441">Validator</text>
+        <rect x="500" y="150" width="130" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/><text x="565" y="172" fill="#444441">Record store</text>
+        <rect x="40" y="250" width="180" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+        <text x="130" y="268" fill="#085041">Provenance</text><text x="130" y="288" fill="#0F6E56" font-size="12" font-weight="400">source, model, prompt</text>
+        <rect x="250" y="250" width="180" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+        <text x="340" y="268" fill="#085041">Resumability</text><text x="340" y="288" fill="#0F6E56" font-size="12" font-weight="400">resume, don't redo</text>
+        <rect x="460" y="250" width="180" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+        <text x="550" y="268" fill="#085041">Two fact types</text><text x="550" y="288" fill="#0F6E56" font-size="12" font-weight="400">declared vs inferred</text>
+      </g>
+      <g stroke="#B4B2A9" stroke-width="0.75" stroke-dasharray="3 3" fill="none">
+        <line x1="130" y1="96" x2="115" y2="150"/>
+        <line x1="340" y1="96" x2="265" y2="150"/>
+        <line x1="550" y1="96" x2="415" y2="150"/>
+        <line x1="130" y1="250" x2="565" y2="194"/>
+        <line x1="340" y1="250" x2="565" y2="194"/>
+        <line x1="550" y1="250" x2="565" y2="194"/>
+      </g>
+      <g stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#arrow2)">
+        <line x1="180" y1="172" x2="198" y2="172"/>
+        <line x1="330" y1="172" x2="348" y2="172"/>
+        <line x1="480" y1="172" x2="498" y2="172"/>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Fig. 2 — Each instrument is deterministic, and each one exists to make a claim about the model call auditable.</figcaption>
+  </figure>
+
+  <div class="inst-label">01 · Versioned prompts</div>
+  <p><strong>Versioned prompts.</strong> Prompts are code. They live in files, under version control, referenced by identifier from every record they produced. Without this, a result cannot be attributed to the thing that produced it.</p>
+  <p class="req"><span class="kw">THE SYSTEM SHALL</span> render prompts from versioned template files and record the template version on every generated record.</p>
+
+  <div class="inst-label">02 · Validation contract</div>
+  <p><strong>A validation contract at the boundary.</strong> Model output is untyped text until a validator has accepted it. Rejection is a first-class outcome, counted and reported. A silently coerced response is a data-quality failure that surfaces much later and much more expensively.</p>
+  <p class="req"><span class="kw">WHEN</span> a model response fails schema validation <span class="kw">THE SYSTEM SHALL</span> reject it and record the failure, and <span class="kw">SHALL NOT</span> coerce it into a valid shape.</p>
+
+  <div class="inst-label">03 · Provenance</div>
+  <p><strong>Provenance on every generated record.</strong> Source record, model identifier, prompt version, timestamp, method. This is what makes a result auditable and a regression diagnosable.</p>
+  <p class="req"><span class="kw">THE SYSTEM SHALL NOT</span> persist a generated record lacking a pointer to its source record, a model identifier, a prompt version and the sampling parameters used.</p>
+
+  <div class="inst-label">04 · Cache</div>
+  <p><strong>A cache keyed on input, prompt version and model.</strong> This is what recovers reproducibility despite a nondeterministic model: a rerun of an evaluation returns identical results because it returns the same cached generations. Low temperature does not achieve this — output can still vary within a model version and certainly across them. Specify the cache, not identical output.</p>
+  <p class="req"><span class="kw">WHEN</span> the same input, prompt version and model have been processed before <span class="kw">THE SYSTEM SHALL</span> return the cached result rather than re-calling the model.</p>
+
+  <div class="inst-label">05 · Resumability</div>
+  <p><strong>Resumability.</strong> Long extraction runs fail. A run that cannot resume is a run you will be reluctant to repeat, and reluctance to rerun is how stale results survive.</p>
+  <p class="req"><span class="kw">WHEN</span> an extraction run is interrupted <span class="kw">THE SYSTEM SHALL</span> resume without reprocessing completed records.</p>
+
+  <div class="inst-label">06 · Declared vs inferred</div>
+  <p><strong>Separation of declared and inferred.</strong> Facts published by an authoritative source and facts your model produced are different kinds of statement. Keep them in separate types so they cannot be merged by accident, and so any answer built from them can declare which it rests on.</p>
+  <p class="req"><span class="kw">THE SYSTEM SHALL</span> keep declared facts and inferred facts in separate types, such that no code path can merge them.</p>
+
+  <h2>4. Measuring the system as a whole</h2>
+
+  <h3>Find ground truth you already hold</h3>
+
+  <p>The best evaluation costs nothing to label, because the labels already exist somewhere in your source data.</p>
+
+  <p>The pattern: identify a relationship your source publishes explicitly, withhold it from the inference pipeline, then measure whether the pipeline recovers it. In a support system, for example, tickets already carry the product area and root-cause category an agent assigned when closing them — hide those labels, classify from the ticket text alone, and check how often the inferred categories match the ones you hid.</p>
+
+  <figure class="fig">
+    <div class="fig-frame">
+    <svg viewBox="0 0 680 290" role="img" aria-labelledby="fig3-title fig3-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="fig3-title">Held-out ground truth evaluation</title>
+      <desc id="fig3-desc">A source record contains ticket text and declared labels. Only the text is fed to the pipeline, which produces inferred labels. The withheld declared labels bypass the pipeline and are compared against the inferred ones to yield precision and recall.</desc>
+      <defs><marker id="arrow3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+      <rect x="40" y="40" width="240" height="186" rx="12" fill="none" stroke="#888780" stroke-width="0.75" stroke-dasharray="4 3"/>
+      <g font-size="14" font-weight="500" dominant-baseline="central">
+        <text x="60" y="62" fill="#444441">Source record</text>
+        <g text-anchor="middle">
+          <rect x="60" y="84" width="200" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/><text x="160" y="106" fill="#444441">Ticket text</text>
+          <rect x="60" y="150" width="200" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+          <text x="160" y="168" fill="#085041">Declared labels</text><text x="160" y="188" fill="#0F6E56" font-size="12" font-weight="400">withheld from pipeline</text>
+          <rect x="340" y="84" width="140" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/><text x="410" y="106" fill="#3C3489">Pipeline</text>
+          <rect x="340" y="150" width="140" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+          <text x="410" y="168" fill="#3C3489">Inferred labels</text><text x="410" y="188" fill="#534AB7" font-size="12" font-weight="400">from text alone</text>
+          <rect x="520" y="117" width="120" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+          <text x="580" y="135" fill="#444441">Compare</text><text x="580" y="155" fill="#5F5E5A" font-size="12" font-weight="400">precision, recall</text>
+        </g>
+      </g>
+      <g stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#arrow3)">
+        <line x1="260" y1="106" x2="338" y2="106"/>
+        <line x1="410" y1="128" x2="410" y2="148"/>
+        <path d="M480 178 L500 178 L500 145 L518 145"/>
+        <path d="M160 206 L160 250 L580 250 L580 175"/>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Fig. 3 — The withheld labels never touch the pipeline. They exist only to be compared against.</figcaption>
+  </figure>
+
+  <p>This yields precision and recall on the central claim with no hand-labelling and no gold set to construct. Make it the headline metric precisely because no opinion can move it.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Design the held-out split before you look at results, and implement the withholding as a flag in the schema rather than a step in a script, so it cannot be quietly skipped.</p>
+  </div>
+
+  <h3>Separate reproduction from contribution</h3>
+
+  <p>An inferred relationship that reproduces something the source already declares proves the pipeline runs. It adds nothing, because the fact was already available.</p>
+
+  <p>The contribution is relationships the system infers that were <em>never</em> declared and that a domain expert confirms are real. Report these separately. A system that scores well only by rediscovering published facts has demonstrated a mechanism, not a result.</p>
+
+  <h3>Blind the judgements that need a human</h3>
+
+  <p>Where expert judgement is unavoidable, the builder is usually the expert, and self-evaluation reliably flatters the system.</p>
+
+  <p>Mix generated outputs with plausible-looking distractors and judge them together without knowing which is which.</p>
+
+  <blockquote><p>If the acceptance rate on distractors approaches the rate on real output, that is the finding — and it is invisible unblinded.</p></blockquote>
+
+  <p>Write the rubric before seeing any output, and do not revise it after seeing the aggregate.</p>
+
+  <p>The distinction that matters is what is being judged. Reviewing the <em>inputs</em> to the model &mdash; the prompt, the plan, the research it will act on &mdash; should be done unblinded, because there your bias is the expertise you want applied. Judging the <em>outputs</em> of your own pipeline is where the same bias flatters, and that is the judgement to blind.</p>
+
+  <h3>Record confidence per judgement</h3>
+
+  <p>Expertise is uneven across subdomains. A per-item confidence rating lets results be reported stratified rather than as a uniform expert assertion. If accuracy tracks stated confidence, that is itself evidence the evaluation is functioning.</p>
+
+  <h3>Attribute value by ablation</h3>
+
+  <p>Systems accrete signals that nobody has verified are helping. Run the evaluation with each layer removed — base retrieval alone, then with metadata reranking, then with structural constraint rejection — so each component gets a number for what it buys.</p>
+
+  <figure class="fig">
+    <div class="fig-frame">
+    <svg viewBox="0 0 680 260" role="img" aria-labelledby="fig4-title fig4-desc" xmlns="http://www.w3.org/2000/svg">
+      <title id="fig4-title">Ablation: precision by pipeline configuration</title>
+      <desc id="fig4-desc">Bar chart with illustrative values. Base retrieval 0.61 precision, plus metadata reranking 0.68, plus constraint rejection 0.74.</desc>
+      <g stroke="#e1e0d9" stroke-width="1">
+        <line x1="80" y1="50" x2="640" y2="50"/><line x1="80" y1="87.5" x2="640" y2="87.5"/>
+        <line x1="80" y1="125" x2="640" y2="125"/><line x1="80" y1="162.5" x2="640" y2="162.5"/>
+      </g>
+      <line x1="80" y1="200" x2="640" y2="200" stroke="#c3c2b7" stroke-width="1"/>
+      <g font-size="12" fill="#898781" text-anchor="end" dominant-baseline="central">
+        <text x="68" y="200">0.00</text><text x="68" y="162.5">0.25</text><text x="68" y="125">0.50</text><text x="68" y="87.5">0.75</text><text x="68" y="50">1.00</text>
+      </g>
+      <path d="M150 200 V112.5 a4 4 0 0 1 4 -4 h52 a4 4 0 0 1 4 4 V200 Z" fill="#85B7EB"/>
+      <path d="M310 200 V102 a4 4 0 0 1 4 -4 h52 a4 4 0 0 1 4 4 V200 Z" fill="#378ADD"/>
+      <path d="M470 200 V93 a4 4 0 0 1 4 -4 h52 a4 4 0 0 1 4 4 V200 Z" fill="#185FA5"/>
+      <g font-size="14" font-weight="500" fill="#444441" text-anchor="middle" dominant-baseline="central">
+        <text x="180" y="96">0.61</text><text x="340" y="86">0.68</text><text x="500" y="77">0.74</text>
+      </g>
+      <g font-size="12" fill="#5F5E5A" text-anchor="middle" dominant-baseline="central">
+        <text x="180" y="222">Base retrieval</text><text x="340" y="222">+ metadata reranking</text><text x="500" y="222">+ constraint rejection</text>
+      </g>
+      <text x="80" y="248" font-size="11" fill="#898781" dominant-baseline="central">Precision on held-out set — illustrative values</text>
+    </svg>
+    </div>
+    <figcaption>Fig. 4 — What an ablation report looks like. Some layers will earn their place and some will not.</figcaption>
+  </figure>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Every signal you add gets its own ablation bar. The ablation is cheap compared with discovering later that half the matching logic was noise.</p>
+  </div>
+
+  <h3>Report numbers, not adjectives</h3>
+
+  <p>"The system surfaces interesting relationships" is unfalsifiable, and will be recognised as such by anyone with a reason to scrutinise it. A precision figure against a held-out set, with the split described and the ablation attached, is a claim that survives contact with a sceptical reader.</p>
+
+  <p>The number does a second job. Horthy argues that the main purpose of code review is mental alignment &mdash; keeping a team on the same page about what the system is and how it changes &mdash; and that once output is cheap, most of a codebase is unfamiliar to any given engineer at any given time. His answer is that nobody can read a 2,000-line diff daily, but anyone can read a 200-line plan. The same holds here: nobody can audit 50,000 generated records, but anyone can read a precision figure with its split and its ablation. The evaluation report is how the next person understands what the system actually does.</p>
+
+  <p>Report the failures too: the share of source rules that could not be structured, the share of records the validator rejected, the subdomains where accuracy was poor. A system that surfaces its own incompleteness is more credible than one presenting a clean surface, and considerably more useful to whoever inherits it.</p>
+
+  <h2>5. Anti-patterns</h2>
+
+  <p>Each of these is something I have done or watched someone do. They share a shape: a shortcut that looks free and is paid for later, by someone else.</p>
+
+  <table>
+    <thead>
+      <tr><th>Anti-pattern</th><th>Why it fails</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Routing deterministic work through the model because it's convenient</td><td>Destroys the baseline, makes error attribution impossible, and costs money for no gain</td></tr>
+      <tr><td>Quality claims in design documents</td><td>Hypotheses acquire the status of decisions</td></tr>
+      <tr><td>Evaluation designed after results are seen</td><td>The split stops being held out in any meaningful sense</td></tr>
+      <tr><td>Unit tests standing in for evaluation</td><td>Tests confirm output is well-formed, never that it is correct</td></tr>
+      <tr><td>Tasks like "improve alignment"</td><td>Never completes; sits at a level that moves whenever the prompt changes</td></tr>
+      <tr><td>Building the appealing feature before validating the layer beneath it</td><td>The consequential layer ends up resting on the unmeasured one</td></tr>
+      <tr><td>Prompt text pasted into documentation</td><td>Describes version one forever</td></tr>
+    </tbody>
+  </table>
+
+  <h2>6. Sequence</h2>
+
+  <p>Read the stack from the bottom. Each layer is only as trustworthy as the one beneath it, and error multiplies on the way up. Horthy's version for coding agents: a bad line of code is one bad line, a bad line of a plan becomes hundreds, a bad line of research becomes thousands. For a runtime model the chain is the same shape. A bad line in the prompt becomes thousands of bad records, and a bad assumption in the evaluation design makes every one of them look fine. That is why the harness is built before the inference component, not after.</p>
+
+  <div class="stack">
+    <div class="stack-layer top"><span class="n">05</span><p><strong>Build downstream.</strong> Only now build anything that acts on the inferred output.</p></div>
+    <div class="stack-layer"><span class="n">04</span><p><strong>Measure. Ablate. Report the number</strong>, including where it is bad.</p></div>
+    <div class="stack-layer"><span class="n">03</span><p><strong>Build the inference component</strong>, versioning prompts from the first run.</p></div>
+    <div class="stack-layer"><span class="n">02</span><p><strong>Build the evaluation harness.</strong> Deterministic software with clear inputs and outputs — the thing standing between you and believing your own results. It gets full rigour before there are results to be tempted by.</p></div>
+    <div class="stack-layer"><span class="n">01</span><p><strong>Build the deterministic scaffolding</strong>, including the six instruments in section 3.</p></div>
+    <p class="stack-note">the consequential layer rests on everything below it</p>
+  </div>
+
+  <div class="callout">
+    <div class="callout-label">Why step five waits</div>
+    <p>Step five is the one most often taken early. Anything that gives advice, issues a credential, or otherwise affects a person is the consequential layer. Put it on top of an unmeasured inference layer, and <strong>the first person to discover the error rate is whoever the error happens to.</strong></p>
+  </div>
+
+  <p>That is the whole method, and it reduces to two moves. Shrink the nondeterministic surface until it is one function with a validator on its output, and then refuse to build on that function until a held-out number says what it is worth. Everything else here is just the scaffolding that makes those two moves possible.</p>
+
+  <!-- Related reading — uncomment once there is at least one other post to link.
+       Only link posts that already exist in this repo.
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="../eng/other-post.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Other post title</div>
+      </a>
+    </div>
+  </div>
+  -->
+
+  <h2>Further reading</h2>
+
+  <p>Two pieces argue the adjacent case for coding agents, where the model builds the software rather than running inside it. Dex Horthy's <a href="https://github.com/humanlayer/advanced-context-engineering-for-coding-agents/blob/main/ace-fca.md">Advanced Context Engineering for Coding Agents</a> is the source for the stateless-function framing, the error-multiplication argument and the case for review as mental alignment. Addy Osmani's <em>Agentic Engineering</em> (O'Reilly, early release), chapter 5, &ldquo;Specs as Leverage,&rdquo; covers what a spec for an agent should contain and the spec-like objects that fail on contact with a reader that won't raise its hand. Both are about the spec the model reads before it writes code; this post is about the spec for the code that surrounds a model at runtime.</p>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; September 2026</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

@@ -2,7 +2,11 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://gpazevedo.github.io/</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-06</lastmod>
+  </url>
+  <url>
+    <loc>https://gpazevedo.github.io/blog/eng/specifying-and-measuring-ai-systems.html</loc>
+    <lastmod>2026-09-06</lastmod>
   </url>
   <url>
     <loc>https://gpazevedo.github.io/blog/eng/floci-offline-aws.html</loc>
@@ -86,30 +90,30 @@
   </url>
   <url>
     <loc>https://gpazevedo.github.io/projects/buyer-team.html</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-06</lastmod>
   </url>
   <url>
     <loc>https://gpazevedo.github.io/projects/atlas-counsel.html</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-06</lastmod>
   </url>
   <url>
     <loc>https://gpazevedo.github.io/projects/scalable-mcp.html</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-06</lastmod>
   </url>
   <url>
     <loc>https://gpazevedo.github.io/projects/spring-genai.html</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-06</lastmod>
   </url>
   <url>
     <loc>https://gpazevedo.github.io/projects/aws-agentic-generator.html</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-06</lastmod>
   </url>
   <url>
     <loc>https://gpazevedo.github.io/demos/pr-to-po.html</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-06</lastmod>
   </url>
   <url>
     <loc>https://gpazevedo.github.io/demos/aws-architecture.html</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-09-06</lastmod>
   </url>
 </urlset>
