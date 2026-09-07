@@ -6,7 +6,15 @@
   <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
   <language>en-us</language>
-  <lastBuildDate>Thu, 03 Sep 2026 00:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Sun, 06 Sep 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>Specifying and measuring an AI system</title>
+      <link>https://gpazevedo.github.io/blog/eng/specifying-and-measuring-ai-systems.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/specifying-and-measuring-ai-systems.html</guid>
+      <pubDate>Sun, 06 Sep 2026 00:00:00 +0000</pubDate>
+      <description>A working method for specifying, instrumenting and evaluating systems that contain a model but are mostly ordinary software.</description>
+      <category>AI systems</category>
+    </item>
     <item>
       <title>Adopting Floci: the tests that used to cost a NAT Gateway</title>
       <link>https://gpazevedo.github.io/blog/eng/floci-offline-aws.html</link>
