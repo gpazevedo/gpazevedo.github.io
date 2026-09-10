@@ -26,6 +26,16 @@
       <category>AI systems</category>
     </item>
     <item>
+      <title>Wiring agents into SAP with the AWS for SAP MCP Server</title>
+      <link>https://gpazevedo.github.io/blog/eng/aws-sap-mcp-server.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/aws-sap-mcp-server.html</guid>
+      <pubDate>Sat, 05 Sep 2026 00:00:00 +0000</pubDate>
+      <description>Our SAP transport isn't code we wrote — it's AWS's own GA server on AgentCore Runtime. What that choice buys, what it costs, and how four operations became the entire contract between an agent platform and an ERP.</description>
+      <category>SAP</category>
+      <category>MCP</category>
+      <category>Integration</category>
+    </item>
+    <item>
       <title>Adopting Floci: the tests that used to cost a NAT Gateway</title>
       <link>https://gpazevedo.github.io/blog/eng/floci-offline-aws.html</link>
       <guid>https://gpazevedo.github.io/blog/eng/floci-offline-aws.html</guid>
