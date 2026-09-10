@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Emulating SAP for agentic development — Gustavo Azevedo</title>
+<meta name="description" content="You cannot point an agent at S/4HANA forty times an hour while you iterate on a prompt. Where to cut the emulation seam, and the eight-increment order that built one."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/emulating-sap-for-agentic-development.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/emulating-sap-for-agentic-development.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Emulating SAP for agentic development"/>
+<meta property="og:description" content="You cannot point an agent at S/4HANA forty times an hour while you iterate on a prompt. Where to cut the emulation seam, and the eight-increment order that built one."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-09-10T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-09-10T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="SAP"/>
+<meta property="article:tag" content="MCP"/>
+<meta property="article:tag" content="Local Emulation"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Emulating SAP for agentic development"/>
+<meta name="twitter:description" content="You cannot point an agent at S/4HANA forty times an hour while you iterate on a prompt. Where to cut the emulation seam, and the eight-increment order that built one."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Emulating SAP for agentic development","description":"You cannot point an agent at S/4HANA forty times an hour while you iterate on a prompt. Where to cut the emulation seam, and the eight-increment order that built one.","datePublished":"2026-09-10","dateModified":"2026-09-10","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/emulating-sap-for-agentic-development.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/emulating-sap-for-agentic-development.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Emulating SAP for agentic development","item":"https://gpazevedo.github.io/blog/eng/emulating-sap-for-agentic-development.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+
+<style>
+/* ---------------------------------------------------------------------------
+   Post-specific additions. Loaded after both site stylesheets.
+   Only what buyer-team-blog.css and site-blog.css do not already provide:
+   the figure/SVG vocabulary and list indentation (the shared reset zeroes
+   list padding and never restores it).
+   Colours come from the shared tokens so dark mode follows.
+   --------------------------------------------------------------------------- */
+.fig{margin:2.4rem 0 2.75rem;color:var(--ink)}
+.fig svg{display:block;width:100%;height:auto}
+.fig figcaption{font-size:.85rem;font-weight:300;color:var(--ink-muted);
+                margin-top:.7rem;line-height:1.6}
+
+.fig .t{font-size:14px;fill:currentColor}
+.fig .th{font-size:14px;font-weight:500;fill:currentColor}
+.fig .ts{font-size:12px;fill:currentColor;fill-opacity:.68}
+.fig .arr{stroke:currentColor;stroke-opacity:.45;stroke-width:1.25;fill:none}
+.fig .seam{stroke:currentColor;stroke-opacity:.3;stroke-width:1;stroke-dasharray:5 4}
+.fig .seam-on{stroke:var(--teal);stroke-opacity:1;stroke-width:1.5}
+
+.fig .n-gray   rect,.fig .n-gray   circle{fill:currentColor;fill-opacity:.08;
+                                          stroke:currentColor;stroke-opacity:.45}
+.fig .n-teal   rect,.fig .n-teal   circle{fill:var(--teal-light); stroke:var(--teal)}
+.fig .n-coral  rect,.fig .n-coral  circle{fill:var(--coral-light);stroke:var(--coral)}
+.fig .n-purple rect,.fig .n-purple circle{fill:rgba(127,119,221,.15);stroke:#6A61CC}
+.fig .n-amber  rect,.fig .n-amber  circle{fill:var(--amber-light);stroke:var(--amber)}
+.fig .n-green  rect,.fig .n-green  circle{fill:var(--green-light);stroke:var(--green)}
+.fig .n-blue   rect,.fig .n-blue   circle{fill:var(--blue-light); stroke:var(--blue)}
+.fig .frame rect{fill:none;stroke:currentColor;stroke-opacity:.22}
+
+.page ul{margin:0 0 1.4rem;padding-left:1.15rem}
+.page li{margin-bottom:.5rem;font-weight:300;color:var(--ink)}
+</style>
+</head>
+
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Emulating SAP</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <time datetime="2026-09-10">September 2026</time>
+    <span class="dot">·</span>
+    <span>22 min read</span>
+  </div>
+
+  <h1>Emulating SAP for <em>agentic development</em></h1>
+  <p class="deck">You cannot point an agent at S/4HANA forty times an hour while you iterate on a prompt. The fix isn't emulating SAP — it's emulating the OData contract your MCP server actually sees, built one increment at a time.</p>
+
+  <div class="tldr">
+    <div class="tldr-label">TL;DR</div>
+    <p>You cannot build an agentic SAP integration against a shared sandbox you get to touch twice a week. You need an emulator, and the useful one is <strong>not a fake SAP</strong> — it is a fake of the OData contract your tool layer actually sees.</p>
+    <p>Cut the seam <strong>below the MCP server</strong> so the server stays production code. Then build it <strong>one increment at a time</strong>, and let each increment buy one capability the previous one put in reach. That is the part worth copying: not the final shape of the emulator, but the order the capabilities arrive in.</p>
+  </div>
+
+  <p>You have an agent that needs to read purchase orders out of S/4HANA. Maybe it also needs to create them. You have an MCP server that exposes SAP's OData surface as tools. What you do not have is an SAP system you can point it at forty times an hour while you iterate on a prompt.</p>
+
+  <p>This is the practical bottleneck in most agentic SAP projects. Sandboxes are shared, provisioning takes weeks, someone else's test data changes under you, and nobody is going to let an unproven agent run <code>odata_create</code> against anything until you can show it behaves. Meanwhile the agent loop you are building needs a tight feedback cycle to develop at all.</p>
+
+  <p>The answer is to emulate SAP. Not all of it, not the parts you would expect, and — this is the part most write-ups skip — not all at once.</p>
+
+  <h2>You are not emulating SAP</h2>
+
+  <p>The single most useful reframe: you are emulating the OData surface that your agent's tool layer sees. Nothing else.</p>
+
+  <p>This is what the clean-core pattern buys you. If your architecture touches SAP only through standard API surface, then the seam between "your system" and "SAP" is a well-defined HTTP contract, and a well-defined HTTP contract is something you can serve from a laptop. You are not reimplementing ABAP, pricing procedures, availability checks, or the enqueue server. You are serving XML metadata and JSON entity sets over HTTPS.</p>
+
+  <p>If you find yourself trying to reproduce SAP-computed business logic in your fake, stop. That is a signal that the path you are testing genuinely needs a real system, and you should be honest about it rather than building an elaborate lie.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">Emulate the contract, not the system. Find the narrowest interface your integration actually touches and serve that — the narrower the seam, the cheaper the fake and the higher its fidelity.</span>
+  </div>
+
+  <h2>Pick the right seam</h2>
+
+  <p>There are three places you can cut, and they test very different things.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 680 424" role="img" xmlns="http://www.w3.org/2000/svg">
+      <title>Three places to cut the integration for testing</title>
+      <desc>The stack runs agent, MCP server, SAP gateway, S/4HANA. Seam one stubs the tools below the agent, seam two fakes the OData endpoint below the MCP server, seam three uses a real sandbox below the gateway. Seam two is highlighted as the recommended cut.</desc>
+
+      <g class="n-gray"><rect x="170" y="30" width="300" height="52" rx="8" stroke-width="1"/>
+      <text class="th" x="320" y="56" text-anchor="middle" dominant-baseline="central">Your agent</text></g>
+
+      <line class="seam" x1="118" y1="108" x2="460" y2="108"/>
+      <g class="n-gray"><circle cx="100" cy="108" r="11" stroke-width="1"/></g>
+      <text class="ts" x="100" y="108" text-anchor="middle" dominant-baseline="central">1</text>
+      <text class="ts" x="474" y="108" dominant-baseline="central">Stub the tools</text>
+
+      <g class="n-teal"><rect x="170" y="134" width="300" height="52" rx="8" stroke-width="1"/>
+      <text class="th" x="320" y="160" text-anchor="middle" dominant-baseline="central">MCP server</text></g>
+
+      <line class="seam-on" x1="118" y1="212" x2="460" y2="212"/>
+      <g class="n-teal"><circle cx="100" cy="212" r="11" stroke-width="1"/></g>
+      <text class="ts" x="100" y="212" text-anchor="middle" dominant-baseline="central">2</text>
+      <text class="th" x="474" y="212" dominant-baseline="central">Fake the OData endpoint</text>
+
+      <g class="n-coral"><rect x="170" y="238" width="300" height="52" rx="8" stroke-width="1"/>
+      <text class="th" x="320" y="264" text-anchor="middle" dominant-baseline="central">SAP gateway</text></g>
+
+      <line class="seam" x1="118" y1="316" x2="460" y2="316"/>
+      <g class="n-gray"><circle cx="100" cy="316" r="11" stroke-width="1"/></g>
+      <text class="ts" x="100" y="316" text-anchor="middle" dominant-baseline="central">3</text>
+      <text class="ts" x="474" y="316" dominant-baseline="central">Real sandbox</text>
+
+      <g class="n-coral"><rect x="170" y="342" width="300" height="52" rx="8" stroke-width="1"/>
+      <text class="th" x="320" y="368" text-anchor="middle" dominant-baseline="central">S/4HANA</text></g>
+    </svg>
+    <figcaption>Everything above the cut runs as production code. Seam 2 is the only one that leaves the MCP server, its catalog discovery, and its query construction in the test path.</figcaption>
+  </figure>
+
+  <p><strong>Seam 1, stubbing the tools.</strong> You hand the agent a fake <code>odata_read</code> that returns canned JSON. This is fast and it is worth having for prompt iteration, but understand what it does not test: catalog discovery, metadata parsing, OData query construction, auth, the read and write enablement flags, error handling, pagination. All the places integrations actually break. Use it for the inner loop of prompt work and nothing else.</p>
+
+  <p><strong>Seam 2, faking the OData endpoint.</strong> You point <code>MCP_SERVER_SAP_BASE_URL</code> at a server you control. The real MCP server container runs. It does real catalog discovery, builds real <code>$filter</code> expressions, handles real responses. Everything between your agent and the network boundary is production code. This is where you should spend your effort.</p>
+
+  <p><strong>Seam 3, the real thing.</strong> Highest fidelity, and you still need it, just not on every commit.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">Cut below the component you most want to exercise, not above it. A seam chosen for convenience tests your test harness; a seam chosen for coverage tests your system.</span>
+  </div>
+
+  <p>The rest of this post is about seam 2. Concretely, it means swapping one branch under an otherwise untouched stack:</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 680 296" role="img" xmlns="http://www.w3.org/2000/svg">
+      <title>What the emulator replaces</title>
+      <desc>The agent and the MCP server run unchanged. Below the server, the base URL points either at an OData emulator built from real metadata and fixtures, or at the real SAP BTP and S/4HANA path used only on the higher rungs.</desc>
+      <defs><marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+
+      <g class="n-gray"><rect x="190" y="26" width="300" height="52" rx="8" stroke-width="1"/>
+      <text class="th" x="340" y="52" text-anchor="middle" dominant-baseline="central">Your agent</text></g>
+
+      <line class="arr" x1="340" y1="78" x2="340" y2="100" marker-end="url(#ar2)"/>
+
+      <g class="n-teal"><rect x="190" y="106" width="300" height="56" rx="8" stroke-width="1"/>
+      <text class="th" x="340" y="128" text-anchor="middle" dominant-baseline="central">MCP server</text>
+      <text class="ts" x="340" y="146" text-anchor="middle" dominant-baseline="central">Unchanged production container</text></g>
+
+      <path class="arr" d="M340 162 V190 H185 V202" marker-end="url(#ar2)"/>
+      <path class="arr" d="M340 190 H495 V202" marker-end="url(#ar2)"/>
+
+      <g class="n-green"><rect x="60" y="208" width="250" height="58" rx="8" stroke-width="1"/>
+      <text class="th" x="185" y="230" text-anchor="middle" dominant-baseline="central">OData emulator</text>
+      <text class="ts" x="185" y="248" text-anchor="middle" dominant-baseline="central">Real metadata, fixtures</text></g>
+
+      <g class="n-coral"><rect x="370" y="208" width="250" height="58" rx="8" stroke-width="1"/>
+      <text class="th" x="495" y="230" text-anchor="middle" dominant-baseline="central">SAP BTP and S/4HANA</text>
+      <text class="ts" x="495" y="248" text-anchor="middle" dominant-baseline="central">Rungs 3 and 4 only</text></g>
+    </svg>
+    <figcaption>One environment variable decides the branch. Nothing above it changes between environments, which is the entire point.</figcaption>
+  </figure>
+
+  <h2>The path, and what each increment buys</h2>
+
+  <p>What follows is the actual order the emulator was built in, over about three days. I am giving it as a path rather than a design because the order is the useful part: each increment buys one capability, and having that capability is what puts the next one in reach. The later ones were not on the roadmap — the emulator earned them by getting good enough to push further.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 680 468" role="img" xmlns="http://www.w3.org/2000/svg">
+      <title>Eight increments and what each one unlocks</title>
+      <desc>A vertical list of eight increments. One: CAP domain model, V4 service and stdio MCP server, the fast loop. Two: Kraljic axes on the material group. Three: create_purchase_order as a deep insert. Four: container Lambda, Basic auth, OData V2 and a hand-built CSRF handshake. Five: filter literal escaping and a token on every response. Six: health and reseed endpoints. Seven: CI running the tests and a docker build. Eight: S/4 field names, ETag concurrency and fault injection.</desc>
+
+      <g class="n-teal"><rect x="52" y="16" width="608" height="50" rx="8" stroke-width="1"/><circle cx="30" cy="41" r="13" stroke-width="1"/></g>
+      <text class="ts" x="30" y="41" text-anchor="middle" dominant-baseline="central">1</text>
+      <text class="th" x="68" y="35" dominant-baseline="central">CAP domain model, V4 service, stdio MCP server</text>
+      <text class="ts" x="68" y="53" dominant-baseline="central">The fast loop: a second to restart, the same known state every time.</text>
+
+      <g class="n-teal"><rect x="52" y="72" width="608" height="50" rx="8" stroke-width="1"/><circle cx="30" cy="97" r="13" stroke-width="1"/></g>
+      <text class="ts" x="30" y="97" text-anchor="middle" dominant-baseline="central">2</text>
+      <text class="th" x="68" y="91" dominant-baseline="central">Kraljic axes carried on the material group</text>
+      <text class="ts" x="68" y="109" dominant-baseline="central">An agent can classify a line as leverage or bottleneck without recomputing it.</text>
+
+      <g class="n-teal"><rect x="52" y="128" width="608" height="50" rx="8" stroke-width="1"/><circle cx="30" cy="153" r="13" stroke-width="1"/></g>
+      <text class="ts" x="30" y="153" text-anchor="middle" dominant-baseline="central">3</text>
+      <text class="th" x="68" y="147" dominant-baseline="central">A write tool: create_purchase_order, as a deep insert</text>
+      <text class="ts" x="68" y="165" dominant-baseline="central">Exercises the one path nobody will let you run against real SAP.</text>
+
+      <g class="n-blue"><rect x="52" y="184" width="608" height="50" rx="8" stroke-width="1"/><circle cx="30" cy="209" r="13" stroke-width="1"/></g>
+      <text class="ts" x="30" y="209" text-anchor="middle" dominant-baseline="central">4</text>
+      <text class="th" x="68" y="203" dominant-baseline="central">Container Lambda, Basic auth, OData V2, hand-built CSRF</text>
+      <text class="ts" x="68" y="221" dominant-baseline="central">AWS's real SAP MCP Server can now drive it, unmodified, over V2.</text>
+
+      <g class="n-amber"><rect x="52" y="240" width="608" height="50" rx="8" stroke-width="1"/><circle cx="30" cy="265" r="13" stroke-width="1"/></g>
+      <text class="ts" x="30" y="265" text-anchor="middle" dominant-baseline="central">5</text>
+      <text class="th" x="68" y="259" dominant-baseline="central">Escape $filter literals; echo the token on every response</text>
+      <text class="ts" x="68" y="277" dominant-baseline="central">Filter literals that hold, and a handshake real V2 clients accept.</text>
+
+      <g class="n-amber"><rect x="52" y="296" width="608" height="50" rx="8" stroke-width="1"/><circle cx="30" cy="321" r="13" stroke-width="1"/></g>
+      <text class="ts" x="30" y="321" text-anchor="middle" dominant-baseline="central">6</text>
+      <text class="th" x="68" y="315" dominant-baseline="central">GET /health, POST /admin/reseed</text>
+      <text class="ts" x="68" y="333" dominant-baseline="central">A test can see a cold start coming and reset to a known seed.</text>
+
+      <g class="n-green"><rect x="52" y="352" width="608" height="50" rx="8" stroke-width="1"/><circle cx="30" cy="377" r="13" stroke-width="1"/></g>
+      <text class="ts" x="30" y="377" text-anchor="middle" dominant-baseline="central">7</text>
+      <text class="th" x="68" y="371" dominant-baseline="central">CI: run the tests, then build the image</text>
+      <text class="ts" x="68" y="389" dominant-baseline="central">Two invariants held on every commit: tests pass, image builds.</text>
+
+      <g class="n-green"><rect x="52" y="408" width="608" height="50" rx="8" stroke-width="1"/><circle cx="30" cy="433" r="13" stroke-width="1"/></g>
+      <text class="ts" x="30" y="433" text-anchor="middle" dominant-baseline="central">8</text>
+      <text class="th" x="68" y="427" dominant-baseline="central">S/4 field names, ETag concurrency, fault injection</text>
+      <text class="ts" x="68" y="445" dominant-baseline="central">Real vocabulary, real concurrency rejection, failures on demand.</text>
+    </svg>
+    <figcaption>Increments 5 through 8 are the ones you cannot plan for. They arrive once a client you did not write is driving the fake, and each one raises its fidelity a level.</figcaption>
+  </figure>
+
+  <h2>1–3. A domain model, and a loop fast enough to be worth having</h2>
+
+  <p>The starting point is a small CAP application: Suppliers, Materials, Purchase Requisitions and Purchase Orders with their line items, backed by an in-memory SQLite database seeded from CSV on every restart. Nothing persists between runs, which locally is a feature — every test starts from the same known state.</p>
+
+  <p>Above it sits a thin MCP server over stdio that wraps the OData API as tools, so an agent can ask for purchase orders without hand-building query strings. Restart takes a second. That is increment 1, and for a while it is all you need.</p>
+
+  <p>Two things went in immediately after, and both are worth stealing.</p>
+
+  <p><strong>Carry the signal your agent actually reasons about.</strong> The fixtures grew a <code>MaterialGroups</code> entity holding the two Kraljic axes — profit impact and supply risk — so a sourcing agent can classify a line as leverage, strategic, non-critical or bottleneck without recomputing it. A fixture set that is structurally correct and semantically empty produces an agent that looks like it works and reasons about nothing.</p>
+
+  <p><strong>Build the write path early.</strong> <code>create_purchase_order</code> does a deep insert: a header with nested line items, one request. This is the tool nobody will let you run against a real system, which is exactly why it has to be the one you exercise most against the fake.</p>
+
+  <h2>Fixtures are scenarios, not rows</h2>
+
+  <p>Before going further, the thing that determines whether any of this is worth running: what is actually in the database.</p>
+
+  <p>The instinct is to generate a thousand plausible purchase orders. That is close to useless. An agent that works on a thousand well-formed records tells you nothing. What you want is a small set of records that each encode a situation the agent must handle correctly:</p>
+
+  <ul>
+    <li>A PO fully delivered, and one partially delivered</li>
+    <li>A requisition still open, and one already converted to an order and linked to it</li>
+    <li>One record in a currency that is not the company code currency</li>
+    <li>One with a null in a field your prompt assumes is populated</li>
+    <li>One belonging to a different purchasing group than the calling user</li>
+    <li>One with a supplier name containing an apostrophe, because <code>$filter</code> string literals escape by doubling and something in your stack will get this wrong</li>
+  </ul>
+
+  <p>That last one is not a hypothetical — increment 5 below is what that fixture caught.</p>
+
+  <p>Name the fixtures after the scenario, not the record. <code>po-partially-delivered.json</code> beats <code>po-4500012347.json</code>. When a test fails you want to know which situation broke, not which number.</p>
+
+  <p>Then add the volume case: one entity set large enough that an unguarded read blows out the context window. This is how you verify that the count-before-read discipline actually holds under a model in a hurry, rather than merely being written down in your system prompt.</p>
+
+  <p>Note what this argues against: a large synthetic dataset. Two material groups, three suppliers, three materials, two purchase orders and two requisitions — seeded from plain semicolon-separated CSV and reloaded fresh on every restart — cover more real agent behaviour than a thousand generated rows would, and stay legible enough that you can read the fixture file and know exactly what state you are asserting against.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">Name fixtures after the situation, not the record. The fixture directory should read as a list of the things that can go wrong.</span>
+  </div>
+
+  <h2>4. Point the real client at it</h2>
+
+  <p>This is the increment that changes what the emulator is for.</p>
+
+  <p>Up to here the only consumer was a hand-written MCP server, which means the fake and its client were built by the same person from the same assumptions — the failure mode where a mock and its caller agree with each other and both disagree with reality. The fix is to make the consumer something you did not write: AWS's <strong>AWS for SAP MCP Server</strong>, the real GA container, unmodified, pointed at this backend the same way it would point at a real SAP gateway.</p>
+
+  <p>That server speaks OData V2, so the emulator had to grow one.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 960 700" role="img" xmlns="http://www.w3.org/2000/svg">
+      <title>sap/ architecture: two client paths, two OData versions, one backend</title>
+      <desc>Claude Code agents reach the CAP app locally over OData V4 through mcp-server/server.js. AWS's real AWS for SAP MCP Server reaches the same CAP app, deployed as a container-image Lambda, over OData V2 through a CSRF handshake in server.js. Inside the CAP app two V4 services project the same tables, one under the original field names and one under real S/4 names, and server.js adds admin routes for health, reseed and fault injection. Everything converges on the same in-memory SQLite database seeded from CSV. Four test files pin the behaviour and run in CI.</desc>
+      <defs>
+        <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/></marker>
+        <marker id="arrowOrange" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#c2410c"/></marker>
+        <marker id="arrowGray" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#4b5563"/></marker>
+        <marker id="arrowGrayDash" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#6b7280"/></marker>
+        <style>
+          .a-title{font:600 18px ui-sans-serif,system-ui,sans-serif;fill:#111827}
+          .a-lane{font:600 13px ui-sans-serif,system-ui,sans-serif;fill:#111827}
+          .a-desc{font:400 10.5px ui-sans-serif,system-ui,sans-serif;fill:#374151}
+          .a-desc-sm{font:400 9.5px ui-sans-serif,system-ui,sans-serif;fill:#374151}
+          .a-mono{font:500 10px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#111827}
+          .a-mono-sm{font:500 9.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#4b5563}
+          .a-v4{font:600 10.5px ui-sans-serif,system-ui,sans-serif;fill:#1d4ed8}
+          .a-v2{font:600 10.5px ui-sans-serif,system-ui,sans-serif;fill:#c2410c}
+          .a-path{font:500 9.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;fill:#4b5563}
+          .a-legend{font:400 10px ui-sans-serif,system-ui,sans-serif;fill:#4b5563}
+        </style>
+      </defs>
+      <rect x="0" y="0" width="960" height="700" rx="12" fill="#fafafa" stroke="#e5e7eb"/>
+      <text x="480" y="28" text-anchor="middle" class="a-title">sap/ — two client paths into the same CAP backend</text>
+
+      <rect x="40" y="46" width="250" height="52" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+      <text x="165" y="77" text-anchor="middle" class="a-lane">Claude Code / negotiation agents</text>
+      <path d="M165,98 L165,118" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowBlue)"/>
+      <rect x="40" y="120" width="250" height="54" rx="8" fill="#eff6ff" stroke="#2563eb" stroke-width="1.5"/>
+      <text x="165" y="142" text-anchor="middle" class="a-mono">mcp-server/server.js</text>
+      <text x="165" y="158" text-anchor="middle" class="a-desc-sm">(sap-procurement-emulator · stdio)</text>
+
+      <rect x="640" y="46" width="280" height="52" rx="8" fill="#fff7ed" stroke="#c2410c" stroke-width="1.5"/>
+      <text x="780" y="67" text-anchor="middle" class="a-lane">AWS Bedrock AgentCore</text>
+      <text x="780" y="83" text-anchor="middle" class="a-desc-sm">AWS for SAP MCP Server (real, GA)</text>
+      <path d="M780,98 L780,118" fill="none" stroke="#c2410c" stroke-width="2" marker-end="url(#arrowOrange)"/>
+      <text x="792" y="113" class="a-desc-sm">HTTPS + Basic auth</text>
+      <rect x="640" y="120" width="280" height="54" rx="8" fill="#fff7ed" stroke="#c2410c" stroke-width="1.5"/>
+      <text x="780" y="142" text-anchor="middle" class="a-desc">Lambda Function URL</text>
+      <text x="780" y="158" text-anchor="middle" class="a-desc-sm">(Dockerfile + Lambda Web Adapter)</text>
+
+      <path d="M165,174 L165,228 L330,228 L330,260" fill="none" stroke="#2563eb" stroke-width="2" marker-end="url(#arrowBlue)"/>
+      <text x="250" y="200" text-anchor="middle" class="a-v4">OData V4</text>
+      <text x="250" y="214" text-anchor="middle" class="a-path">/odata/v4/procurement</text>
+      <path d="M780,174 L780,228 L630,228 L630,260" fill="none" stroke="#c2410c" stroke-width="2" marker-end="url(#arrowOrange)"/>
+      <text x="708" y="200" text-anchor="middle" class="a-v2">OData V2</text>
+      <text x="708" y="214" text-anchor="middle" class="a-path">/odata/v2/procurement</text>
+
+      <rect x="200" y="262" width="560" height="266" rx="10" fill="#ffffff" stroke="#374151" stroke-width="1.5"/>
+      <text x="480" y="286" text-anchor="middle" class="a-lane">CAP app — cds-serve</text>
+      <text x="480" y="301" text-anchor="middle" class="a-mono-sm">entrypoint: server.js</text>
+
+      <rect x="214" y="314" width="172" height="62" rx="6" fill="#eff6ff" stroke="#93c5fd"/>
+      <text x="300" y="338" text-anchor="middle" class="a-mono">procurement-service</text>
+      <text x="300" y="354" text-anchor="middle" class="a-desc-sm">V4 · original field names</text>
+
+      <rect x="396" y="314" width="172" height="62" rx="6" fill="#ecfdf5" stroke="#6ee7b7"/>
+      <text x="482" y="338" text-anchor="middle" class="a-mono">s4-procurement-service</text>
+      <text x="482" y="354" text-anchor="middle" class="a-desc-sm">V4 · real S/4 names + handler</text>
+
+      <rect x="578" y="314" width="172" height="62" rx="6" fill="#fff7ed" stroke="#fdba74"/>
+      <text x="664" y="338" text-anchor="middle" class="a-mono">server.js</text>
+      <text x="664" y="354" text-anchor="middle" class="a-desc-sm">CSRF handshake → cov2ap</text>
+
+      <path d="M300,376 L300,396" fill="none" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+      <path d="M482,376 L482,396" fill="none" stroke="#4b5563" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+
+      <rect x="280" y="398" width="400" height="54" rx="6" fill="#f3f4f6" stroke="#9ca3af"/>
+      <text x="480" y="420" text-anchor="middle" class="a-mono">db/schema.cds</text>
+      <text x="480" y="436" text-anchor="middle" class="a-desc-sm">in-memory SQLite · seeded from db/data/*.csv</text>
+
+      <rect x="214" y="470" width="536" height="44" rx="6" fill="#fefce8" stroke="#d1d5db"/>
+      <text x="482" y="489" text-anchor="middle" class="a-mono">GET /health · POST /admin/reseed · POST|DELETE /admin/fault</text>
+      <text x="482" y="504" text-anchor="middle" class="a-desc-sm">mounted ahead of CSRF and cov2ap — not part of the OData surface</text>
+
+      <path d="M480,548 L480,532" fill="none" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrowGrayDash)"/>
+
+      <rect x="40" y="550" width="430" height="46" rx="6" fill="#fafafa" stroke="#9ca3af" stroke-dasharray="4 3"/>
+      <text x="255" y="569" text-anchor="middle" class="a-mono">test-odata-contract.sh</text>
+      <text x="255" y="584" text-anchor="middle" class="a-desc-sm">V4 contract pins (SB-C1…C7)</text>
+
+      <rect x="490" y="550" width="430" height="46" rx="6" fill="#fafafa" stroke="#9ca3af" stroke-dasharray="4 3"/>
+      <text x="705" y="569" text-anchor="middle" class="a-mono">test/csrf.test.js</text>
+      <text x="705" y="584" text-anchor="middle" class="a-desc-sm">V2 token handshake regression</text>
+
+      <rect x="40" y="604" width="430" height="46" rx="6" fill="#fafafa" stroke="#9ca3af" stroke-dasharray="4 3"/>
+      <text x="255" y="623" text-anchor="middle" class="a-mono">test/s4-surface.test.js</text>
+      <text x="255" y="638" text-anchor="middle" class="a-desc-sm">S/4 names, key resolution, stale If-Match → 412</text>
+
+      <rect x="490" y="604" width="430" height="46" rx="6" fill="#fafafa" stroke="#9ca3af" stroke-dasharray="4 3"/>
+      <text x="705" y="623" text-anchor="middle" class="a-mono">fault-injection · health-reseed</text>
+      <text x="705" y="638" text-anchor="middle" class="a-desc-sm">armed failures, cold-start probe, forced reseed</text>
+
+      <line x1="290" y1="672" x2="326" y2="672" stroke="#374151" stroke-width="2"/>
+      <text x="334" y="676" class="a-legend">request path</text>
+      <line x1="530" y1="672" x2="566" y2="672" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="574" y="676" class="a-legend">pinned by, and run by npm test in CI</text>
+    </svg>
+    <figcaption>The V2 adapter fronts both V4 services, so the S/4-named surface is reachable from either lane. The left path is rung 2 from the ladder below — your own MCP server, run locally. The right path is a step past it: the real AWS server, unmodified, talking V2 to the same fixtures over a real CSRF handshake.</figcaption>
+  </figure>
+
+  <p>Two mechanical details from that increment cost real time and are worth writing down.</p>
+
+  <p><strong>The V2 surface is generated, not hand-typed.</strong> A V2 adapter — <code>@cap-js-community/odata-v2-adapter</code> — produces a genuine V2 surface from the same CDS model that serves V4: the <code>d.results</code> envelope, <code>__metadata</code>, <code>guid'…'</code> keys, V2 EDMX, all from real protocol code rather than a hand-written imitation. It is a plugin CAP's own discovery has to find, which means it must be a <em>declared</em> dependency. Installing it without letting your package manager write the entry is enough to leave it silently unmounted, serving nothing, with no error.</p>
+
+  <p><strong>The CSRF handshake is not in the box.</strong> Classic V2 clients do a token dance before any write: <code>GET</code> with <code>X-CSRF-Token: Fetch</code>, read the token from the response header, send it back on the write. Neither CAP core nor the V2 adapter implements that for a service's own endpoints — both source trees only carry client-side helpers for calling <em>out</em> to protected services. So it is hand-built: the adapter's self-registration is switched off in config, and the CSRF middleware is mounted manually, ahead of it, so tokens are issued and checked before anything proxies to V4.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">If the real integration component can run against your emulator unmodified, you have not built a mock of the integration — you have built a test environment for it. Aim for that whenever the real component is available to you at all.</span>
+  </div>
+
+  <h2>5. What an independent client exercises</h2>
+
+  <p>Within a day the independent client had pushed into two paths no amount of designing would have found, and each one turned into a permanent property of the stack.</p>
+
+  <p><strong>Filter literals that hold under a hostile value.</strong> <code>status</code>, <code>poNumber</code> and <code>prNumber</code> were being interpolated raw into <code>$filter</code>. Passing <code>status = "OPEN' or status ne '"</code> broke out of the string literal and rewrote the filter's boolean logic — every row came back. OData escapes a single quote by doubling it; a one-function fix, applied at four call sites, verified against the emulator by watching the same crafted value return every row before and zero rows after. That is the apostrophe fixture from the list above, earning its keep as a security finding rather than a formatting nicety.</p>
+
+  <p><strong>A handshake shaped like the one real clients expect.</strong> The first CSRF implementation set <code>X-CSRF-Token</code> only on responses to requests that carried the <code>Fetch</code> sentinel, which is what the protocol description implies. AWS's <code>odata_update</code> failed against it with "CSRF token not found in response headers" — its update flow reads the target entity by key first, with no sentinel, and expects <em>that</em> response to already carry a usable token. Real clients pick up tokens opportunistically from whichever response they saw last. The fix is to echo the current token on every response.</p>
+
+  <div class="callout">
+    <p>A third behaviour sits underneath that one, and it is the more interesting one: after the header fix, writes still failed intermittently. Debug logging proved the server's own token had changed between two calls nine seconds apart with no fetch in between. The cause was the Lambda cold-starting and re-running the module's <code>randomBytes</code> — capping concurrency does not keep an execution environment warm. Nothing in the token logic was wrong. The live test retries the whole call, and the emulator stayed amnesiac on purpose.</p>
+  </div>
+
+  <h2>6. A probe and a reset, so the container can say where it is</h2>
+
+  <p>Locally, "nothing persists between runs" is a gift. Deployed as a container-image Lambda, keeping it a gift takes two small endpoints: the in-memory database and the CSRF token both reset on every cold start, and a test should be able to see that happen rather than guess at it.</p>
+
+  <p>Provisioned concurrency would suppress the resets and charge for the privilege. Making them visible and repeatable is cheaper and worth more:</p>
+
+  <ul>
+    <li><code>GET /health</code> — no auth, so it doubles as a Lambda health probe. Returns build SHA, boot timestamp, and the current row count per entity. A live test polling it can tell a genuine cold start (a new <code>bootedAt</code>) from a warm container, and the build SHA is what a drift check compares against when the deployed image and the tag it claims disagree.</li>
+    <li><code>POST /admin/reseed</code> — authenticated with the same credential as the OData service. Drops every row and reloads from the CSV fixtures in foreign-key-safe order, returning the new counts. A test that calls it in setup cannot have its assertions muddied by a cold start.</li>
+  </ul>
+
+  <p>Both are mounted ahead of the CSRF and V2 middleware, because neither is part of the OData surface and neither should inherit its handshake.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">When your fake is deliberately stateless, give callers a probe and a reset instead of paying to make it stateful. Cheaper, and it turns an invisible source of flaky tests into an assertion.</span>
+  </div>
+
+  <h2>7. CI that keeps two invariants true</h2>
+
+  <p>Building the image locally to verify the health endpoint is what made the case for CI: the Dockerfile still carried a <code>COPY</code> of a directory the repository never had. Minutes to fix once something ran the build, an afternoon to find on a deploy.</p>
+
+  <p>So increment 7 is a CI workflow, and it is deliberately small: install, <code>npm test</code>, then <code>docker build</code> with the git SHA as a build argument. No push, no AWS credentials, no deploy. It proves exactly two things — the tests still pass and the image still builds — which are the two invariants every later increment leans on.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">An artifact nothing builds on a schedule is an artifact that is already broken. A CI job that only builds and throws the result away is worth more than it looks.</span>
+  </div>
+
+  <h2>8. Real S/4 names, and what they unlock</h2>
+
+  <p>This is the increment that makes the emulator's vocabulary real, and it returns more per line changed than anything else on the path.</p>
+
+  <p>The original model used names that were convenient: <code>poNumber</code>, <code>materialNumber</code>, <code>status</code>. Real S/4 uses <code>A_PurchaseOrder.PurchaseOrder</code>, <code>A_PurchaseOrderItem.Material</code>, <code>ProcessingStatus</code>, and it makes org fields mandatory that the mock had no concept of at all — <code>CompanyCode</code>, <code>Plant</code>, <code>PurchasingOrganization</code>, <code>PurchasingGroup</code>, <code>PurchaseRequisitionType</code>, <code>AccountAssignmentCategory</code>. An agent developed against invented names is an agent trained on a vocabulary that does not exist.</p>
+
+  <p>The move is a <em>second</em> service projecting the same tables under real S/4 entity and field names, mounted alongside the original. Both stay live until every caller has moved; deleting the old one is a later step, not this one. Adding a surface is cheap and reversible, and it lets callers migrate one at a time.</p>
+
+  <p>Doing it produced the single best finding of the whole exercise. Reads expose the business key by flattening an association path — <code>material.materialNumber as Material</code> — so a response carries <code>MAT-1001</code> rather than an internal UUID. CAP cannot reverse that on write. Posting <code>{"Material": "MAT-1001"}</code> does not error: it <strong>silently drops the field</strong>, and you get a line item with no material at all.</p>
+
+  <p>The resolution — look the business key up, set the foreign key, reject with a 400 if it does not exist — is precisely the work a real S/4 OData service's own ABAP handler does server-side. Nobody had planned to write it. It surfaced because the fake was faithful enough to reach the same wall the real service does, which is the whole return on building it faithfully.</p>
+
+  <p>Two more things landed with it:</p>
+
+  <ul>
+    <li><strong>Optimistic concurrency.</strong> Real S/4 rejects a <code>PATCH</code> without a matching <code>If-Match</code>. An ETag annotation on the managed <code>modifiedAt</code> of orders and requisitions turns that on, and a test asserts that a stale token gets a 412 and a fresh one succeeds. Without this, a write path can carry a lost-update bug all the way to production and never see a 412 in development.</li>
+    <li><strong>Deliberate failure.</strong> <code>POST /admin/fault</code> arms the next N OData calls to fail with a chosen status — 400, 412, 429 or 503 — and <code>DELETE</code> disarms it. It is armed as server state rather than a request header on purpose: the calls that need to fail are ones the caller's own SDK makes internally, which a test has no way to attach a header to.</li>
+  </ul>
+
+  <p>That last one opens a path the earlier increments could not reach. A caller's retry classification, backoff and dead-letter handling only run when something fails, so the emulator has to be able to fail on cue.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">Add the faithful surface next to the convenient one rather than replacing it, and give the fake a switch that makes it fail on demand. Retry logic that has never seen a failure is not logic, it is decoration.</span>
+  </div>
+
+  <h2>What actually has to be right</h2>
+
+  <p>Stepping out of the path: here is the checklist those increments converged on. A JSON server that returns <code>{"purchaseOrders": [...]}</code> will make your agent work perfectly in dev and fail on day one in staging.</p>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Thing</th><th>What SAP actually does</th></tr></thead>
+    <tbody>
+      <tr><td>Response envelope</td><td>OData V2 wraps collections as <code>{"d": {"results": [...]}}</code> and single entities as <code>{"d": {...}}</code>. Not V4's <code>{"value": [...]}</code>.</td></tr>
+      <tr><td>Entity metadata</td><td>Every entity carries a <code>__metadata</code> object with <code>uri</code>, <code>type</code>, and often <code>etag</code>. Some clients follow the <code>uri</code> for subsequent reads.</td></tr>
+      <tr><td>Field names</td><td>Standard APIs use <code>A_</code>-prefixed entities and SAP field names, and make org fields mandatory. Convenient names train the agent on a vocabulary that does not exist.</td></tr>
+      <tr><td>Business keys</td><td>Reads expose the business key; writes may need it resolved back to an internal key. Check that your stack does not silently drop the field instead of erroring.</td></tr>
+      <tr><td>Dates</td><td><code>Edm.DateTime</code> serializes as <code>/Date(1767225600000)/</code>. Filters use the literal form <code>datetime'2026-01-01T00:00:00'</code>. Times come back as ISO 8601 durations like <code>PT08H30M00S</code>.</td></tr>
+      <tr><td>Decimals</td><td><code>Edm.Decimal</code> serializes as a <em>string</em>, not a number. An agent doing arithmetic on <code>"1250.00"</code> without parsing will silently concatenate.</td></tr>
+      <tr><td>Keys</td><td>Document numbers are zero-padded fixed-width strings. Purchase order <code>4500012345</code> is a 10-character string; material numbers are 18 characters padded. An integer key teaches the agent the wrong lookup format.</td></tr>
+      <tr><td>Counting</td><td><code>/EntitySet/$count</code> returns a bare integer as <code>text/plain</code>. <code>$inlinecount=allpages</code> puts a <code>__count</code> string in the body.</td></tr>
+      <tr><td>CSRF</td><td>Modifying requests need a token: GET with <code>X-CSRF-Token: Fetch</code>, read it from the response header, send it back on the POST with the session cookie. Echo it on every response, not only on the fetch.</td></tr>
+      <tr><td>Concurrency</td><td>A <code>PATCH</code> without a matching <code>If-Match</code> is rejected with 412. Skip this and a lost-update bug never surfaces before production.</td></tr>
+      <tr><td>Client</td><td>The <code>sap-client</code> parameter selects the logical client. Getting it wrong in production means querying an empty client and receiving a valid, empty, wrong answer.</td></tr>
+      <tr><td>Errors</td><td><code>{"error": {"code": "...", "message": {"lang": "en", "value": "..."}}}</code> with gateway-style exception codes. Agents reason about error text, so give them realistic error text.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout">
+    <p>The envelope is the one that bites hardest. A team that builds its emulator against V4 conventions writes an agent, prompts, and an eval set that all quietly assume <code>value</code>. Every one of those artifacts has to be revisited when the first real response arrives shaped as <code>d.results</code>. This is the strongest argument for generating the V2 surface from a real adapter rather than typing it out.</p>
+  </div>
+
+  <p>Two further behaviours are worth reproducing on purpose, because they are exactly the failures your guardrails are meant to catch.</p>
+
+  <p><strong>Annotation-driven restrictions.</strong> SAP's metadata carries <code>sap:filterable</code>, <code>sap:sortable</code>, <code>sap:creatable</code>, <code>sap:updatable</code>, and <code>sap:required-in-filter</code>. A service with <code>sap:required-in-filter="true"</code> on a field will reject a read that does not filter on it. A field marked <code>sap:filterable="false"</code> errors if you filter it. A permissive mock accepts all of this happily. Make at least one entity set enforce its own annotations and you will learn in dev whether your agent reads metadata or guesses.</p>
+
+  <p><strong>Pagination that is not <code>$skip</code>.</strong> Some services require <code>$skiptoken</code> for stable paging. Build one entity set that way. It is also the canonical example of what a service hints file is for, so it doubles as a live test of whether your hints are actually reaching the model.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">Reproduce the vendor's restrictions, not only its happy path. A permissive mock is a mock that lies, and it lies in the direction that feels like progress.</span>
+  </div>
+
+  <h2>Start from real metadata where you can</h2>
+
+  <p>The increments above generated the emulator's schema from a CDS model, which is the right move when you are also the one deciding the domain. Where you are integrating with a standard SAP API, the stronger move is to take the vendor's own contract.</p>
+
+  <p>The <code>$metadata</code> document <em>is</em> the contract. Your agent's model reads it to learn entity set names, property names, types, key fields, and navigation properties. Invent it and you are training your agent against field names that do not exist — which is exactly the debt increment 8 was paying off.</p>
+
+  <p>Getting the real one is a single GET against a service you already know the name of, and you can usually obtain it without full sandbox access. SAP publishes EDMX for standard services through its API documentation. Somebody on the customer side can export it from their gateway in thirty seconds. A trial or developer edition system will hand you the standard catalog.</p>
+
+  <p>Then commit that file. Treat it as a versioned contract artifact, not a fixture. Everything else in your emulator is generated from it or validated against it. The payoff compounds: once the metadata is real you can generate fixture skeletons from it, validate every fixture against the declared types, and catch the class of bug where your test data carries a field the real service does not expose.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">Never hand-write a schema you can obtain. Pull the vendor's own schema document, commit it, and generate your fixtures from it rather than alongside it.</span>
+  </div>
+
+  <h2>The write path is why any of this exists</h2>
+
+  <figure class="fig">
+    <svg viewBox="0 0 680 358" role="img" xmlns="http://www.w3.org/2000/svg">
+      <title>Read and write tools, and the two-level write opt-in</title>
+      <desc>Five read tools are on by default. Four write tools are off by default and need both the master write flag and the matching per-operation flag before they run.</desc>
+
+      <g class="frame"><rect x="40" y="50" width="280" height="268" rx="18" stroke-width="1"/></g>
+      <text class="th" x="60" y="80" dominant-baseline="central">Read tools</text>
+      <text class="ts" x="60" y="98" dominant-baseline="central">On by default</text>
+
+      <g class="n-teal"><rect x="60" y="112" width="240" height="30" rx="5" stroke-width="1"/><text class="ts" x="74" y="127" dominant-baseline="central">find_sap_services</text></g>
+      <g class="n-teal"><rect x="60" y="150" width="240" height="30" rx="5" stroke-width="1"/><text class="ts" x="74" y="165" dominant-baseline="central">get_metadata</text></g>
+      <g class="n-teal"><rect x="60" y="188" width="240" height="30" rx="5" stroke-width="1"/><text class="ts" x="74" y="203" dominant-baseline="central">odata_read</text></g>
+      <g class="n-teal"><rect x="60" y="226" width="240" height="30" rx="5" stroke-width="1"/><text class="ts" x="74" y="241" dominant-baseline="central">odata_count</text></g>
+      <g class="n-teal"><rect x="60" y="264" width="240" height="30" rx="5" stroke-width="1"/><text class="ts" x="74" y="279" dominant-baseline="central">get_service_hints</text></g>
+
+      <g class="frame"><rect x="360" y="50" width="280" height="268" rx="18" stroke-width="1"/></g>
+      <text class="th" x="380" y="80" dominant-baseline="central">Write tools</text>
+      <text class="ts" x="380" y="98" dominant-baseline="central">Off by default</text>
+
+      <g class="n-coral"><rect x="380" y="112" width="240" height="30" rx="5" stroke-width="1"/><text class="ts" x="394" y="127" dominant-baseline="central">odata_create</text></g>
+      <g class="n-coral"><rect x="380" y="150" width="240" height="30" rx="5" stroke-width="1"/><text class="ts" x="394" y="165" dominant-baseline="central">odata_update</text></g>
+      <g class="n-coral"><rect x="380" y="188" width="240" height="30" rx="5" stroke-width="1"/><text class="ts" x="394" y="203" dominant-baseline="central">odata_delete</text></g>
+      <g class="n-coral"><rect x="380" y="226" width="240" height="30" rx="5" stroke-width="1"/><text class="ts" x="394" y="241" dominant-baseline="central">odata_function_import</text></g>
+
+      <g class="n-amber"><rect x="380" y="264" width="240" height="34" rx="5" stroke-width="1"/>
+      <text class="ts" x="394" y="281" dominant-baseline="central">Needs master flag plus op flag</text></g>
+    </svg>
+    <figcaption>The write column is why the emulator earns its keep. Against fixtures you can turn both flags on, let the agent genuinely create records, and assert on the resulting state — which no shared sandbox will ever let you do on every commit.</figcaption>
+  </figure>
+
+  <p>Every one of the late increments — the CSRF handshake, the business-key resolution, the ETag rejection, the injected 429 — is on the write path. That is not a coincidence. The read path is the one a shared sandbox will grudgingly give you; the write path is the one you will only ever exercise properly against something you own.</p>
+
+  <h2>Emulate authorization, not just authentication</h2>
+
+  <p>This is the recommendation people skip and the one that causes the most expensive late-stage rework. It is also the next increment on this path rather than one already taken: today the emulator runs one <code>mcp</code> account with Basic auth, and every caller sees every row.</p>
+
+  <p>That is fine while the emulator's job is protocol fidelity. It stops being fine the moment agent behaviour depends on visibility. If your fixtures return every record to every caller, the agent never learns it might see a partial view, your prompts never handle "the user cannot see that PO", and your evaluation set has no coverage of the case.</p>
+
+  <p>Then you ship with on-behalf-of token exchange, SAP's authorization objects start filtering per user, and the agent's behaviour changes in ways nobody tested.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 680 260" role="img" xmlns="http://www.w3.org/2000/svg">
+      <title>Machine-to-machine versus on-behalf-of identity</title>
+      <desc>Under machine-to-machine the server uses one service account and the agent sees every record, so authorization becomes the agent layer's problem. Under on-behalf-of token exchange the end-user identity reaches SAP and the agent sees a filtered slice.</desc>
+      <defs><marker id="ar4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="currentColor" stroke-opacity=".45" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+
+      <g class="n-purple"><rect x="40" y="26" width="280" height="44" rx="8" stroke-width="1"/>
+      <text class="th" x="180" y="48" text-anchor="middle" dominant-baseline="central">M2M</text></g>
+      <g class="n-purple"><rect x="360" y="26" width="280" height="44" rx="8" stroke-width="1"/>
+      <text class="th" x="500" y="48" text-anchor="middle" dominant-baseline="central">ON_BEHALF_OF</text></g>
+
+      <line class="arr" x1="180" y1="76" x2="180" y2="94" marker-end="url(#ar4)"/>
+      <line class="arr" x1="500" y1="76" x2="500" y2="94" marker-end="url(#ar4)"/>
+
+      <g class="n-gray"><rect x="40" y="100" width="280" height="44" rx="8" stroke-width="1"/>
+      <text class="t" x="180" y="122" text-anchor="middle" dominant-baseline="central">One service account</text></g>
+      <g class="n-gray"><rect x="360" y="100" width="280" height="44" rx="8" stroke-width="1"/>
+      <text class="t" x="500" y="122" text-anchor="middle" dominant-baseline="central">End-user identity</text></g>
+
+      <line class="arr" x1="180" y1="150" x2="180" y2="168" marker-end="url(#ar4)"/>
+      <line class="arr" x1="500" y1="150" x2="500" y2="168" marker-end="url(#ar4)"/>
+
+      <g class="n-amber"><rect x="40" y="174" width="280" height="56" rx="8" stroke-width="1"/>
+      <text class="th" x="180" y="194" text-anchor="middle" dominant-baseline="central">Agent sees everything</text>
+      <text class="ts" x="180" y="212" text-anchor="middle" dominant-baseline="central">Authorization is your problem</text></g>
+
+      <g class="n-green"><rect x="360" y="174" width="280" height="56" rx="8" stroke-width="1"/>
+      <text class="th" x="500" y="194" text-anchor="middle" dominant-baseline="central">Agent sees a slice</text>
+      <text class="ts" x="500" y="212" text-anchor="middle" dominant-baseline="central">SAP applies its own objects</text></g>
+    </svg>
+    <figcaption>Develop against the left column, ship the right one, and the difference is discovered by a user rather than a test.</figcaption>
+  </figure>
+
+  <p>The increment to take is small: read a header identifying the caller and filter fixtures by purchasing group, company code, or plant. The org fields that increment 8 added are exactly the ones you would filter on, which is the usual pattern — a fidelity increment makes the next one cheap. It costs an afternoon, and it turns "user asks about a PO they cannot see" into a scenario with a fixture rather than an incident.</p>
+
+  <p>Keep the transport auth simple in the fast loop. Emulate the consequences of the identity model, not its handshake.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">When you stub an auth boundary, stub what it <em>filters</em>, not just what it <em>permits</em>. The expensive surprises come from visibility, not from 401s.</span>
+  </div>
+
+  <h2>An environment ladder</h2>
+
+  <p>Different questions deserve different fidelity. Four rungs, in descending frequency of use.</p>
+
+  <figure class="fig">
+    <svg viewBox="0 0 680 344" role="img" xmlns="http://www.w3.org/2000/svg">
+      <title>Four-rung environment ladder</title>
+      <desc>Rung one is an in-process fixture server run on every save. Rung two adds the real MCP server and runs on every commit. Rung three is recorded replay, run nightly. Rung four is a real sandbox, run per release.</desc>
+
+      <g class="n-green"><rect x="40" y="26" width="400" height="60" rx="8" stroke-width="1"/><circle cx="64" cy="56" r="13" stroke-width="1"/>
+      <text class="ts" x="64" y="56" text-anchor="middle" dominant-baseline="central">1</text>
+      <text class="th" x="88" y="48" dominant-baseline="central">Fixture server, in-process</text>
+      <text class="ts" x="88" y="66" dominant-baseline="central">Prompt and agent-loop iteration</text></g>
+      <g class="n-gray"><rect x="460" y="39" width="180" height="34" rx="17" stroke-width="1"/>
+      <text class="ts" x="550" y="56" text-anchor="middle" dominant-baseline="central">Every save</text></g>
+
+      <g class="n-green"><rect x="40" y="102" width="400" height="60" rx="8" stroke-width="1"/><circle cx="64" cy="132" r="13" stroke-width="1"/>
+      <text class="ts" x="64" y="132" text-anchor="middle" dominant-baseline="central">2</text>
+      <text class="th" x="88" y="124" dominant-baseline="central">Fixtures plus the real MCP server</text>
+      <text class="ts" x="88" y="142" dominant-baseline="central">Tool surface, config flags, catalog, hints</text></g>
+      <g class="n-gray"><rect x="460" y="115" width="180" height="34" rx="17" stroke-width="1"/>
+      <text class="ts" x="550" y="132" text-anchor="middle" dominant-baseline="central">Every commit</text></g>
+
+      <g class="n-blue"><rect x="40" y="178" width="400" height="60" rx="8" stroke-width="1"/><circle cx="64" cy="208" r="13" stroke-width="1"/>
+      <text class="ts" x="64" y="208" text-anchor="middle" dominant-baseline="central">3</text>
+      <text class="th" x="88" y="200" dominant-baseline="central">Recorded replay</text>
+      <text class="ts" x="88" y="218" dominant-baseline="central">Conformance against real responses</text></g>
+      <g class="n-gray"><rect x="460" y="191" width="180" height="34" rx="17" stroke-width="1"/>
+      <text class="ts" x="550" y="208" text-anchor="middle" dominant-baseline="central">Nightly</text></g>
+
+      <g class="n-coral"><rect x="40" y="254" width="400" height="60" rx="8" stroke-width="1"/>
+      <text class="th" x="88" y="276" dominant-baseline="central">Real sandbox</text>
+      <text class="ts" x="88" y="294" dominant-baseline="central">Computed values, function imports</text></g>
+      <g class="n-coral"><circle cx="64" cy="284" r="13" stroke-width="1"/></g>
+      <text class="ts" x="64" y="284" text-anchor="middle" dominant-baseline="central">4</text>
+      <g class="n-gray"><rect x="460" y="267" width="180" height="34" rx="17" stroke-width="1"/>
+      <text class="ts" x="550" y="284" text-anchor="middle" dominant-baseline="central">Per release</text></g>
+    </svg>
+    <figcaption>Rung 3 is the underused one and the cheapest fidelity you will ever buy.</figcaption>
+  </figure>
+
+  <p>Put a recording proxy in front of a real system for one supervised session, capture the request and response pairs, and replay them deterministically. You get genuine SAP response bodies with genuine quirks, without needing the system again.</p>
+
+  <p>Custom function imports deserve a specific warning. They are the tool most likely to have behaviour you cannot infer from metadata, and the one your emulator will get wrong. Test those against something real.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">Give each question the cheapest environment that can answer it honestly, and record the real system once so the middle rungs are not guesswork.</span>
+  </div>
+
+  <h2>Keeping the fake honest</h2>
+
+  <p>Emulators drift. The mitigation is to make drift loud rather than to prevent it, and the mechanism is per-lane contract tests rather than manual poking.</p>
+
+  <p>In practice that is four things, all of which run on every pull request alongside the image build:</p>
+
+  <ul>
+    <li>A shell script that pins the V4 response shape — that an over-length key is rejected with the right error code, that a deep insert returns child IDs, that decimals come back as JSON strings, that a partial insert accepts a null. Every fact it checks is something the calling bridge assumes and its offline fakes replay.</li>
+    <li>A unit test for the CSRF middleware: a token on a plain GET, a 403 with the <code>Required</code> sentinel when a write carries none, a 403 on a stale one, success on a fresh one.</li>
+    <li>A test for the S/4 surface: flat S/4-named fields without a deep expand, a business key resolved server-side on deep insert, an unknown key rejected with 400, a stale <code>If-Match</code> rejected with 412.</li>
+    <li>Tests for the operational endpoints: health reporting seeded counts without auth, reseed rejecting bad credentials and restoring the seed, faults arming and disarming.</li>
+  </ul>
+
+  <p>On top of that, if you are integrating with a real SAP API: re-pull <code>$metadata</code> from the real system on a schedule and diff it against the committed copy. Fail the build on any change. A new field is a fixture you should add; a removed field is a prompt about to break. Either way you want to hear it from CI rather than from production.</p>
+
+  <p>And keep a conformance suite: a fixed set of requests fired at both the emulator and a real system, comparing response <em>shape</em> rather than values. Status codes, envelope structure, header presence, type serialization. Not data. Values differ legitimately; shapes should not.</p>
+
+  <div class="verdict">
+    <span class="verdict-badge">Reuse this</span>
+    <span class="verdict-text">Make drift loud. Pin each lane with its own contract test, diff the vendor contract on a schedule, and fail the build on change rather than trusting anyone to notice a field went away.</span>
+  </div>
+
+  <h2>What not to bother with</h2>
+
+  <p>Do not emulate business logic. Pricing, availability, credit checks, workflow determination. If your agent's correctness depends on values SAP computes, that path belongs on rung 4.</p>
+
+  <p>Do not emulate SAP's real multi-service catalog. One mock service standing in for four real ones, mounted at a plain path, is enough — as long as the entity and field names inside it are honest. Number ranges, document-type addressing and supplier master-data matching are all things you can key on a technical ID instead, provided you write down that you did.</p>
+
+  <p>Do not emulate event delivery through the OData layer. Event-driven ingestion is a separate architecture with its own emulation story, and conflating the two produces a fake that tests neither well.</p>
+
+  <div class="callout">
+    <p>Do not emulate performance precisely, but do inject latency. Real OData responses take hundreds of milliseconds to seconds. An emulator that answers instantly hides timeout handling, hides the cost of a chatty agent, and makes your latency budget look fine right up until it is not. A fixed few hundred milliseconds is enough to keep you honest — and pairs with the fault switch: slow is a different failure mode from broken, and your caller should survive both.</p>
+  </div>
+
+  <h2>The short version</h2>
+
+  <blockquote>
+    <p>The emulator is not a stand-in for SAP. It is a fast, deterministic, safely writable implementation of the contract between your agent and SAP — and it gets good by being driven, early and often, by a client you did not write.</p>
+  </blockquote>
+
+  <figure class="fig">
+    <svg viewBox="0 0 680 476" role="img" xmlns="http://www.w3.org/2000/svg">
+      <title>The whole approach: one fixed seam, a contract to emulate, four rungs of fidelity</title>
+      <desc>Above the seam sits the agent and the real MCP server, identical in every environment. The seam itself is one environment variable. Directly below it is the contract being emulated: metadata, the d.results envelope, the CSRF handshake, key and type formats, restrictions and the write path. Below that, four rungs of rising fidelity and falling frequency: a fixture server run on every save, the real MCP server against fixtures on every commit, recorded replay nightly, and a real sandbox per release. The eight increments described in the post are marked under the first two rungs, with a ninth, per-caller visibility, still to come.</desc>
+
+      <g class="frame"><rect x="40" y="16" width="620" height="76" rx="8"/></g>
+      <text class="ts" x="52" y="32" dominant-baseline="central">Above the seam — identical in dev, CI and production</text>
+      <g class="n-gray"><rect x="56" y="44" width="150" height="36" rx="8" stroke-width="1"/></g>
+      <text class="th" x="131" y="62" text-anchor="middle" dominant-baseline="central">Your agent</text>
+      <path class="arr" d="M212,62 L242,62"/>
+      <g class="n-teal"><rect x="248" y="44" width="150" height="36" rx="8" stroke-width="1"/></g>
+      <text class="th" x="323" y="62" text-anchor="middle" dominant-baseline="central">MCP server</text>
+      <text class="ts" x="414" y="55" dominant-baseline="central">the real container: catalog discovery,</text>
+      <text class="ts" x="414" y="71" dominant-baseline="central">$filter construction, CSRF, retries</text>
+
+      <text class="ts" x="40" y="106" dominant-baseline="central">Seam 2 — the only thing that changes between environments</text>
+      <path class="seam-on" d="M40,120 L660,120"/>
+      <text class="ts" x="660" y="106" text-anchor="end" dominant-baseline="central">MCP_SERVER_SAP_BASE_URL</text>
+
+      <g class="n-teal"><rect x="40" y="136" width="620" height="52" rx="8" stroke-width="1"/></g>
+      <text class="th" x="56" y="156" dominant-baseline="central">What you emulate is the contract, not the system</text>
+      <text class="ts" x="56" y="174" dominant-baseline="central">$metadata · d.results envelope · CSRF · key and type formats · restrictions · writes</text>
+
+      <g class="n-green"><rect x="40" y="256" width="146" height="96" rx="8" stroke-width="1"/>
+      <circle cx="64" cy="280" r="13" stroke-width="1"/></g>
+      <text class="ts" x="64" y="280" text-anchor="middle" dominant-baseline="central">1</text>
+      <text class="th" x="52" y="306" dominant-baseline="central">Fixture server</text>
+      <text class="ts" x="52" y="324" dominant-baseline="central">prompt loop</text>
+      <text class="ts" x="52" y="340" dominant-baseline="central">every save</text>
+      <g class="n-green"><rect x="198" y="240" width="146" height="112" rx="8" stroke-width="1"/>
+      <circle cx="222" cy="264" r="13" stroke-width="1"/></g>
+      <text class="ts" x="222" y="264" text-anchor="middle" dominant-baseline="central">2</text>
+      <text class="th" x="210" y="306" dominant-baseline="central">Real MCP server</text>
+      <text class="ts" x="210" y="324" dominant-baseline="central">tools, hints</text>
+      <text class="ts" x="210" y="340" dominant-baseline="central">every commit</text>
+      <g class="n-blue"><rect x="356" y="224" width="146" height="128" rx="8" stroke-width="1"/>
+      <circle cx="380" cy="248" r="13" stroke-width="1"/></g>
+      <text class="ts" x="380" y="248" text-anchor="middle" dominant-baseline="central">3</text>
+      <text class="th" x="368" y="306" dominant-baseline="central">Recorded replay</text>
+      <text class="ts" x="368" y="324" dominant-baseline="central">response shapes</text>
+      <text class="ts" x="368" y="340" dominant-baseline="central">nightly</text>
+      <g class="n-coral"><rect x="514" y="208" width="146" height="144" rx="8" stroke-width="1"/>
+      <circle cx="538" cy="232" r="13" stroke-width="1"/></g>
+      <text class="ts" x="538" y="232" text-anchor="middle" dominant-baseline="central">4</text>
+      <text class="th" x="526" y="306" dominant-baseline="central">Real sandbox</text>
+      <text class="ts" x="526" y="324" dominant-baseline="central">computed values</text>
+      <text class="ts" x="526" y="340" dominant-baseline="central">per release</text>
+
+      <g class="n-gray"><rect x="40" y="366" width="304" height="32" rx="16" stroke-width="1"/></g>
+
+      <g class="n-teal"><circle cx="60" cy="382" r="11" stroke-width="1"/></g>
+      <text class="ts" x="60" y="382" text-anchor="middle" dominant-baseline="central">1</text>
+      <g class="n-teal"><circle cx="98" cy="382" r="11" stroke-width="1"/></g>
+      <text class="ts" x="98" y="382" text-anchor="middle" dominant-baseline="central">2</text>
+      <g class="n-teal"><circle cx="136" cy="382" r="11" stroke-width="1"/></g>
+      <text class="ts" x="136" y="382" text-anchor="middle" dominant-baseline="central">3</text>
+      <g class="n-teal"><circle cx="174" cy="382" r="11" stroke-width="1"/></g>
+      <text class="ts" x="174" y="382" text-anchor="middle" dominant-baseline="central">4</text>
+      <g class="n-teal"><circle cx="212" cy="382" r="11" stroke-width="1"/></g>
+      <text class="ts" x="212" y="382" text-anchor="middle" dominant-baseline="central">5</text>
+      <g class="n-teal"><circle cx="250" cy="382" r="11" stroke-width="1"/></g>
+      <text class="ts" x="250" y="382" text-anchor="middle" dominant-baseline="central">6</text>
+      <g class="n-teal"><circle cx="288" cy="382" r="11" stroke-width="1"/></g>
+      <text class="ts" x="288" y="382" text-anchor="middle" dominant-baseline="central">7</text>
+      <g class="n-teal"><circle cx="326" cy="382" r="11" stroke-width="1"/></g>
+      <text class="ts" x="326" y="382" text-anchor="middle" dominant-baseline="central">8</text>
+      <path class="seam" d="M368,382 L392,382"/>
+      <g class="n-amber"><circle cx="412" cy="382" r="11" stroke-width="1"/></g>
+      <text class="ts" x="412" y="382" text-anchor="middle" dominant-baseline="central">9</text>
+      <text class="ts" x="432" y="382" dominant-baseline="central">next: per-caller visibility</text>
+      <text class="ts" x="40" y="198" dominant-baseline="central">What serves that contract:</text>
+      <text class="ts" x="40" y="412" dominant-baseline="central">Eight increments, each buying one capability the next one needs</text>
+
+      <text class="ts" x="40" y="450" dominant-baseline="central">fidelity rises, and how often you can afford to run it falls</text>
+      <path class="arr" d="M40,466 L648,466 M640,461 L650,466 L640,471"/>
+    </svg>
+    <figcaption>The seam is held fixed: everything above it is production code in every environment. What sits underneath climbs, from fixtures you own to the system you do not, and the eight increments are the emulator earning its way up the first two rungs.</figcaption>
+  </figure>
+
+  <p>Build it at the OData boundary. Take the metadata from a real system and never hand-write it. Reproduce the quirks deliberately, including the annoying ones. Point the real integration component at it as early as you can stand, and let what it exercises decide the next increment. Give it a way to fail on demand. Model authorization, not just authentication. And keep one rung of the ladder pointed at something real, so you find out early when the contract moves.</p>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="../eng/floci-offline-aws.html" class="related-post-card">
+        <div class="rpc-tag">Local Emulation</div>
+        <div class="rpc-title">Adopting Floci: the tests that used to cost a NAT Gateway</div>
+      </a>
+      <a href="../eng/scalable-mcp.html" class="related-post-card">
+        <div class="rpc-tag">MCP</div>
+        <div class="rpc-title">scalable-mcp: a reusable base for MCP servers and clients</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; September 2026</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

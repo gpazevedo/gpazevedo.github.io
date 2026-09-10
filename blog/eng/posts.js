@@ -2,6 +2,15 @@
    Add one entry per file in this folder. Ties keep the order listed here. */
 window.engPosts = [
   {
+    "slug": "emulating-sap-for-agentic-development",
+    "file": "emulating-sap-for-agentic-development.html",
+    "title": "Emulating SAP for agentic development",
+    "description": "You cannot point an agent at S/4HANA forty times an hour while you iterate on a prompt. Where to cut the emulation seam, and the eight-increment order that built one.",
+    "tags": ["SAP", "MCP", "Local Emulation"],
+    "date": "2026-09-10",
+    "readingTime": 22
+  },
+  {
     "slug": "specifying-and-measuring-ai-systems",
     "file": "specifying-and-measuring-ai-systems.html",
     "title": "Specifying and measuring an AI system",
