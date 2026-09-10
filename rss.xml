@@ -6,7 +6,17 @@
   <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
   <language>en-us</language>
-  <lastBuildDate>Sun, 06 Sep 2026 00:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Thu, 10 Sep 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>Emulating SAP for agentic development</title>
+      <link>https://gpazevedo.github.io/blog/eng/emulating-sap-for-agentic-development.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/emulating-sap-for-agentic-development.html</guid>
+      <pubDate>Thu, 10 Sep 2026 00:00:00 +0000</pubDate>
+      <description>You cannot point an agent at S/4HANA forty times an hour while you iterate on a prompt. Where to cut the emulation seam, and the eight-increment order that built one.</description>
+      <category>SAP</category>
+      <category>MCP</category>
+      <category>Local Emulation</category>
+    </item>
     <item>
       <title>Specifying and measuring an AI system</title>
       <link>https://gpazevedo.github.io/blog/eng/specifying-and-measuring-ai-systems.html</link>
