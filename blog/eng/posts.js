@@ -29,6 +29,15 @@ window.engPosts = [
     "readingTime": 14
   },
   {
+    "slug": "aws-sap-mcp-server",
+    "file": "aws-sap-mcp-server.html",
+    "title": "Wiring agents into SAP with the AWS for SAP MCP Server",
+    "description": "Our SAP transport isn't code we wrote — it's AWS's own GA server on AgentCore Runtime. What that choice buys, what it costs, and how four operations became the entire contract between an agent platform and an ERP.",
+    "tags": ["SAP", "MCP", "Integration"],
+    "date": "2026-09-05",
+    "readingTime": 14
+  },
+  {
     "slug": "oauth-resource-server-pattern",
     "file": "oauth-resource-server-pattern.html",
     "title": "No users table: the OAuth 2.0 resource server pattern, adapted",

@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Wiring agents into SAP with the AWS for SAP MCP Server — Gustavo Azevedo</title>
+<meta name="description" content="Our SAP transport isn't code we wrote — it's AWS's own GA server on AgentCore Runtime. What that choice buys, what it costs, and how four operations became the entire contract between an agent platform and an ERP."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/aws-sap-mcp-server.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/aws-sap-mcp-server.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Wiring agents into SAP with the AWS for SAP MCP Server"/>
+<meta property="og:description" content="Our SAP transport isn't code we wrote — it's AWS's own GA server on AgentCore Runtime. What that choice buys, what it costs, and how four operations became the entire contract between an agent platform and an ERP."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-09-05T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-09-05T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="SAP"/>
+<meta property="article:tag" content="MCP"/>
+<meta property="article:tag" content="Integration"/>
+<meta property="article:tag" content="AgentCore"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Wiring agents into SAP with the AWS for SAP MCP Server"/>
+<meta name="twitter:description" content="Our SAP transport isn't code we wrote — it's AWS's own GA server on AgentCore Runtime. What that choice buys, and how four operations became the entire contract with an ERP."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Wiring agents into SAP with the AWS for SAP MCP Server",
+  "description": "Our SAP transport isn't code we wrote — it's AWS's own GA server on AgentCore Runtime. What that choice buys, what it costs, and how four operations became the entire contract between an agent platform and an ERP.",
+  "datePublished": "2026-09-05",
+  "dateModified": "2026-09-05",
+  "author": {"@type": "Person", "name": "Gustavo Peixoto de Azevedo", "url": "https://gpazevedo.github.io/"},
+  "publisher": {"@type": "Person", "name": "Gustavo Peixoto de Azevedo", "url": "https://gpazevedo.github.io/"},
+  "url": "https://gpazevedo.github.io/blog/eng/aws-sap-mcp-server.html",
+  "mainEntityOfPage": "https://gpazevedo.github.io/blog/eng/aws-sap-mcp-server.html",
+  "image": {"@type": "ImageObject", "url": "https://gpazevedo.github.io/assets/architect.jpg"}
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://gpazevedo.github.io/"},
+    {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://gpazevedo.github.io/#blog"},
+    {"@type": "ListItem", "position": 3, "name": "Wiring agents into SAP with the AWS for SAP MCP Server", "item": "https://gpazevedo.github.io/blog/eng/aws-sap-mcp-server.html"}
+  ]
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+
+<style>
+/* ── EVAL GRID: force 2 × 2 (four cards, no orphan cell) ── */
+.eval-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 600px) {
+  .eval-grid { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">SAP MCP Server</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <time datetime="2026-09-05">September 2026</time>
+    <span class="dot">·</span>
+    <span>14 min read</span>
+  </div>
+
+  <h1>Wiring agents into SAP with the <em>AWS for SAP MCP Server</em></h1>
+
+  <p class="deck">
+    Buyer Team's SAP transport isn't code we wrote. It's AWS's own GA server, running on AgentCore Runtime, reaching an ERP through nothing but its standard OData surface. This is what that choice buys, what it costs, and how a requisition raised in SAP ends up as a negotiated purchase order written back to it — across a contract four operations wide.
+  </p>
+
+  <hr>
+
+  <p>
+    Every procurement automation platform eventually runs into the same wall: the ERP. Buyer Team's negotiation chain is entirely ours — six agents, a deterministic Step Functions DAG, our own data model. But a negotiation begins with a purchase requisition somebody raised in SAP, and it ends with a purchase order that has to land back in SAP. Both ends of the system belong to someone else, and they speak OData.
+  </p>
+
+  <p>
+    We had already written that client, and it worked. <code>orchestrator/sap_client.py</code> is a perfectly good Python OData client driving an automated requisition-to-order loop. The problem with it isn't quality; it's ownership. A hand-rolled ERP client makes you the maintainer of an integration surface that changes on somebody else's schedule, in a domain where the cost of being subtly wrong is a purchase order that shouldn't exist.
+  </p>
+
+  <p>
+    So our integration design names a different transport: the <strong>AWS for SAP MCP Server</strong>, GA since 1 May 2026 — a container image AWS publishes and you deploy onto Amazon Bedrock AgentCore Runtime. The appeal is straightforward. Your agent never learns SAP. It calls generic tools — <code>odata_read</code>, <code>get_metadata</code>, <code>odata_create</code> — and the server owns catalog discovery, query construction, authentication and response handling. Business logic stays on AWS. SAP is touched only through its standard API surface, which is a clean-core pattern rather than a pile of custom ABAP extensions.
+  </p>
+
+  <p>
+    The claim underneath all of that is <em>the integration becomes configuration rather than code</em>. This post is what happened when we tested it.
+  </p>
+
+  <div class="stat-row">
+    <div class="stat-cell">
+      <div class="stat-num">4</div>
+      <div class="stat-label">Operations in the whole SAP contract</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num">0</div>
+      <div class="stat-label">Extensions installed in the ERP</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num">6</div>
+      <div class="stat-label">AWS tools the agents call</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-num">$0</div>
+      <div class="stat-label">Test infrastructure at rest</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <h2>The loop this is all for</h2>
+
+  <p>
+    Before any configuration makes sense, it helps to see what the integration carries. A requisition is raised in SAP and sits there <code>OPEN</code>. Buyer Team notices it, prices it against SAP's own materials catalog, negotiates it across six agents, awards it, and writes the resulting purchase order back — at which point the requisition SAP started with reads <code>ORDERED</code> and points at a real order document.
+  </p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 680 990" role="img" aria-labelledby="wf-title wf-desc" font-family="'Sora', system-ui, sans-serif">
+      <title id="wf-title">The procurement loop between SAP and Buyer Team</title>
+      <desc id="wf-desc">A swimlane diagram with SAP on the left and Buyer Team on AWS on the right. A purchase requisition is raised in SAP with status OPEN. A scheduled poller reads it, counting first and then reading, and emits an EventBridge event. An ingest handler reads SAP master data — product unit prices, suppliers, and the material groups on existing purchase order items — and turns the requisition into a domain row with priced items, a supplier pool and category bindings. A six-agent Step Functions chain negotiates with candidate suppliers drawn from those bindings, contacting each one over its own MCP server where registered. The award is written to an orders table, then a drain exports it back to SAP as a purchase order and updates the requisition to ORDERED, with terminal failures routed to a dead letter queue that a redrive consumer replays or escalates. Four operations cross the boundary, all through AWS's SAP MCP Server.</desc>
+      <style>
+        .wf-card { fill: #F8FAFC; stroke: #E2E8F0; stroke-width: 1; }
+        .wf-name { font: 500 14px 'Sora', sans-serif; }
+        .wf-src  { font: 400 11px 'DM Mono', ui-monospace, monospace; }
+        .wf-flow { font: 400 11px 'DM Mono', ui-monospace, monospace; fill: #64748B; }
+        .wf-lane { font: 500 11px 'DM Mono', ui-monospace, monospace; letter-spacing: 0.1em; }
+        .wf-sub  { font: 400 10px 'DM Mono', ui-monospace, monospace; fill: #64748B; }
+        .wf-edge { stroke: #94A3B8; stroke-width: 1.5; fill: none; }
+        .wf-soft { stroke: #CBD5E1; stroke-width: 1.5; fill: none; stroke-dasharray: 5 4; }
+        .wf-div  { stroke: #CBD5E1; stroke-width: 1; stroke-dasharray: 3 5; }
+        .wf-amber { fill: #B07D2A; } .wf-blue { fill: #2563EB; } .wf-teal { fill: #0D9488; }
+        .wn { fill: #0F172A; } .ws { fill: #475569; }
+        @media (prefers-color-scheme: dark) {
+          .wf-card { fill: #111B2E; stroke: #1E293B; }
+          .wf-flow, .wf-sub { fill: #94A3B8; }
+          .wf-edge { stroke: #475569; }
+          .wf-soft { stroke: #334155; }
+          .wf-div  { stroke: #334155; }
+          .wf-amber { fill: #EF9F27; } .wf-blue { fill: #60A5FA; } .wf-teal { fill: #2DD4BF; }
+          .wn { fill: #F1F5F9; } .ws { fill: #94A3B8; }
+        }
+      </style>
+      <defs>
+        <marker id="wf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <text class="wf-lane wf-amber" x="44" y="30">SAP</text>
+      <text class="wf-sub" x="44" y="48">S/4-shaped OData V2 surface</text>
+      <text class="wf-lane wf-blue" x="290" y="30">BUYER TEAM ON AWS</text>
+      <text class="wf-sub" x="290" y="48">AgentCore · Lambda · Step Functions · DynamoDB</text>
+      <line class="wf-div" x1="272" y1="64" x2="272" y2="946"/>
+
+      <rect class="wf-card" x="44" y="76" width="210" height="80" rx="10"/>
+      <rect class="wf-amber" x="44" y="76" width="4" height="80" rx="2"/>
+      <text class="wf-name wn" x="60" y="106">Requisition raised</text>
+      <text class="wf-src ws" x="60" y="128">A_PurchaseRequisition</text>
+      <text class="wf-src ws" x="60" y="146">status OPEN</text>
+
+      <path class="wf-edge" d="M149 156 V197 H286" marker-end="url(#wf-arrow)"/>
+      <text class="wf-flow" x="210" y="190" text-anchor="middle">odata_read</text>
+
+      <rect class="wf-card" x="290" y="158" width="350" height="78" rx="10"/>
+      <rect class="wf-blue" x="290" y="158" width="4" height="78" rx="2"/>
+      <text class="wf-name wn" x="306" y="188">sap_pr_poller — every 5 minutes</text>
+      <text class="wf-src ws" x="306" y="210">odata_count to gauge volume, then odata_read</text>
+      <text class="wf-src ws" x="306" y="228">OPEN requisition → EventBridge PutEvents</text>
+
+      <path class="wf-edge" d="M465 236 V354" marker-end="url(#wf-arrow)"/>
+
+      <rect class="wf-card" x="44" y="252" width="210" height="96" rx="10"/>
+      <rect class="wf-amber" x="44" y="252" width="4" height="96" rx="2"/>
+      <text class="wf-name wn" x="60" y="282">Master data</text>
+      <text class="wf-src ws" x="60" y="304">A_Product · unit price</text>
+      <text class="wf-src ws" x="60" y="322">A_Supplier</text>
+      <text class="wf-src ws" x="60" y="340">MaterialGroup on PO items</text>
+
+      <path class="wf-edge" d="M149 348 V406 H286" marker-end="url(#wf-arrow)"/>
+      <text class="wf-flow" x="210" y="399" text-anchor="middle">odata_read</text>
+
+      <rect class="wf-card" x="290" y="358" width="350" height="96" rx="10"/>
+      <rect class="wf-blue" x="290" y="358" width="4" height="96" rx="2"/>
+      <text class="wf-name wn" x="306" y="388">sap_pr_ingest_handler</text>
+      <text class="wf-src ws" x="306" y="410">Requisition and items become a domain row</text>
+      <text class="wf-src ws" x="306" y="428">Catalog price scores bids, PR estimate caps it</text>
+      <text class="wf-src ws" x="306" y="446">Supplier pool and category bindings written</text>
+
+      <path class="wf-edge" d="M465 454 V466" marker-end="url(#wf-arrow)"/>
+
+      <text class="wf-sub" x="149" y="556" text-anchor="middle">no SAP calls between</text>
+      <text class="wf-sub" x="149" y="574" text-anchor="middle">ingest and export —</text>
+      <text class="wf-sub" x="149" y="592" text-anchor="middle">the negotiation runs</text>
+      <text class="wf-sub" x="149" y="610" text-anchor="middle">on data already read</text>
+
+      <rect class="wf-card" x="290" y="470" width="350" height="78" rx="10"/>
+      <rect class="wf-teal" x="290" y="470" width="4" height="78" rx="2"/>
+      <text class="wf-name wn" x="306" y="500">Six-agent negotiation on Step Functions</text>
+      <text class="wf-src ws" x="306" y="522">Candidates from {env}-category-suppliers</text>
+      <text class="wf-src ws" x="306" y="540">carrying source_system_ids.sap</text>
+
+      <path class="wf-edge" d="M465 548 V562" marker-end="url(#wf-arrow)"/>
+
+      <rect class="wf-card" x="290" y="566" width="350" height="64" rx="10"/>
+      <rect class="wf-teal" x="290" y="566" width="4" height="64" rx="2"/>
+      <text class="wf-name wn" x="306" y="596">Supplier contact</text>
+      <text class="wf-src ws" x="306" y="618">select_channel probes mcp_registration</text>
+
+      <path class="wf-edge" d="M465 630 V644" marker-end="url(#wf-arrow)"/>
+
+      <rect class="wf-card" x="290" y="648" width="350" height="64" rx="10"/>
+      <rect class="wf-teal" x="290" y="648" width="4" height="64" rx="2"/>
+      <text class="wf-name wn" x="306" y="678">Award written to {env}-orders</text>
+      <text class="wf-src ws" x="306" y="700">export_status pending → po_export_drain</text>
+
+      <path class="wf-edge" d="M465 712 V726" marker-end="url(#wf-arrow)"/>
+
+      <rect class="wf-card" x="290" y="730" width="350" height="96" rx="10"/>
+      <rect class="wf-blue" x="290" y="730" width="4" height="96" rx="2"/>
+      <text class="wf-name wn" x="306" y="760">po_export_drain</text>
+      <text class="wf-src ws" x="306" y="782">Terminal errors fast-path to the DLQ</text>
+      <text class="wf-src ws" x="306" y="800">Redrive every 5 min replays or escalates to</text>
+      <text class="wf-src ws" x="306" y="818">export_status = REQUIRES_ATTENTION</text>
+
+      <path class="wf-edge" d="M465 826 V894 H258" marker-end="url(#wf-arrow)"/>
+      <text class="wf-flow" x="360" y="887" text-anchor="middle">odata_create</text>
+
+      <rect class="wf-card" x="44" y="846" width="210" height="96" rx="10"/>
+      <rect class="wf-amber" x="44" y="846" width="4" height="96" rx="2"/>
+      <text class="wf-name wn" x="60" y="876">Order written back</text>
+      <text class="wf-src ws" x="60" y="898">A_PurchaseOrder + items</text>
+      <text class="wf-src ws" x="60" y="916">keys resolved server-side</text>
+      <text class="wf-src ws" x="60" y="934">odata_update → ORDERED</text>
+
+      <path class="wf-soft" d="M44 894 H28 V116 H40" marker-end="url(#wf-arrow)"/>
+
+      <text class="wf-flow" x="340" y="972" text-anchor="middle">The requisition that opens the loop is the one that closes it — same document, now ORDERED</text>
+    </svg>
+    <figcaption>Everything on the right is Buyer Team's. Everything crossing the dashed line is a tool call to AWS's server — <code>odata_read</code> twice on the way in, <code>odata_create</code> and <code>odata_update</code> on the way out. <strong>Four operations are the entire contract with SAP</strong>, which is what makes this a clean-core integration rather than a set of extensions living inside the ERP.</figcaption>
+  </figure>
+
+  <p>
+    Two properties of that picture matter more than anything else in this post. The first is that SAP is only ever touched through its standard OData surface — no ABAP extension, no custom RFC, nothing installed on the tenant side, so an upgrade to the ERP is not an event in our release calendar. The second is that the loop is genuinely closed: the write-back isn't a report or a notification, it's the same requisition transitioning state. That's the difference between an integration that reads an ERP and one that participates in it.
+  </p>
+
+  <hr>
+
+  <h2>No SAP tenant? Build the other side of the wire</h2>
+
+  <p>
+    We don't have an S/4HANA system to point at, and renting one to answer an architecture question is not a good trade. What we do have is a SAP Cloud Application Programming Model app serving a procurement domain over OData — suppliers, materials, requisitions, orders and their line items — implementing the real state machine: a requisition starts <code>OPEN</code>, and once bought it gets linked to an order and flips to <code>ORDERED</code>.
+  </p>
+
+  <p>
+    Two things had to change before AWS's server could talk to it. It had to speak <strong>OData V2</strong>, which is what classic SAP Gateway exposes, and CAP serves V4 — an adapter handles that. And it had to be <strong>reachable from AWS</strong>, which is where the first architectural decision got made and unmade. The original plan was a container on ECS behind an internal load balancer with certificates and DNS. That plan was structurally unworkable and we caught it before building it: none of our SAP Lambdas run inside a VPC, so they could never have reached an internal endpoint. What replaced it is much smaller — the app packaged as a container-image Lambda behind a public Function URL, with no load balancer, no certificate, no DNS, and no cost at rest.
+  </p>
+
+  <p>
+    The mock is deliberately cheap, and the cheapness has a cost we chose knowingly: its database lives in memory, so it forgets everything on a cold start. Health and reseed endpoints make that volatility uninteresting rather than expensive to fix. This is the kind of trade worth making explicit, because a test double that costs real money gets switched off, and a test double that's switched off proves nothing.
+  </p>
+
+  <hr>
+
+  <h2>The request path</h2>
+
+  <p>
+    Zoom into any one of those four boundary crossings and this is what it looks like. An agent mints a machine-to-machine token; an AgentCore Gateway validates it, evaluates a policy and pins the request to a tenant; AWS's server authenticates outbound to the ERP with credentials it reads from Secrets Manager. Inbound authorization and outbound authentication are separate trust boundaries, which turns out to be the single most useful thing to understand about this architecture.
+  </p>
+
+  <figure class="diagram">
+    <svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 680 596" role="img" aria-labelledby="path-title path-desc" font-family="'Sora', system-ui, sans-serif">
+      <title id="path-title">Request path from a Buyer Team agent to the SAP OData surface</title>
+      <desc id="path-desc">A tool call travels from a Buyer Team agent holding a Cognito machine-to-machine token, through an AgentCore Gateway that validates the JWT, evaluates a Cedar policy in log-only mode and runs an interceptor that pins the service_name argument to the tenant in the token, into AWS's aws-sap-mcp container on AgentCore Runtime, out over a public Lambda Function URL protected by basic auth and a CSRF handshake, and finally into the CAP procurement mock serving OData V2. Inbound authorization and outbound authentication are separate trust boundaries.</desc>
+      <style>
+        .pp-card { fill: #F8FAFC; stroke: #E2E8F0; stroke-width: 1; }
+        .pp-name { font: 500 15px 'Sora', sans-serif; }
+        .pp-src  { font: 400 12px 'DM Mono', ui-monospace, monospace; }
+        .pp-flow { font: 400 11px 'DM Mono', ui-monospace, monospace; fill: #64748B; }
+        .pp-edge { stroke: #94A3B8; stroke-width: 1.5; fill: none; }
+        .acc-blue  { fill: #2563EB; } .bar-blue  { fill: #2563EB; }
+        .acc-teal  { fill: #0D9488; } .bar-teal  { fill: #0D9488; }
+        .acc-amber { fill: #B07D2A; } .bar-amber { fill: #B07D2A; }
+        .t-name { fill: #0F172A; }
+        .t-src  { fill: #475569; }
+        @media (prefers-color-scheme: dark) {
+          .pp-card { fill: #111B2E; stroke: #1E293B; }
+          .pp-flow { fill: #94A3B8; }
+          .pp-edge { stroke: #475569; }
+          .t-name { fill: #F1F5F9; }
+          .t-src  { fill: #94A3B8; }
+          .acc-blue  { fill: #60A5FA; } .bar-blue  { fill: #60A5FA; }
+          .acc-teal  { fill: #2DD4BF; } .bar-teal  { fill: #2DD4BF; }
+          .acc-amber { fill: #EF9F27; } .bar-amber { fill: #EF9F27; }
+        }
+      </style>
+      <defs>
+        <marker id="pp-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <rect class="pp-card" x="40" y="28" width="600" height="76" rx="12"/>
+      <rect class="bar-blue" x="40" y="28" width="5" height="76" rx="2.5"/>
+      <text class="pp-name t-name" x="64" y="58">Buyer Team agent</text>
+      <text class="pp-src t-src" x="64" y="80">Cognito client_credentials · scope buyer-team-api/sap</text>
+      <line class="pp-edge" x1="340" y1="104" x2="340" y2="136" marker-end="url(#pp-arrow)"/>
+      <text class="pp-flow" x="352" y="124">tools/call over Streamable HTTP</text>
+
+      <rect class="pp-card" x="40" y="136" width="600" height="86" rx="12"/>
+      <rect class="bar-blue" x="40" y="136" width="5" height="86" rx="2.5"/>
+      <text class="pp-name t-name" x="64" y="166">AgentCore Gateway — dev-sap-mcp-gateway</text>
+      <text class="pp-src t-src" x="64" y="188">CUSTOM_JWT authorizer · Cedar policy engine, LOG_ONLY</text>
+      <text class="pp-src t-src" x="64" y="206">Interceptor pins service_name from the JWT tenantId claim</text>
+      <line class="pp-edge" x1="340" y1="222" x2="340" y2="254" marker-end="url(#pp-arrow)"/>
+      <text class="pp-flow" x="352" y="242">InvokeAgentRuntime</text>
+
+      <rect class="pp-card" x="40" y="254" width="600" height="86" rx="12"/>
+      <rect class="bar-teal" x="40" y="254" width="5" height="86" rx="2.5"/>
+      <text class="pp-name t-name" x="64" y="284">AWS for SAP MCP Server — AgentCore Runtime</text>
+      <text class="pp-src t-src" x="64" y="306">aws-sap-mcp:latest, pulled from AWS's own ECR account</text>
+      <text class="pp-src t-src" x="64" y="324">VPC network mode · reads BASIC creds from Secrets Manager</text>
+      <line class="pp-edge" x1="340" y1="340" x2="340" y2="372" marker-end="url(#pp-arrow)"/>
+      <text class="pp-flow" x="352" y="360">HTTPS · outbound trust boundary</text>
+
+      <rect class="pp-card" x="40" y="372" width="600" height="86" rx="12"/>
+      <rect class="bar-amber" x="40" y="372" width="5" height="86" rx="2.5"/>
+      <text class="pp-name t-name" x="64" y="402">Lambda Function URL — public, basic auth</text>
+      <text class="pp-src t-src" x="64" y="424">Container image + Lambda Web Adapter · $0 at rest</text>
+      <text class="pp-src t-src" x="64" y="442">X-CSRF-Token handshake before every write</text>
+      <line class="pp-edge" x1="340" y1="458" x2="340" y2="490" marker-end="url(#pp-arrow)"/>
+
+      <rect class="pp-card" x="40" y="490" width="600" height="76" rx="12"/>
+      <rect class="bar-amber" x="40" y="490" width="5" height="76" rx="2.5"/>
+      <text class="pp-name t-name" x="64" y="520">CAP procurement service — OData V2</text>
+      <text class="pp-src t-src" x="64" y="542">Suppliers · Materials · PurchaseRequisitions · PurchaseOrders</text>
+
+      <text class="pp-flow" x="340" y="584" text-anchor="middle">Inbound authorization and outbound authentication are independent</text>
+    </svg>
+    <figcaption>The path a single <code>odata_create</code> takes. The Gateway and Runtime are managed and the server is AWS's published image; <strong>the only code of ours in the middle is the interceptor</strong> the Gateway calls before forwarding.</figcaption>
+  </figure>
+
+  <div class="bt-callout">
+    A detail worth internalising before you configure anything: there are <strong>two</strong> AWS SAP MCP servers, and conflating them wastes a day. The <strong>AWS for SAP MCP Server</strong> gives agents access to SAP <em>business data</em> over OData and runs remotely on AgentCore Runtime — that's this post. The <strong>AWS for SAP Management MCP Server</strong> manages SAP <em>workloads on AWS</em> (health, backups, Systems Manager for SAP) and runs locally over stdio. Different problems, similar names.
+  </div>
+
+  <hr>
+
+  <h2>Configuration is the integration</h2>
+
+  <p>
+    Everything about the server is environment variables, validated at startup — a violated rule prints a descriptive error and the process exits. Most of them are connection strings. A few of them encode a security posture, and those are the ones worth understanding before you deploy anything near a production ERP.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Setting</th>
+          <th>Our value</th>
+          <th>Why</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>SAP_OAUTH_FLOW</code></td>
+          <td><code>BASIC</code></td>
+          <td>What the mock presents. On a real tenant this is the most consequential line in the file — see below.</td>
+        </tr>
+        <tr>
+          <td><code>USE_SAP_CATALOG</code></td>
+          <td><code>false</code></td>
+          <td>There is no SAP service catalog to query, so a custom catalog in S3 names our one service and the server makes no catalog calls at all.</td>
+        </tr>
+        <tr class="row-gov">
+          <td><code>WRITE_ENABLED</code></td>
+          <td><code>true</code></td>
+          <td>Master switch. On its own it enables nothing.</td>
+        </tr>
+        <tr class="row-gov">
+          <td><code>CREATE_ENABLED</code> / <code>UPDATE_ENABLED</code></td>
+          <td><code>true</code></td>
+          <td>The loop creates an order and updates a requisition. That is the complete set of writes it needs.</td>
+        </tr>
+        <tr class="row-quality">
+          <td><code>DELETE_ENABLED</code> / <code>FUNCTION_IMPORT_ENABLED</code></td>
+          <td><em>unset</em></td>
+          <td>Left at their default of <code>false</code>. Nothing deletes an SAP record or invokes custom backend logic, so those tools don't exist for the agent to reach for.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    That write configuration is the part I'd argue is genuinely well designed, and it generalises well beyond SAP. Writes require <strong>two independent levels of opt-in</strong> — the master switch <em>and</em> the specific operation flag — and the server refuses to start if you set the master switch without enabling any operation. You cannot accidentally give an agent a delete tool against an ERP. That's scope reduction at the server rather than instruction in a prompt, and it's a much stronger guarantee than telling a model what not to do.
+  </p>
+
+  <p>
+    The same logic extends to the setting that restricts which services the discovery tool will even surface. We didn't need it against a single-service mock, but on a real tenant it's the control that matters most: an agent scoped to procurement should not be able to <em>discover</em> finance services, let alone read them. Making a capability undiscoverable is a stronger guarantee than making it forbidden.
+  </p>
+
+  <hr>
+
+  <h2>Scoping a tool surface you don't own</h2>
+
+  <p>
+    Buyer Team's own MCP servers are multi-tenant, and they're protected by a house pattern: a Gateway interceptor that overwrites the tenant identifier on every call from the caller's token, and a policy engine scoped to specific tool names. Copying that shape onto AWS's server was the obvious first move, and it would have broken every call — because AWS's tools take no tenant parameter. Nothing in the surface is named <code>tenant_id</code>.
+  </p>
+
+  <p>
+    So the Gateway went out deliberately bare, which was correct for a single-tenant validation. What it took longer to see is that <strong>the tenancy axis exists under a different name</strong>. The parameter every one of those tools accepts is <code>service_name</code> — and <code>service_name</code> is precisely what decides which SAP system a call reaches. Pin that from the token and you get the same guarantee the house pattern gives, on a surface the house pattern doesn't fit.
+  </p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⊕</div>
+        <div class="tcard-title">The interceptor pins <code>service_name</code></div>
+      </div>
+      <p>Overwritten from the caller's token claim on every call, failing closed when the claim is absent. No caller passes a tenant, so no caller can pass the wrong one. Tenants get their own catalog entries rather than their own runtimes — one Gateway, one server, entries in a map.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-amber">⊗</div>
+        <div class="tcard-title">The policy engine is the outer ring</div>
+      </div>
+      <p>Cedar sees a coarse action and an opaque request body. It can decide whether a principal may reach the SAP surface at all; it cannot decide which service they get. Knowing where a policy engine's vision ends is what stops you writing policy that can't see what it's deciding about.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head">
+        <div class="tcard-icon icon-teal">⊕</div>
+        <div class="tcard-title">A separately revocable credential</div>
+      </div>
+      <p>SAP access is its own machine-to-machine client on its own scope, independent of every other skill's client. Revoking an agent's ERP access shouldn't require revoking anything else, and shouldn't require a deploy.</p>
+    </div>
+  </div>
+
+  <p>
+    The generalisable lesson is small and portable: every multi-tenant surface has an axis that decides whose data you reach. It just doesn't always share your naming. The question isn't whether your pattern's parameter exists on someone else's tool — it's which of their parameters is doing that parameter's job.
+  </p>
+
+  <hr>
+
+  <h2>How it got built</h2>
+
+  <p>
+    Six phases over several weeks, each independently verifiable, and nothing merged on the strength of a passing unit test alone. Every phase names the rig that proved it: an offline Docker Compose stack with real Lambda containers on a local AWS emulator, and a live dev account with the real Gateway, the real runtime and AWS's real container. Prove it offline, confirm it live.
+  </p>
+
+  <div class="pipeline">
+
+    <div class="pipe-stage">
+      <div class="pipe-aside">1</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Prove the shape</div>
+        <div class="pipe-desc">
+          Deploy AWS's actual image — not a stand-in — register it behind a Gateway, and drive a full create-and-update round trip from an authenticated client. Three boundary problems stood between "deployed" and "working": an undocumented IAM permission, a protocol handshake one side assumes and the other never implements, and a runtime lifetime that doesn't mean what its setting is named. None of them are inferable from either party's documentation, and all three cost less than a day once we were looking at real logs instead of reasoning about them.
+        </div>
+        <div class="pipe-pass">✓ Answered the architecture question — and moved the product exactly zero distance, which is worth naming out loud</div>
+      </div>
+    </div>
+
+    <div class="pipe-stage">
+      <div class="pipe-aside">2</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Put the loop in the deployed path</div>
+        <div class="pipe-desc">
+          The probe proved a transport that exactly one integration test could reach; the deployed functions were still pointed at an empty URL. Closing that meant computing configuration from infrastructure rather than setting it by hand, moving credentials to a secret both sides read so they can't drift apart, and pushing the protocol handshake down into the shared client where no caller needs to know it exists.
+        </div>
+        <div class="pipe-pass">✓ First unattended run: a real requisition produced a real event, a real domain row and a real negotiation — no test code invoking any of it</div>
+      </div>
+    </div>
+
+    <div class="pipe-stage">
+      <div class="pipe-aside">3</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Make failure visible</div>
+        <div class="pipe-desc">
+          A loop that runs unattended has to say so when it stops. Alarms went on the obvious failures and on the one that isn't: exports that are pending but never draining, where nothing errors and nothing moves. A drift check compares the deployed test double against the version we think is running, which turned out to matter more than expected — it caught a build that was pushing successfully and deploying nothing at all.
+        </div>
+        <div class="pipe-pass">✓ Every later phase deployed on the first attempt, verified nightly against a green baseline</div>
+      </div>
+    </div>
+
+    <div class="pipe-stage">
+      <div class="pipe-aside">4</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Make the contract look like S/4</div>
+        <div class="pipe-desc">
+          Everything so far had been proven against a domain model of our own invention, and a mock whose field names we chose can't tell you whether the mapping layer survives contact with a real one. So the mock grew a second service under genuine S/4 entity and field names, plus the organisational fields a real document carries — company code, plant, purchasing organisation and group. Added alongside the first rather than replacing it, so callers could migrate one at a time.
+        </div>
+        <div class="pipe-pass">✓ The mapping layer stopped being a fiction, and optimistic concurrency became something we'd tested rather than assumed</div>
+      </div>
+    </div>
+
+    <div class="pipe-stage">
+      <div class="pipe-aside">5</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Join the data, promote the transport</div>
+        <div class="pipe-desc">
+          Until this point the pipeline carried a requisition to a negotiation that then stopped for want of candidate suppliers — a precise, legible answer from a working system, naming its own next step. Supplier and category data began crossing the same boundary as the requisition, and pricing gained a distinction that matters: the materials catalog price scores the bids, while the requisitioner's own estimate stays the budget ceiling. Conflating those two numbers would move an authorised budget silently.
+          <br><br>
+          With both transports finally reading one contract, AWS's server became the default and the hand-written client became the fallback rather than the primary.
+        </div>
+        <div class="pipe-pass">✓ A SAP-sourced negotiation reached an award, with candidates and scoring both traceable to SAP data</div>
+      </div>
+    </div>
+
+    <div class="pipe-stage">
+      <div class="pipe-aside">6</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Scope the surface, close the failure paths</div>
+        <div class="pipe-desc">
+          Tenancy moved from asserted to enforced, per the section above. The dead-letter queue got a consumer rather than just an alarm, along with a classification model for the ways a message can be undeliverable — writing that list is the design work, and it's what surfaced a message type that had been silently discarded. And suppliers gained the ability to expose their own MCP servers, discovered and registered at runtime, which is the same integration pattern pointed outward instead of at the ERP.
+        </div>
+        <div class="pipe-pass">✓ Every message has somewhere to go, and every call is pinned to a tenant before it reaches SAP</div>
+      </div>
+    </div>
+
+  </div>
+
+  <blockquote>
+    <p>"Almost every finding in that sequence is a boundary problem — a permission nobody documents as required, a handshake one side assumes and the other never implements, a setting that doesn't mean what it's named. None of them live in either party's code. They live in the gap, and the only instrument that reads the gap is a deployment."</p>
+  </blockquote>
+
+  <hr>
+
+  <h2>What's true today</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Claim</th>
+          <th>How we know</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>The whole loop runs unattended, both halves</td>
+          <td>A requisition raised in the mock becomes an award and a written-back order that flips it to <code>ORDERED</code> — no test code invoking any step</td>
+        </tr>
+        <tr>
+          <td>AWS's server is the default transport, not the experiment</td>
+          <td>Deployed configuration on every SAP function. The hand-written client remains as a tested fallback reading the same contract</td>
+        </tr>
+        <tr>
+          <td>The MCP branch is the branch that runs</td>
+          <td>Live tests with the fallback patched to fail on contact — a green pass can't have been the fallback quietly covering for it</td>
+        </tr>
+        <tr>
+          <td>SAP data reaches the agents, not just the pipeline</td>
+          <td>An award whose candidate suppliers and bid scoring both trace back to SAP master data rather than to seeded fixtures</td>
+        </tr>
+        <tr>
+          <td>Tenancy is enforced rather than asserted</td>
+          <td>An interceptor pinning the service from the token and failing closed without it, with per-tenant catalog entries and a policy alarm at zero over a 14-hour live run</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="verdict">
+    <div class="verdict-badge">Verdict</div>
+    <div class="verdict-text"><strong>The integration really is configuration rather than code — and getting the configuration right took a deployment.</strong> A requisition raised in SAP becomes a negotiated, awarded purchase order written back through AWS's own server, with suppliers and catalog prices sourced from the ERP, every call pinned to a tenant, and no extension of any kind installed on the SAP side. What it is <em>not</em> is a validation of S/4HANA semantics — the thing on the other side of the wire is still an app we wrote, and that distinction does more work than everything above it.</div>
+  </div>
+
+  <hr>
+
+  <h2>The remaining distance to a real tenant</h2>
+
+  <p>
+    A mock is not a tenant, and each phase has been explicit about which part of the distance it closed. Field names being right is the cheapest part of being right. Four pieces of the real-tenant path are still ahead, and every one is a design decision rather than a chore — which is the good kind of remaining work:
+  </p>
+
+  <div class="eval-grid">
+    <div class="eval-card">
+      <div class="ec-label">Transport</div>
+      <div class="ec-name">SAP BTP API Management</div>
+      <span class="ec-badge badge-code">Not built</span>
+      <div class="ec-desc">AWS's recommended pattern routes through BTP rather than pointing the server at the SAP gateway directly, with the Destination Service resolving the backend. Our Function URL stands in for that whole layer.</div>
+    </div>
+    <div class="eval-card">
+      <div class="ec-label">Identity</div>
+      <div class="ec-name">Outbound OAuth flow</div>
+      <span class="ec-badge badge-llm">Consequential</span>
+      <div class="ec-desc">The real choice is a single service account versus on-behalf-of token exchange — and it's an authorization design decision, not a plumbing one.</div>
+    </div>
+    <div class="eval-card">
+      <div class="ec-label">Grounding</div>
+      <div class="ec-name">Service hints</div>
+      <span class="ec-badge badge-ground">Underrated</span>
+      <div class="ec-desc">A hints file maps human concepts to exact SAP property names, with known issues and workarounds. This is the documented mechanism for stopping a model inventing field names against a 400-field entity.</div>
+    </div>
+    <div class="eval-card">
+      <div class="ec-label">Semantics</div>
+      <div class="ec-name">S/4 business validation</div>
+      <span class="ec-badge badge-code">The real distance</span>
+      <div class="ec-desc">Release strategies, budget availability checks, account assignment, number ranges. Our app accepts an order because the columns line up. A real system accepts one because a controller's configuration says it may.</div>
+    </div>
+  </div>
+
+  <p>
+    The identity one deserves more than a card, because it's the decision most likely to be made by accident. A single machine-to-machine service account collapses every user into one identity and moves the entire authorization burden into your agent layer. On-behalf-of token exchange propagates the end user's identity into SAP, so SAP-side authorization objects still apply and a buyer sees only their own purchasing group. In a regulated landscape, keeping that burden in SAP where the authorization model already lives is usually the better trade — and it's worth deciding deliberately at design time rather than discovering after an audit.
+  </p>
+
+  <h3>And one boundary the server doesn't cross</h3>
+
+  <p>
+    MCP is a request/response tool-execution protocol. The server does not subscribe to SAP business events. If you want an agent to react the moment a requisition is raised, that's a separate architecture you compose alongside it — SAP Event Mesh to EventBridge to a function that starts an agent session, which then reads back to enrich from whatever identifier the event carried. Our scheduled poller is precisely a stand-in for that missing event source.
+  </p>
+
+  <p>
+    Worth being honest about which parts of a design are AWS features and which are your own composition; the two get blurred in a lot of writing about this server, and the parts you composed are the parts you have to operate. Idempotency and poison-message handling are yours either way — at-least-once delivery means the same document arrives twice, and a failing agent session belongs in a queue somebody drains rather than retrying forever against an ERP.
+  </p>
+
+  <hr>
+
+  <h2>What we'd tell the next team</h2>
+
+  <p>
+    <strong>Deploy the real image early, then keep deploying.</strong> Every finding worth having came from the gap between two systems, and gaps are invisible to both sides' test suites. Our offline coverage is good and it could not have caught a single one of them.
+  </p>
+
+  <p>
+    <strong>Separate "the shape holds" from "this is what runs."</strong> The first probe answered the architecture question completely and moved the product zero distance. That distance turned out to be five phases wide, and it is very easy to declare victory at the end of the first one. Naming the two things differently is most of what stops you.
+  </p>
+
+  <p>
+    <strong>Prefer scope reduction to instruction.</strong> The best security property in this whole integration is that the delete tool doesn't exist, because a flag wasn't set. A capability an agent cannot discover is a much stronger guarantee than a capability you've asked it not to use, and that principle transfers to every tool surface you build or adopt.
+  </p>
+
+  <p>
+    <strong>Find your pattern's analogue rather than forcing your pattern.</strong> The house tenancy pattern didn't fit a surface with no tenant parameter, and scoping the Gateway bare was the right first move. The better question, once you know a surface, is which of its parameters is doing your parameter's job.
+  </p>
+
+  <p>
+    <strong>Make the fallback fail the test.</strong> A graceful fallback and a green assertion are indistinguishable from a working primary path. If a new transport is wrapped in a broad exception handler, the only test worth writing is one that makes the old transport explode on contact. That single line is the difference between proving something and hoping about it.
+  </p>
+
+  <p>
+    The integration is configuration — and the configuration compounds. A requisition raised in SAP now becomes a negotiated award and a written-back purchase order without anyone watching, scored on the ERP's own catalog prices, routed to the right tenant's service, and recoverable from every failure path we know how to produce. Four operations wide, nothing installed on the SAP side, and each phase small enough to describe in a paragraph. The system is the sequence, not any one of them.
+  </p>
+
+  <!-- RELATED POSTS -->
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="emulating-sap-for-agentic-development.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Emulating SAP for agentic development</div>
+      </a>
+      <a href="atlas-counsel-mcp-v2-oauth.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">ATLAS Counsel MCP v2: an OAuth resource server built for broad exposure</div>
+      </a>
+      <a href="failure-handling.html" class="related-post-card">
+        <div class="rpc-tag">Engineering</div>
+        <div class="rpc-title">Designing for failure in a multi-agent procurement system</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- POST FOOTER -->
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> — AI Solution Architect · September 2026</p>
+    <p>From the design and build of <a href="https://www.buyer-team.com" target="_blank" rel="noopener noreferrer">Buyer Team</a> — an autonomous multi-agent procurement negotiation system.</p>
+    <p>Based on PRD-011 (Integration Skill) · AWS for SAP MCP Server, GA 2026-05-01 · Live state verified 2026-09-05</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>
