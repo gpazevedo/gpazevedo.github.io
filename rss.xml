@@ -6,7 +6,17 @@
   <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
   <language>en-us</language>
-  <lastBuildDate>Thu, 10 Sep 2026 00:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Thu, 24 Sep 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>Every requirement has a test, and you can check it</title>
+      <link>https://gpazevedo.github.io/blog/eng/requirement-traceability.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/requirement-traceability.html</guid>
+      <pubDate>Thu, 24 Sep 2026 00:00:00 +0000</pubDate>
+      <description>A skill for AI coding agents that turns "the tests cover every requirement" from a reviewer's judgement call into a colon-anchored grep that fails when a requirement has no test.</description>
+      <category>Testing</category>
+      <category>AI Coding</category>
+      <category>Agent Skills</category>
+    </item>
     <item>
       <title>Emulating SAP for agentic development</title>
       <link>https://gpazevedo.github.io/blog/eng/emulating-sap-for-agentic-development.html</link>
