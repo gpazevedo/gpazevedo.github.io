@@ -8,11 +8,11 @@
   <language>en-us</language>
   <lastBuildDate>Thu, 24 Sep 2026 00:00:00 +0000</lastBuildDate>
     <item>
-      <title>Every requirement is covered by tests</title>
+      <title>Every requirement has a test, and a check that proves it</title>
       <link>https://gpazevedo.github.io/blog/eng/requirement-traceability.html</link>
       <guid>https://gpazevedo.github.io/blog/eng/requirement-traceability.html</guid>
       <pubDate>Thu, 24 Sep 2026 00:00:00 +0000</pubDate>
-      <description>When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that every requirement is covered by tests, completely, before review. It carries over to other agentic skill sets.</description>
+      <description>When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that proves every requirement has a test before review, and an optional pass that judges whether those tests cover all of it. It carries over to other agentic skill sets.</description>
       <category>Testing</category>
       <category>AI Coding</category>
       <category>Agent Skills</category>
