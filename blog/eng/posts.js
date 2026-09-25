@@ -4,11 +4,11 @@ window.engPosts = [
   {
     "slug": "requirement-traceability",
     "file": "requirement-traceability.html",
-    "title": "Every requirement is covered by tests",
-    "description": "When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that every requirement is covered by tests, completely, before review. It carries over to other agentic skill sets.",
+    "title": "Every requirement has a test, and a check that proves it",
+    "description": "When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that proves every requirement has a test before review, and an optional pass that judges whether those tests cover all of it. It carries over to other agentic skill sets.",
     "tags": ["Testing", "AI Coding", "Agent Skills"],
     "date": "2026-09-24",
-    "readingTime": 10
+    "readingTime": 14
   },
   {
     "slug": "emulating-sap-for-agentic-development",
