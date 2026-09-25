@@ -2,6 +2,15 @@
    Add one entry per file in this folder. Ties keep the order listed here. */
 window.engPosts = [
   {
+    "slug": "requirement-traceability",
+    "file": "requirement-traceability.html",
+    "title": "Every requirement is covered by tests",
+    "description": "When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that every requirement is covered by tests, completely, before review. It carries over to other agentic skill sets.",
+    "tags": ["Testing", "AI Coding", "Agent Skills"],
+    "date": "2026-09-24",
+    "readingTime": 10
+  },
+  {
     "slug": "emulating-sap-for-agentic-development",
     "file": "emulating-sap-for-agentic-development.html",
     "title": "Emulating SAP for agentic development",
