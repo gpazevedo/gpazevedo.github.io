@@ -6,7 +6,7 @@
 <meta name="robots" content="index, follow">
 <meta name="author" content="Gustavo Peixoto de Azevedo">
 <title>Every requirement is covered by tests — Gustavo Azevedo</title>
-<meta name="description" content="A skill for AI coding agents that turns &quot;the tests cover every requirement&quot; from a reviewer's judgement call into a colon-anchored grep that fails when a requirement has no test."/>
+<meta name="description" content="When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that every requirement is covered by tests, completely, before review. It carries over to other agentic skill sets."/>
 <link rel="canonical" href="https://gpazevedo.github.io/blog/eng/requirement-traceability.html"/>
 <link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
 <meta name="theme-color" content="#0F172A"/>
@@ -15,7 +15,7 @@
 <meta property="og:url" content="https://gpazevedo.github.io/blog/eng/requirement-traceability.html"/>
 <meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
 <meta property="og:title" content="Every requirement is covered by tests"/>
-<meta property="og:description" content="A skill for AI coding agents that turns &quot;the tests cover every requirement&quot; from a reviewer's judgement call into a colon-anchored grep that fails when a requirement has no test."/>
+<meta property="og:description" content="When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that every requirement is covered by tests, completely, before review. It carries over to other agentic skill sets."/>
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-09-24T00:00:00+00:00"/>
@@ -26,10 +26,10 @@
 
 <meta name="twitter:card" content="summary"/>
 <meta name="twitter:title" content="Every requirement is covered by tests"/>
-<meta name="twitter:description" content="A skill for AI coding agents that turns &quot;the tests cover every requirement&quot; from a reviewer's judgement call into a colon-anchored grep that fails when a requirement has no test."/>
+<meta name="twitter:description" content="When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that every requirement is covered by tests, completely, before review. It carries over to other agentic skill sets."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Every requirement is covered by tests","description":"A skill for AI coding agents that turns \"the tests cover every requirement\" from a reviewer's judgement call into a colon-anchored grep that fails when a requirement has no test.","datePublished":"2026-09-24","dateModified":"2026-09-24","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/requirement-traceability.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/requirement-traceability.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Every requirement is covered by tests","description":"When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that every requirement is covered by tests, completely, before review. It carries over to other agentic skill sets.","datePublished":"2026-09-24","dateModified":"2026-09-24","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/requirement-traceability.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/requirement-traceability.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Every requirement is covered by tests","item":"https://gpazevedo.github.io/blog/eng/requirement-traceability.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -76,43 +76,123 @@
 
   <h1>Every requirement is <em>covered by tests</em></h1>
 
-  <p class="deck">"The tests cover all the requirements" is a sentence every code review says and nobody verifies. With an AI agent writing both the code and the tests, it becomes the sentence that matters most. <code>requirement-traceability</code> is a skill that makes it a command you run: one that fails, by name, when a requirement has no test.</p>
+  <p class="deck">When an agent writes the code, you stop reading every line. What you trust instead is the tests. So the question that decides whether agent-written code can be trusted is simple: do the tests cover every requirement, completely? <code>requirement-traceability</code> turns that question into a check you can run.</p>
+
+  <p>I built it as an addition to <a href="https://github.com/mattpocock/skills">Matt Pocock's skills</a>, one of the most respected agentic engineering skill sets, and applied it to his spec, ticket and test-first flow. Nothing in it depends on that repo: the same traceability and coverage check fits any skill set that goes from a spec to tests.</p>
+
+  <h2>The argument</h2>
+
+  <p>Suppose a feature is well defined: its architecture, design and requirements have been written down and reviewed. Then a short chain of reasoning follows.</p>
+
+  <ol style="margin-bottom:1.3em">
+    <li><strong>The spec says what the feature must do.</strong> That is what the review was for.</li>
+    <li><strong>The tests check everything the spec says.</strong> Every requirement has tests, and those tests check all of it, not part of it.</li>
+    <li><strong>Therefore, code that passes the tests does what the spec says.</strong> It does not matter who or what wrote it.</li>
+  </ol>
+
+  <p>Step 1 is a human job, and teams already do it. Step 3 is what a CI run tells you. Step 2 is the weak link. Everyone says "the tests cover the requirements" in code review, and almost nobody verifies it. With a human writing the code, that gap is survivable, because the human also carries the intent in their head. With an agent writing the code, the tests are the only thing carrying the intent. If a requirement has no test, nothing stops the agent from getting it wrong, and nothing tells you it did.</p>
+
+  <figure class="diagram">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" role="img" aria-labelledby="rt1-t rt1-d">
+    <title id="rt1-t">The argument chain</title>
+    <desc id="rt1-d">Three links: a reviewed spec, tests that cover every requirement fully, and passing code that conforms. The middle link is the weak one and is what this skill checks. Below, the risks that remain: the spec is wrong or silent, tests drift toward the code, and Jev misjudges coverage.</desc>
+    <defs>
+      <style>
+        .rt text { font-family: var(--sans); fill: var(--ink); stroke: none; }
+        .rt .t { font-size: 15px; font-weight: 600; text-anchor: middle; }
+        .rt .s { font-size: 12.5px; fill: var(--ink-muted); text-anchor: middle; }
+        .rt .sl { text-anchor: start; }
+        .rt .m { font-family: var(--mono); font-size: 11px; letter-spacing: .04em; fill: var(--ink-muted); }
+        .rt .mc { font-family: var(--mono); font-size: 12px; fill: var(--ink); }
+        .rt .hl { fill: var(--amber); font-weight: 600; }
+        .rt .box { fill: var(--surface); stroke: var(--rule); stroke-width: 1.5; }
+        .rt .box-amber { fill: var(--amber-light); stroke: var(--amber); stroke-width: 2; }
+        .rt .box-teal { fill: var(--teal-light); stroke: var(--teal); stroke-width: 1.5; }
+        .rt .box-coral { fill: var(--coral-light); stroke: var(--coral); stroke-width: 1.5; }
+        .rt .box-blue { fill: var(--blue-light); stroke: var(--blue); stroke-width: 1.5; }
+        .rt .risk { fill: none; stroke: var(--ink-faint); stroke-width: 1.2; stroke-dasharray: 4 4; }
+        .rt .edge { fill: none; stroke: var(--ink-muted); stroke-width: 1.5; }
+        .rt .edge-faint { fill: none; stroke: var(--ink-faint); stroke-width: 1.2; stroke-dasharray: 3 4; }
+        .rt .ink-amber { fill: var(--amber); }
+        .rt .ink-teal { fill: var(--teal); }
+        .rt .ink-coral { fill: var(--coral); }
+        .rt .ink-blue { fill: var(--blue); }
+      </style>
+      <marker id="rt1-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <g class="rt">
+      <text x="320" y="22" class="m" text-anchor="middle">THE WEAK LINK</text>
+
+      <rect x="10" y="36" width="180" height="104" rx="10" class="box"/>
+      <text x="100" y="70" class="t">Reviewed spec</text>
+      <text x="100" y="92" class="s">architecture, design,</text>
+      <text x="100" y="108" class="s">requirements</text>
+      <text x="100" y="130" class="m" text-anchor="middle">CHECKED BY PEOPLE</text>
+
+      <rect x="230" y="36" width="180" height="104" rx="10" class="box-amber"/>
+      <text x="320" y="70" class="t">Tests cover every</text>
+      <text x="320" y="90" class="t">requirement, fully</text>
+      <text x="320" y="130" class="m ink-amber" text-anchor="middle">CHECKED BY THIS SKILL</text>
+
+      <rect x="450" y="36" width="180" height="104" rx="10" class="box"/>
+      <text x="540" y="70" class="t">Passing code</text>
+      <text x="540" y="90" class="t">conforms to spec</text>
+      <text x="540" y="130" class="m" text-anchor="middle">CHECKED BY CI</text>
+
+      <line x1="192" y1="88" x2="226" y2="88" class="edge" marker-end="url(#rt1-a)"/>
+      <line x1="412" y1="88" x2="446" y2="88" class="edge" marker-end="url(#rt1-a)"/>
+
+      <text x="450" y="223" class="m">← WHAT REMAINS</text>
+      <line x1="100" y1="142" x2="100" y2="200" class="edge-faint"/>
+      <line x1="320" y1="142" x2="320" y2="200" class="edge-faint"/>
+      <rect x="10" y="200" width="180" height="36" rx="18" class="risk"/>
+      <text x="100" y="223" class="s">spec wrong, or silent</text>
+      <rect x="230" y="200" width="180" height="36" rx="18" class="risk"/>
+      <text x="320" y="223" class="s">tests drift toward code</text>
+      <line x1="320" y1="236" x2="320" y2="250" class="edge-faint"/>
+      <rect x="230" y="250" width="180" height="36" rx="18" class="risk"/>
+      <text x="320" y="273" class="s">Jev misjudges coverage</text>
+    </g>
+  </svg>
+  <figcaption>Code that passes the tests conforms to the spec <strong>only if the tests cover every requirement, fully</strong>. That middle link is what this skill makes checkable.</figcaption>
+  </figure>
+
+  <p>This post is about making step 2 checkable.</p>
 
   <div class="callout">
     <div class="callout-label">The goal</div>
-    <p>Three things: two checked mechanically, one judged by a model:</p>
-    <ul style="font-size:14px;margin:8px 0 0">
-      <li><strong>Trace every test to its requirement.</strong> For any requirement in the spec, you can list every test that exercises it, and for any test, you can say which requirement it serves.</li>
-      <li><strong>Guarantee every requirement is covered.</strong> A requirement with no test is reported by name and fails the check, unless the spec explicitly waives it with a reason.</li>
-      <li><strong>Check that each requirement is covered in full.</strong> An optional pass has a small model, Jev, read all the tests tagged with a requirement and judge whether their assertions check the whole behaviour, only part of it, or something else.</li>
+    <ul style="font-size:14px;margin:0">
+      <li><strong>Trace every test to its requirement.</strong> For any requirement, list every test that checks it. For any test, name the requirement it serves.</li>
+      <li><strong>Guarantee every requirement is covered.</strong> A requirement with no test fails the check, by name, unless the spec explicitly waives it with a reason.</li>
+      <li><strong>Check that each requirement is covered in full.</strong> An optional pass has a small model read a requirement's tests and judge whether they check all of it.</li>
     </ul>
   </div>
 
-  <p>I have been working on a set of agent skills in my <a href="https://github.com/gpazevedo/skills">fork</a> of Matt Pocock's <a href="https://github.com/mattpocock/skills">skills repo</a>. The main chain goes from a grilling session to a spec (<code>to-spec</code>), from the spec to tickets (<code>to-tickets</code>), then test-first implementation (<code>tdd</code>, <code>implement</code>) and a two-axis review (<code>code-review</code>). One axis of that review asks whether the code matches the spec. And for a long time, the only way to answer "is every requirement tested?" was for a model to read the spec, read the tests, and form an opinion.</p>
-
-  <p>That opinion is usually right. It is also unrepeatable, and it gets worse exactly when you need it most: large specs, long sessions, many small tickets. A missing test for requirement 14 out of 22 is precisely the kind of thing attention skips. The gap was reported upstream as <a href="https://github.com/mattpocock/skills/issues/341">issue #341</a>: decisions made during grilling were not traceable through spec, tickets and implementation. This skill closes the spec-to-test half of it. It is not a new flow: it plugs into the existing one, and <a href="#workflow">the workflow section</a> shows exactly where.</p>
+  <p>The skill lives in my <a href="https://github.com/gpazevedo/skills">fork</a> of Pocock's repo and plugs into its main flow: grill the idea, write a spec (<code>/to-spec</code>), split it into tickets (<code>/to-tickets</code>), build each ticket test-first (<code>/tdd</code>, <code>/implement</code>), review (<code>/code-review</code>). Until now, the only answer to "is every requirement tested?" was a model reading the spec and the tests and forming an opinion. That opinion is usually right. It is also unrepeatable, and it fails exactly where you need it most: a missing test for requirement 14 of 22, in a long session, across many small tickets. The gap was reported upstream as <a href="https://github.com/mattpocock/skills/issues/341">issue #341</a>. This skill closes the spec-to-test half of it.</p>
 
   <hr>
 
-  <h2>The idea: one ID, carried end to end</h2>
+  <h2>One ID, carried from spec to test</h2>
 
-  <p>Nothing here is new. Requirement traceability matrices are older than most of the people reading this. What is new is the cost: when an agent writes the spec, the tickets and the tests, keeping a stable ID attached to each requirement across all of them costs nothing, so there is no reason not to.</p>
+  <p>Requirement traceability is an old idea. What is new is the cost. When an agent writes the spec, the tickets and the tests, keeping a stable ID on each requirement costs nothing, so there is no reason not to.</p>
 
-  <p>Each requirement gets an ID of the form <code>&lt;KEY&gt;-&lt;n&gt;</code>, like <code>CPN-3</code>. <code>KEY</code> is two to five uppercase letters chosen per spec. (A bare <code>R3</code> would collide across specs and count another spec's test as coverage.) Four pieces carry the ID from the spec to the tests:</p>
+  <p>Each requirement gets an ID like <code>CPN-3</code>: a key of two to five capital letters chosen per spec, then a number. (A bare <code>R3</code> would collide across specs and count another spec's test as coverage.) The ID travels through four places:</p>
 
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Piece</th><th>Where it lives</th><th>Shape</th></tr></thead>
+      <thead><tr><th>Piece</th><th>Where it lives</th><th>Example</th></tr></thead>
       <tbody>
-        <tr><td>Requirement ID</td><td>The spec's user stories, after the list number</td><td><code>1. CPN-1: As a shopper, I want to apply a coupon…</code></td></tr>
-        <tr><td>Seam table</td><td>The spec's testing decisions</td><td>Each seam mapped to the IDs it covers, or a <code>waived: &lt;reason&gt;</code> row</td></tr>
-        <tr><td><code>Covers:</code> line</td><td>Each ticket, added by annotation</td><td><code>Covers: CPN-1, CPN-4</code></td></tr>
-        <tr><td>Test tag</td><td>The start of the test name</td><td><code>it('CPN-3: rejects expired coupons', …)</code>, on every test for that requirement</td></tr>
+        <tr><td>Requirement ID</td><td>The spec's user stories</td><td><code>1. CPN-1: As a shopper, I want to apply a coupon…</code></td></tr>
+        <tr><td>Seam table</td><td>The spec's testing decisions</td><td>Each test seam mapped to the IDs it covers</td></tr>
+        <tr><td><code>Covers:</code> line</td><td>Each ticket</td><td><code>Covers: CPN-1, CPN-4</code></td></tr>
+        <tr><td>Test tag</td><td>The start of every test name</td><td><code>it('CPN-3: rejects expired coupons', …)</code></td></tr>
       </tbody>
     </table>
   </div>
 
-  <p>A spec looks like this:</p>
+  <p>A spec with IDs looks like this:</p>
 
   <pre><code>Requirement key: CPN
 
@@ -120,33 +200,82 @@
 2. CPN-2: As a shopper, I want an expired coupon rejected with a reason, so that I know why it failed.
 3. CPN-3: (dropped) As a shopper, I want to stack coupons.</code></pre>
 
-  <p>The rules are few and strict. One behaviour per ID, so compound stories get split. IDs are never renumbered or reused. A withdrawn requirement keeps its ID and is marked <code>(dropped)</code>, so an old test tagged <code>CPN-3:</code> shows up as stale instead of silently counting for something new.</p>
+  <p>Three rules keep the IDs honest. One behaviour per ID, so compound stories get split. IDs are never renumbered or reused. A withdrawn requirement keeps its ID and is marked <code>(dropped)</code>, so an old test tagged <code>CPN-3:</code> shows up as stale instead of quietly counting for something new.</p>
 
-  <p>One behaviour per ID does not mean one test per ID. A requirement usually needs several tests (the main case, edge cases, errors), and every one carries the same tag:</p>
+  <p>One behaviour per ID does not mean one test per ID. A requirement usually needs several tests (the main case, edge cases, errors), and each carries the same tag:</p>
 
   <pre><code>it('CPN-2: rejects a coupon past its expiry date', () =&gt; { … });
 it('CPN-2: rejects a coupon expiring today at 00:00', () =&gt; { … });
 it('CPN-2: shows the expiry reason to the shopper', () =&gt; { … });</code></pre>
 
-  <p>The ID is the link from the requirement to <em>all</em> of its tests, and grepping for <code>CPN-2:</code> lists them.</p>
+  <p>Grep for <code>CPN-2:</code> and you get every test for that requirement.</p>
+
+  <figure class="diagram">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 330" role="img" aria-labelledby="rt2-t rt2-d">
+    <title id="rt2-t">One ID, followed from spec to tests</title>
+    <desc id="rt2-d">The ID CPN-2 appears on the user story, in the seam table row for POST /checkout, on ticket 02's Covers line, and at the start of three test names. One requirement, several tests; searching for CPN-2 with its colon finds the story and every test.</desc>
+    <defs>
+      <marker id="rt2-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <g class="rt">
+      <rect x="10" y="10" width="290" height="76" rx="10" class="box"/>
+      <text x="26" y="34" class="m">SPEC · USER STORY</text>
+      <text x="26" y="58" class="mc">2. <tspan class="hl">CPN-2:</tspan> As a shopper, I want</text>
+      <text x="26" y="76" class="mc">an expired coupon rejected…</text>
+
+      <rect x="10" y="120" width="290" height="62" rx="10" class="box"/>
+      <text x="26" y="144" class="m">SPEC · SEAM TABLE</text>
+      <text x="26" y="167" class="mc">POST /checkout → CPN-1, <tspan class="hl">CPN-2</tspan></text>
+
+      <rect x="10" y="216" width="290" height="62" rx="10" class="box"/>
+      <text x="26" y="240" class="m">TICKET 02</text>
+      <text x="26" y="263" class="mc">Covers: <tspan class="hl">CPN-2</tspan></text>
+
+      <line x1="155" y1="88" x2="155" y2="116" class="edge" marker-end="url(#rt2-a)"/>
+      <line x1="155" y1="184" x2="155" y2="212" class="edge" marker-end="url(#rt2-a)"/>
+
+      <text x="360" y="130" class="m">TESTS · ONE REQUIREMENT, SEVERAL TESTS</text>
+      <rect x="360" y="142" width="270" height="44" rx="8" class="box-amber"/>
+      <text x="374" y="169" class="mc"><tspan class="hl">CPN-2:</tspan> rejects a past expiry</text>
+      <rect x="360" y="202" width="270" height="44" rx="8" class="box-amber"/>
+      <text x="374" y="229" class="mc"><tspan class="hl">CPN-2:</tspan> rejects expiry at 00:00</text>
+      <rect x="360" y="262" width="270" height="44" rx="8" class="box-amber"/>
+      <text x="374" y="289" class="mc"><tspan class="hl">CPN-2:</tspan> shows the reason</text>
+
+      <path d="M302 247 C 330 247, 330 164, 356 164" class="edge" marker-end="url(#rt2-a)"/>
+      <path d="M302 247 C 330 247, 330 224, 356 224" class="edge" marker-end="url(#rt2-a)"/>
+      <path d="M302 247 C 330 247, 330 284, 356 284" class="edge" marker-end="url(#rt2-a)"/>
+
+      <text x="360" y="40" class="s sl">One search finds the requirement</text>
+      <text x="360" y="66" class="mc">grep "<tspan class="hl">CPN-2:</tspan>"</text>
+      <text x="360" y="92" class="s sl">and every test that checks it.</text>
+    </g>
+  </svg>
+  <figcaption>The ID is the thread. <strong>One behaviour per ID, but as many tests as it takes</strong>, each starting with <code>CPN-2:</code>.</figcaption>
+  </figure>
+
 
   <hr>
 
-  <h2>The colon is load-bearing</h2>
+  <h2>The colon does the heavy lifting</h2>
 
-  <p>The single most important design decision is one character. <strong>The ID is always followed by a colon, and every match anchors on the colon.</strong></p>
+  <p>The most important design decision is a single character: <strong>the ID is always followed by a colon, and every search includes it.</strong></p>
 
-  <p>The reason is prefixes. <code>CPN-1</code> is a prefix of <code>CPN-10</code>. Grep for <code>CPN-1</code> and the moment someone writes a test for <code>CPN-10</code>, the untested <code>CPN-1</code> looks covered. Nothing fails, nothing warns. You get a green check that is a lie, and silent false coverage is the one failure this whole convention exists to prevent.</p>
+  <p>Here is why. <code>CPN-1</code> is a prefix of <code>CPN-10</code>. Search for <code>CPN-1</code>, and the moment someone writes a test for <code>CPN-10</code>, the untested <code>CPN-1</code> looks covered. Nothing fails. Nothing warns. You get a green check that is a lie.</p>
 
-  <blockquote><p>A traceability check that can report "covered" when it is not is worse than no check, because now people stop looking.</p></blockquote>
+  <blockquote><p>A coverage check that can say "covered" when it is not is worse than no check, because people stop looking.</p></blockquote>
 
-  <p>So every grep, every runner filter and every comparison uses <code>CPN-3:</code>, never <code>CPN-3</code>. Runner filters quote it: <code>-t "CPN-3:"</code>. The final comparison uses <code>comm</code> on whole lines with the colon included, which keeps <code>CPN-1:</code> and <code>CPN-10:</code> apart without any cleverness. One of the eval cases exists only to guard this: twelve requirements, where only <code>CPN-1</code> is untested and its ID is a prefix of <code>CPN-10</code>, <code>CPN-11</code> and <code>CPN-12</code>.</p>
+  <p>So every search, every test-runner filter and every comparison uses <code>CPN-1:</code>, never <code>CPN-1</code>. One of the eval cases exists only to guard this: twelve requirements, where only <code>CPN-1</code> is untested and <code>CPN-10</code>, <code>CPN-11</code> and <code>CPN-12</code> all have tests.</p>
 
   <hr>
 
-  <h2>Gaps visible before code exists</h2>
+  <h2>Gaps you can see before any code exists</h2>
 
-  <p>Most coverage tools tell you about gaps after the code is written. The seam table moves that earlier. In the spec's testing decisions, each test seam lists the IDs it will cover:</p>
+  <p>Most coverage tools report gaps after the code is written. This convention surfaces them earlier, in two places.</p>
+
+  <p><strong>The seam table.</strong> In the spec's testing decisions, each test seam lists the requirements it will check:</p>
 
   <div class="table-wrap">
     <table>
@@ -158,42 +287,30 @@ it('CPN-2: shows the expiry reason to the shopper', () =&gt; { … });</code></p
     </table>
   </div>
 
-  <p>An ID that appears in no row is a gap you can see before any code exists. And an ID that genuinely will not be tested does not just disappear: it gets a <code>waived:</code> row with a reason. <strong>A requirement is waived explicitly, never dropped silently.</strong> Anyone reading the spec can see what is untested and why, and argue with it.</p>
+  <p>A requirement in no row is a gap, visible before a line of code. A requirement that genuinely will not be tested does not just vanish: it gets a <code>waived:</code> row with a reason. <strong>Requirements are waived in writing, never dropped in silence.</strong> Anyone reading the spec can see what is untested and why, and argue with it.</p>
 
-  <p>The <code>Covers:</code> line on tickets carries the same idea into the work breakdown. Every ID lands on exactly one ticket, and <code>Covers:</code> means the IDs this ticket makes <em>fully testable</em>, not the ones it touches. A requirement built across two slices goes on the later slice only. That sounds pedantic until you run the check per ticket: the first slice's check passes honestly, instead of failing on a requirement it was never meant to finish.</p>
+  <p><strong>The <code>Covers:</code> line.</strong> Each ticket names the requirements it makes <em>fully testable</em>, not the ones it merely touches. A requirement built across two tickets goes on the later one. That sounds pedantic until you run the check per ticket: the first ticket passes honestly, instead of failing on a requirement it was never meant to finish.</p>
+
+  <p>The mapping from requirements to tickets is checked mechanically: every requirement on exactly one ticket, and no ticket naming a requirement the spec does not define. That is a count, not a judgement, so the agent fixes violations itself. It only asks you about a requirement that fits no ticket at all, because that is a real gap in how the work was split.</p>
 
   <hr>
 
   <h2>The check is a handful of greps</h2>
 
-  <p>No tooling, no dependency, no config. The check is a short bash block inside the skill's <code>SKILL.md</code>. It builds three sorted lists and compares them:</p>
-
-  <ul>
-    <li><strong>defined</strong>: the IDs the spec's user stories declare, dropped ones excluded;</li>
-    <li><strong>waived</strong>: the IDs in <code>waived:</code> rows of the seam table;</li>
-    <li><strong>tagged</strong>: the IDs that start a quoted string in a test file.</li>
-  </ul>
-
-  <p>The heart of it is three lines:</p>
-
-  <pre><code>echo "UNTESTED (fails):";      comm -23 $T/defined $T/tagged | comm -23 - $T/waived
-echo "UNDEFINED ID (warns):";  comm -13 $T/defined $T/tagged
-echo "NO ID (warns):";         # tests whose name carries no ID</code></pre>
-
-  <p>That yields three classes, with deliberately different weights:</p>
+  <p>No tooling, no dependencies, no config. The check is a short bash block inside the skill. It builds three lists (the requirements the spec defines, the ones it waives, and the IDs found in test names) and compares them. It reports three things:</p>
 
   <div class="table-wrap">
     <table>
       <thead><tr><th>Report</th><th>Meaning</th><th>Effect</th></tr></thead>
       <tbody>
-        <tr class="row-quality"><td>Untested</td><td>A defined, non-waived requirement no test names</td><td>Fails</td></tr>
+        <tr class="row-quality"><td>Untested</td><td>A requirement that no test names, and that is not waived</td><td>Fails</td></tr>
         <tr><td>Undefined ID</td><td>A test tagged with an ID the spec does not define, or has dropped</td><td>Warns: a typo or a stale test</td></tr>
         <tr><td>No ID</td><td>A test with no ID at all</td><td>Warns: scope creep, or a test worth tying to a requirement</td></tr>
       </tbody>
     </table>
   </div>
 
-  <p>Here is the check against the fixture the repo tests it with. The test file has a commented-out test for <code>CPN-1</code> and a skipped one for <code>CPN-5</code>:</p>
+  <p>Here it is on the repo's test fixture. The spec defines <code>CPN-1</code> to <code>CPN-6</code> and <code>CPN-10</code>, drops <code>CPN-3</code> and waives <code>CPN-4</code>. The test file:</p>
 
   <pre><code>it('CPN-2: rejects an expired coupon with a reason', () =&gt; {});
 it('CPN-10: accepts a lowercase coupon code', () =&gt; {});
@@ -202,7 +319,7 @@ it('applies a discount', () =&gt; {});
 // it('CPN-1: applies a coupon at checkout', () =&gt; {});
 it.skip('CPN-5: records coupon analytics', () =&gt; {});</code></pre>
 
-  <p>And the output:</p>
+  <p>The output:</p>
 
   <pre><code>UNTESTED (fails):
 CPN-1:
@@ -212,26 +329,139 @@ CPN-99:
 NO ID (warns):
 tests/checkout.test.ts:4:it('applies a discount', () =&gt; {});</code></pre>
 
-  <p>Note what is <em>not</em> there. <code>CPN-1</code> is untested even though <code>CPN-10</code> has a test. <code>CPN-4</code> has no test but is waived, so it is not reported. <code>CPN-3</code> is dropped, so it is not expected. And the two switched-off tests do not count: a commented-out or <code>skip</code>/<code>todo</code>/<code>xit</code> test is not a passing test, so its requirement goes straight back on the untested list.</p>
+  <p>Notice what the check refused to be fooled by. <code>CPN-1</code> is untested even though <code>CPN-10</code> has a test. Its only test is commented out, and a commented-out test is not a passing test. The same goes for <code>CPN-5</code>, whose test is skipped. <code>CPN-4</code> has no test but is waived, so it is not reported, and dropped <code>CPN-3</code> is not expected at all.</p>
 
   <div class="callout">
     <div class="callout-label">Known blind spot</div>
-    <p>The check reads text, so it errs in both directions, but unevenly. Switched-off tests err on the safe side (reported untested). The unsafe direction is narrow: <strong>a string that merely starts with an ID and a colon counts as a tag</strong>, even outside a test name. Keep IDs out of other string literals.</p>
+    <p>The check reads text, so it can err both ways, but not equally. Switched-off tests err on the safe side: they are reported untested. The unsafe side is narrow: <strong>any string that starts with an ID and a colon counts as a tag</strong>, even outside a test name. Keep IDs out of other string literals.</p>
   </div>
 
-  <p>Because the check lives as prose-plus-code inside a skill, it could rot without anyone noticing. So the repo tests the block <em>as the skill writes it</em>: <code>scripts/test-traceability-check.sh</code> extracts the bash from <code>SKILL.md</code>, runs it against the fixture, and diffs the output against the recorded expectation. Edit the skill's text in a way that breaks the check, and that script goes red.</p>
-
-  <p>A repo that already has its own coverage tooling can name it in <code>docs/agents/traceability.md</code> with a <code>Check command:</code> line. It has the same contract: exit 1 when any ID is untested, and take IDs as trailing arguments to narrow the check to one ticket.</p>
+  <p>Because the check lives as code inside a skill's text, it could break without anyone noticing. So the repo tests it exactly as the skill writes it: a script extracts the bash from <code>SKILL.md</code>, runs it on the fixture, and compares the output with the expected result. The same script tests the ticket-mapping check. A repo with its own coverage tooling can plug it in instead, as long as it follows the same contract: exit 1 when any requirement is untested.</p>
 
   <hr>
 
-  <h2 id="workflow">Using it in the Pocock skills workflow</h2>
+  <h2>Present is not the same as fully covered</h2>
 
-  <p>Matt Pocock's skills already have a main flow from idea to shipped code: grill the idea, write a spec, split it into tickets, implement each ticket test-first, review. Traceability rides on that flow with the smallest footprint I could find: <strong>one extra command, and one line in each of two existing skills</strong>. <code>/to-spec</code>, <code>/to-tickets</code> and <code>/code-review</code> are not modified at all.</p>
+  <p>The check proves that every requirement has at least one test that <em>names</em> it. It cannot tell whether those tests check everything the requirement asks for. <code>it('CPN-2: rejects an expired coupon', () =&gt; {})</code> passes with an empty body. So does a test that checks the rejection but never the reason, when <code>CPN-2</code> asks for both.</p>
 
-  <p><strong>Turn it on</strong> by running <code>/requirement-traceability</code> once per feature, right after <code>/to-tickets</code>. It annotates what the two earlier skills wrote: an ID on each user story, the seam table in the spec, and a <code>Covers:</code> line on each ticket. It then shows you the annotated lines and asks you to confirm that every requirement lands on exactly one ticket. For a one-session build with no tickets, run it after <code>/to-spec</code> instead.</p>
+  <p>That is exactly the gap that matters for the argument above. A requirement that is only half tested is a requirement the agent can half implement, with every check green.</p>
 
-  <p><strong>Then run the flow as usual.</strong> From here the IDs carry themselves:</p>
+  <figure class="diagram">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 230" role="img" aria-labelledby="rt3-t rt3-d">
+    <title id="rt3-t">The coverage ladder</title>
+    <desc id="rt3-d">Three levels of coverage for requirement CPN-2. Untested: no test names it, and the gap check fails. Named: a test exists but checks only the rejection, not the reason; the gap check passes and Jev flags it. Fully covered: the tests check the rejection and the reason; Jev says ok. The gap check lifts a requirement from the first level to the second, the Jev pass from the second to the third.</desc>
+    <defs>
+      <marker id="rt3-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <g class="rt">
+      <rect x="10" y="40" width="170" height="180" rx="10" class="box-coral"/>
+      <text x="26" y="66" class="m ink-coral">1 · UNTESTED</text>
+      <text x="26" y="96" class="s sl">No test names</text>
+      <text x="26" y="114" class="s sl"><tspan class="hl">CPN-2:</tspan> at all.</text>
+      <text x="26" y="200" class="m">GAP CHECK: FAILS</text>
+
+      <rect x="235" y="40" width="170" height="180" rx="10" class="box-amber"/>
+      <text x="251" y="66" class="m ink-amber">2 · NAMED</text>
+      <text x="251" y="96" class="s sl">A <tspan class="hl">CPN-2:</tspan> test checks</text>
+      <text x="251" y="114" class="s sl">the rejection, but</text>
+      <text x="251" y="132" class="s sl">never the reason.</text>
+      <text x="251" y="182" class="m">GAP CHECK: PASSES</text>
+      <text x="251" y="200" class="m ink-amber">JEV: FLAG</text>
+
+      <rect x="460" y="40" width="170" height="180" rx="10" class="box-teal"/>
+      <text x="476" y="66" class="m ink-teal">3 · FULLY COVERED</text>
+      <text x="476" y="96" class="s sl">The <tspan class="hl">CPN-2:</tspan> tests</text>
+      <text x="476" y="114" class="s sl">check the rejection</text>
+      <text x="476" y="132" class="s sl">and the reason.</text>
+      <text x="476" y="182" class="m">GAP CHECK: PASSES</text>
+      <text x="476" y="200" class="m ink-teal">JEV: OK</text>
+
+      <line x1="183" y1="130" x2="231" y2="130" class="edge" marker-end="url(#rt3-a)"/>
+      <line x1="408" y1="130" x2="456" y2="130" class="edge" marker-end="url(#rt3-a)"/>
+      <text x="207" y="24" class="m" text-anchor="middle">GAP CHECK</text>
+      <text x="207" y="112" class="m" text-anchor="middle">grep</text>
+      <text x="432" y="24" class="m" text-anchor="middle">JEV PASS</text>
+      <text x="432" y="112" class="m" text-anchor="middle">model</text>
+      <line x1="207" y1="30" x2="207" y2="102" class="edge-faint"/>
+      <line x1="432" y1="30" x2="432" y2="102" class="edge-faint"/>
+    </g>
+  </svg>
+  <figcaption>The gap check lifts a requirement to <strong>named</strong>. Only the Jev pass tells <strong>named</strong> from <strong>fully covered</strong>, and that gap is where an agent can half build a feature with every check green.</figcaption>
+  </figure>
+
+
+  <p>So there is an optional second pass. A small bundled script, <code>judge.mjs</code>, sends <a href="https://typesafe.ai/blog/introducing-system-one-models-and-jev">Jev</a>, a small, fast model from TypeSafe, one question per requirement, along with every test tagged with it: <em>how much of the behaviour this requirement describes do these assertions check?</em> Because the tests are judged together, a requirement split across three tests counts as fully covered when the three together check all of it. Jev answers with a verdict and a confidence:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Class</th><th>Meaning</th><th>What happens next</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill pill-disable">ok</span></td><td>Confidently fully covered</td><td>Nothing</td></tr>
+        <tr><td><span class="pill pill-rollback">flag</span></td><td>Confidently only partly covered, or checking something else</td><td>The agent adds the missing tests and asks again</td></tr>
+        <tr><td><span class="pill pill-halt">uncertain</span></td><td>Low confidence, or no assertion in the test itself</td><td>The agent reads the tests itself</td></tr>
+        <tr><td><span class="pill pill-sns">not judged</span></td><td>No tagged test</td><td>Already reported by the check</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure class="diagram">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" role="img" aria-labelledby="rt4-t rt4-d">
+    <title id="rt4-t">The Jev loop</title>
+    <desc id="rt4-d">The Jev pass judges each requirement. Ok means done. Uncertain means the agent reads the tests itself. Flag means the agent adds tests for the unchecked part and runs the pass again. If the requirement is still flagged after the third round, the agent stops and asks you.</desc>
+    <defs>
+      <marker id="rt4-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <g class="rt">
+      <rect x="230" y="20" width="180" height="56" rx="10" class="box"/>
+      <text x="320" y="44" class="t">Jev pass</text>
+      <text x="320" y="64" class="s">per requirement</text>
+
+      <rect x="470" y="20" width="160" height="56" rx="10" class="box-teal"/>
+      <text x="486" y="42" class="m ink-teal">OK</text>
+      <text x="486" y="63" class="s sl">Fully covered. Done.</text>
+      <line x1="412" y1="48" x2="466" y2="48" class="edge" marker-end="url(#rt4-a)"/>
+
+      <rect x="10" y="20" width="160" height="56" rx="10" class="box-blue"/>
+      <text x="26" y="42" class="m ink-blue">UNCERTAIN</text>
+      <text x="26" y="63" class="s sl">Agent reads the tests.</text>
+      <line x1="228" y1="48" x2="174" y2="48" class="edge" marker-end="url(#rt4-a)"/>
+
+      <rect x="165" y="134" width="310" height="60" rx="10" class="box-amber"/>
+      <text x="181" y="156" class="m ink-amber">FLAG · NOT FULLY COVERED</text>
+      <text x="181" y="179" class="s sl">Agent adds tests for the unchecked part.</text>
+      <line x1="290" y1="78" x2="290" y2="130" class="edge" marker-end="url(#rt4-a)"/>
+      <line x1="350" y1="132" x2="350" y2="80" class="edge" marker-end="url(#rt4-a)"/>
+      <text x="282" y="110" class="m" text-anchor="end">flag</text>
+      <text x="358" y="104" class="m">run again</text>
+      <text x="358" y="119" class="m">round 1, 2, 3</text>
+
+      <rect x="220" y="232" width="200" height="56" rx="10" class="box-coral"/>
+      <text x="236" y="254" class="m ink-coral">HARD STOP</text>
+      <text x="236" y="275" class="s sl">Agent asks you to decide.</text>
+      <line x1="320" y1="196" x2="320" y2="228" class="edge" marker-end="url(#rt4-a)"/>
+      <text x="330" y="217" class="m">still flagged after round 3</text>
+    </g>
+  </svg>
+  <figcaption>A flag sends the requirement back for more tests, <strong>three rounds at most</strong>. After that the decision is yours: the requirement may be vague, the seam hard to test, or Jev wrong.</figcaption>
+  </figure>
+
+  <p><strong>A flag is an instruction, not a report.</strong> The agent compares the requirement with its tests, names the behaviour no assertion checks, writes tests for it, and runs the pass again. If it reads the tests and genuinely judges them complete, it can disagree with Jev, but it has to say why.</p>
+
+  <p><strong>The loop has a hard limit of three rounds.</strong> If a requirement is still flagged after the third, the agent stops and hands you the decision: which requirements, what it thinks is still unchecked, and what it tried. The requirement may be vague, the code may be hard to test at that seam, or Jev may simply be wrong. Those are calls for a person, and a fourth round only starts if you ask for it.</p>
+
+  <p>Sending code to a third party, from a skill that installs into anyone's repo, needed a rule. The pass runs only when <strong>both</strong> a <code>TYPESAFE_API_KEY</code> is set <strong>and</strong> the repo itself opts in with a <code>Judgement: jev</code> line in <code>docs/agents/traceability.md</code>. A key in your shell is not consent for every repo that shell touches. Without both, the skill says "Judgement pass skipped" and carries on as before.</p>
+
+  <hr>
+
+  <h2 id="workflow">How it fits the Pocock skills workflow</h2>
+
+  <p>The integration is deliberately small: <strong>one extra command, and one line in each of two existing skills.</strong> <code>/to-spec</code>, <code>/to-tickets</code> and <code>/code-review</code> are not modified at all.</p>
+
+  <p>You turn it on by running <code>/requirement-traceability</code> once per feature, right after <code>/to-tickets</code> (or after <code>/to-spec</code> for a small build with no tickets). It adds the IDs, the seam table and the <code>Covers:</code> lines to what those skills wrote, checks the mapping, and shows you the result. From there, the flow runs as usual:</p>
 
   <div class="pipeline">
     <div class="pipe-stage">
@@ -247,7 +477,7 @@ tests/checkout.test.ts:4:it('applies a discount', () =&gt; {});</code></pre>
       <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
       <div class="pipe-body">
         <div class="pipe-title">/to-spec</div>
-        <div class="pipe-desc">Unchanged. Writes the user stories and the testing decisions, with no IDs.</div>
+        <div class="pipe-desc">Unchanged. Writes the user stories and the testing decisions.</div>
       </div>
     </div>
     <div class="pipe-stage">
@@ -255,7 +485,7 @@ tests/checkout.test.ts:4:it('applies a discount', () =&gt; {});</code></pre>
       <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
       <div class="pipe-body">
         <div class="pipe-title">/to-tickets</div>
-        <div class="pipe-desc">Unchanged. Slices the spec into tracer-bullet tickets.</div>
+        <div class="pipe-desc">Unchanged. Slices the spec into tickets.</div>
       </div>
     </div>
     <div class="pipe-stage">
@@ -263,7 +493,7 @@ tests/checkout.test.ts:4:it('applies a discount', () =&gt; {});</code></pre>
       <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
       <div class="pipe-body">
         <div class="pipe-title">/requirement-traceability</div>
-        <div class="pipe-desc"><strong>The one added step.</strong> Puts an ID on each story, a seam table in the spec and a <code>Covers:</code> line on each ticket. Requirements no seam or ticket covers are visible here, before any code.</div>
+        <div class="pipe-desc"><strong>The one added step.</strong> IDs on the stories, a seam table in the spec, a <code>Covers:</code> line on each ticket, and a check that every requirement lands on exactly one ticket.</div>
       </div>
     </div>
     <div class="pipe-stage">
@@ -271,7 +501,7 @@ tests/checkout.test.ts:4:it('applies a discount', () =&gt; {});</code></pre>
       <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
       <div class="pipe-body">
         <div class="pipe-title">/tdd (inside /implement)</div>
-        <div class="pipe-desc"><strong>One added line.</strong> Confirms the seam table, then names each test with its ID and a colon (or the docstring's first line, in Python).</div>
+        <div class="pipe-desc"><strong>One added line.</strong> Starts every test name with its requirement ID and a colon.</div>
       </div>
     </div>
     <div class="pipe-stage">
@@ -279,9 +509,9 @@ tests/checkout.test.ts:4:it('applies a discount', () =&gt; {});</code></pre>
       <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
       <div class="pipe-body">
         <div class="pipe-title">/implement</div>
-        <div class="pipe-desc"><strong>One added line.</strong> Runs the gap check for the ticket's <code>Covers:</code> IDs, then the Jev pass for the same IDs, and fixes gaps and partial coverage before review (at most three Jev rounds, then it asks you).</div>
-        <div class="pipe-pass">✓ every ID tagged and fully covered → review</div>
-        <div class="pipe-fail">✗ untested ID → named, before anyone reads the diff</div>
+        <div class="pipe-desc"><strong>One added line.</strong> Runs the check for the ticket's requirements (all of them, on the last ticket), then the Jev pass, and fixes what they find before review.</div>
+        <div class="pipe-pass">✓ every requirement tested, and fully → review</div>
+        <div class="pipe-fail">✗ untested requirement → named, before anyone reads the diff</div>
       </div>
     </div>
     <div class="pipe-stage">
@@ -289,76 +519,55 @@ tests/checkout.test.ts:4:it('applies a discount', () =&gt; {});</code></pre>
       <div class="pipe-spine"><div class="pipe-dot"></div></div>
       <div class="pipe-body">
         <div class="pipe-title">/code-review</div>
-        <div class="pipe-desc">Unchanged. Reviews the diff against the spec as it always did, on tests that already passed the gate.</div>
+        <div class="pipe-desc">Unchanged. Reviews the diff against the spec, starting from tests that already passed the gate.</div>
       </div>
     </div>
   </div>
 
-  <p>The flow's own context rules still apply: keep grilling, spec and tickets in one session, then <code>/clear</code> between tickets and run <code>/implement</code> on each. Because each ticket carries its <code>Covers:</code> line, a fresh <code>/implement</code> session knows exactly which requirements it must prove, with none of the earlier conversation in context.</p>
+  <p>Because each ticket carries its <code>Covers:</code> line, a fresh <code>/implement</code> session knows exactly which requirements it must prove, with none of the earlier conversation in context.</p>
 
-  <p><strong>Check the whole spec whenever you like.</strong> The per-ticket checks cover one slice each. Before a release, or after the last ticket, run <code>/requirement-traceability</code> against the spec without narrowing it to a ticket, and you get the full untested, undefined and no-ID report for the feature.</p>
+  <p><strong>The whole spec is checked once, at the end.</strong> On the last ticket still open for the spec, <code>/implement</code> checks every requirement, not just that ticket's. This catches what per-ticket checks cannot: a ticket that never wrote its test, or a test that a later ticket removed. "Last open" relies on you closing tickets, which <code>/implement</code> never does itself. The flow already depends on that, but a forgotten close would skip the final check silently, so on every earlier ticket <code>/implement</code> names the tickets still open.</p>
 
-  <p>It is opt-in, and the switch is the spec itself. A spec without IDs changes nothing: nothing invents IDs unless you run the annotation, no ticket gets a <code>Covers:</code> line, and the chain runs as it always did. When <code>/tdd</code> or <code>/implement</code> meet a spec without IDs, the skill says so in one line and they carry on as before. There is no config and no setup question, which matters for a plugin that installs into other people's repos.</p>
-  <hr>
-
-  <h2>Present is not the same as fully covered</h2>
-
-  <p>The gap check proves that every requirement has at least one test that <em>names</em> it. It cannot tell whether those tests check everything the requirement asks for. <code>it('CPN-2: rejects an expired coupon', () =&gt; {})</code> passes the check with an empty body. So does a test that checks the rejection but never the reason, when CPN-2 asks for both. Telling full coverage from partial coverage takes judgement, and the skill splits it into two tiers.</p>
-
-  <p>The first tier is an optional <strong>Judgement pass</strong>. A small bundled script, <code>judge.mjs</code> (Node, no packages), sends <a href="https://typesafe.ai/blog/introducing-system-one-models-and-jev">Jev</a>, a small fast model from TypeSafe, one call per requirement: the requirement line plus <em>every</em> test tagged with its ID (an excerpt of up to 60 lines each). It asks one question: how much of the behaviour the requirement describes do these assertions check? Jev answers <em>asserts</em> (all of it), <em>partial</em> (part of it, with another part unchecked) or <em>unrelated</em> (something else, or nothing), with a confidence. Because the tests are judged together, a requirement split across three tests counts as fully covered when the three together check all of it. The script sorts the answers:</p>
-
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Class</th><th>Meaning</th><th>What happens next</th></tr></thead>
-      <tbody>
-        <tr><td><span class="pill pill-disable">ok</span></td><td>High-confidence <em>asserts</em>: fully covered</td><td>Not re-read</td></tr>
-        <tr><td><span class="pill pill-rollback">flag</span></td><td>High-confidence <em>partial</em> or <em>unrelated</em>: not fully covered</td><td>The agent adds tests for the missing part and re-runs the pass, up to three rounds, then asks you</td></tr>
-        <tr><td><span class="pill pill-halt">uncertain</span></td><td>Low confidence, or no assertion call in the excerpt</td><td>Read by the agent</td></tr>
-        <tr><td><span class="pill pill-sns">not judged</span></td><td>No tagged test</td><td>The gap check owns presence</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <p>A flag is not just a report. The agent is told which requirements are not fully covered and has to act on them: compare the requirement with its tests, name the behaviour no assertion checks, add tests for it, and run the pass again for those IDs. Only when it reads the tests and still judges them complete does it leave the flag for review, saying why.</p>
-
-  <p>The loop has a hard cap: <strong>at most three rounds</strong> of adding tests and re-running the pass. If a requirement is still flagged after the third, the agent stops and hands the decision to you, with each remaining ID, the behaviour it judges still unchecked, and what it tried. The requirement may be vague, the code may be hard to test at that seam, or Jev may simply be wrong; those are calls for a person, and a fourth round only starts if you ask for one.</p>
-
-  <p>The second tier is <code>code-review</code>'s Spec sub-agent, which reviews the tests against the spec as it always has, but now on requirements the gate already sent back until they were fully covered. The review itself is unchanged; it just starts from tests that already passed the gate. The pass still fails no build, and a test whose assertion hides inside a helper is never trusted as ok; it goes straight to a human-grade read.</p>
-
-  <p>Sending repo content to a third party from a skill that installs anywhere needed a rule, and it got an ADR. The pass runs only when <strong>both</strong> <code>TYPESAFE_API_KEY</code> is set in the environment <strong>and</strong> the repo's own <code>docs/agents/traceability.md</code> carries a <code>Judgement: jev</code> line. A key in your shell is not consent for every repo that shell touches; the opt-in line is per repo and visible to anyone reading it. If either is missing, the skill says "Judgement pass skipped" and behaves exactly as before. An outage costs the saving and nothing else.</p>
+  <p>And it stays out of the way when you do not want it. A spec without IDs changes nothing: <code>/tdd</code> and <code>/implement</code> notice, say so in one line, and carry on as they always did. There is no config and no setup question.</p>
 
   <hr>
 
   <h2>What the evals say, honestly</h2>
 
-  <p>The repo has a small <code>claude plugin eval</code> suite for this skill: a gap check with a commented-out test, the prefix collision, a spec without IDs left untouched, the Judgement pass staying off without a key, and annotating a spec and tickets that carry no IDs. Every case passes with the plugin.</p>
+  <p>The skill has a small <code>claude plugin eval</code> suite: a gap check with a commented-out test, the prefix collision, a spec without IDs left alone, the Jev pass staying off without a key, and annotating a spec and tickets. Every case passes with the plugin.</p>
 
-  <p><strong>The four checking cases also pass without it.</strong> On fixtures this size, a current model answers "which requirement has no test" correctly on its own, and the evals do not show the skill adding accuracy. I think that is worth saying plainly rather than burying.</p>
+  <p><strong>The four checking cases also pass without it.</strong> On fixtures this small, a current model answers "which requirement has no test?" correctly on its own. The evals do not show the skill making the model smarter, and I think that is worth saying plainly.</p>
 
-  <p>The annotation case is the one with a gap (1.00 with the plugin, 0.00 without), and it measures the convention, not intelligence. Asked to make a spec traceable, the model without the skill does something sensible but different every run: <code>REQ-1</code> IDs, Gherkin tags, a separate <code>TRACEABILITY.md</code>. None of those give <code>/implement</code> a <code>Covers:</code> line to narrow its check by.</p>
+  <p>The annotation case is the one with a gap: 1.00 with the plugin, 0.00 without. It measures the convention, not intelligence. Asked to "make the spec traceable", the model without the skill does something sensible but different every time: <code>REQ-1</code> IDs, Gherkin tags, a separate <code>TRACEABILITY.md</code>. None of that gives the next step a <code>Covers:</code> line to check against.</p>
 
-  <p>The evals are still worth running: they pin the behaviour against regressions, and they prove the skill fires when a spec has IDs, annotates when asked, and stays silent otherwise. But they do not measure where the convention actually pays:</p>
+  <p>Where the convention really pays is not something small evals measure:</p>
 
-  <ul>
-    <li><strong>Timing.</strong> IDs and the seam table exist before any code, so gaps show up when you confirm the annotation, not in the code review.</li>
-    <li><strong>Determinism.</strong> The check returns the same answer whatever the model's attention is doing that day. A grep does not get tired at story 14.</li>
+  <ul style="margin-bottom:1.3em">
+    <li><strong>Timing.</strong> Gaps show up when the spec is annotated, before any code, instead of in code review.</li>
+    <li><strong>Determinism.</strong> The check gives the same answer whatever the model's attention is doing that day. A grep does not get tired at story 14.</li>
     <li><strong>Scale.</strong> Twelve stories is easy for anyone. Sixty stories across nine tickets and three sessions is where "looks covered to me" starts to drift.</li>
   </ul>
 
-  <p>Building an eval that shows that honestly is open work. Along the way the suite taught two lessons about graders: one early delta of +1.00 turned out to be the fixture's empty test bodies being penalised, not the skill helping; and a grader that bundled two questions flipped between pass and fail on identical runs until it was cut back to one.</p>
+  <p>Building an eval that shows this honestly is still open work.</p>
 
   <hr>
 
-  <h2>What it does not do</h2>
+  <h2>What this guarantees, and what it does not</h2>
 
-  <ul>
-    <li>It starts at the spec. A decision from a grilling session that never became a user story has no ID and is invisible to the check. That half of issue #341 is still open.</li>
-    <li>It annotates a spec and tickets you have just written, before any <code>/implement</code>. Retrofitting IDs onto a spec whose code already exists is out of scope.</li>
-    <li>IDs are assigned after the spec is sliced into tickets, not during. A requirement built across two tickets lands on the later one, but it does not shape how the tickets are cut. That is the price of leaving <code>/to-spec</code> and <code>/to-tickets</code> untouched.</li>
-    <li>A passing gap check means every requirement has at least one test that names it. Whether those tests cover the requirement in full is Jev's verdict: a model's judgement that sends a requirement back for more tests, three rounds at most, and then hands the call to you. It never fails a build.</li>
+  <p>Back to the argument. With this skill in the flow, step 2 is no longer an opinion. Every requirement has tests, checked mechanically, and those tests are judged to cover all of it, with a loop that adds tests where they fall short. If the spec was reviewed and the gate passes, the code an agent wrote does what the spec says, to the extent the spec says it.</p>
+
+  <p>That last clause is where the remaining risk lives, and it is worth being precise about it:</p>
+
+  <ul style="margin-bottom:1.3em">
+    <li><strong>The spec must be right.</strong> The skill checks code against the spec, not the spec against reality. A decision from a design session that never became a user story has no ID and is invisible to the check. That half of issue #341 is still open.</li>
+    <li><strong>Unstated behaviour is unchecked.</strong> Performance, security and anything else the user stories do not say are outside the guarantee, unless you write them as requirements.</li>
+    <li><strong>Tests must be honest.</strong> The same agent writes the tests and the code, so a test could drift toward what the code does rather than what the requirement says. The flow pushes back: <code>/tdd</code> writes each test before the code exists, Jev judges tests against the requirement text rather than the code, and review reads the diff against the spec. It reduces the risk; it does not remove it.</li>
+    <li><strong>"Fully covered" is a model's judgement.</strong> Jev can be wrong in both directions. It is a strong lead, backed by a three-round loop and your decision after that, not a proof. It never fails a build on its own.</li>
+    <li><strong>IDs are added after the tickets are cut.</strong> This keeps <code>/to-spec</code> and <code>/to-tickets</code> untouched, at the price that requirements do not shape how the work is split.</li>
   </ul>
 
-  <p>That last point is the design in one sentence. The skill takes the part of "are the requirements covered?" that can be mechanical and makes it mechanical, so the judgement left over is smaller, better targeted, and spent on the question that actually needs it.</p>
+  <p>None of this makes agent-written code risk-free. What it does is move the risk to where it belongs. The part of "are the requirements covered?" that can be mechanical becomes mechanical. The part that needs judgement gets a narrow, targeted question and a hard stop. And the part that needs a human (is the spec right?) stays with the human, which is where you wanted it all along.</p>
+
 
   <div class="related-posts">
     <div class="related-posts-label">Related reading</div>

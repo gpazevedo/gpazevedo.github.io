@@ -12,7 +12,7 @@
       <link>https://gpazevedo.github.io/blog/eng/requirement-traceability.html</link>
       <guid>https://gpazevedo.github.io/blog/eng/requirement-traceability.html</guid>
       <pubDate>Thu, 24 Sep 2026 00:00:00 +0000</pubDate>
-      <description>A skill for AI coding agents that turns "the tests cover every requirement" from a reviewer's judgement call into a colon-anchored grep that fails when a requirement has no test.</description>
+      <description>When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that every requirement is covered by tests, completely, before review. It carries over to other agentic skill sets.</description>
       <category>Testing</category>
       <category>AI Coding</category>
       <category>Agent Skills</category>

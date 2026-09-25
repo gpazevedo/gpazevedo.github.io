@@ -5,7 +5,7 @@ window.engPosts = [
     "slug": "requirement-traceability",
     "file": "requirement-traceability.html",
     "title": "Every requirement is covered by tests",
-    "description": "A skill for AI coding agents that turns \"the tests cover every requirement\" from a reviewer's judgement call into a colon-anchored grep that fails when a requirement has no test.",
+    "description": "When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that every requirement is covered by tests, completely, before review. It carries over to other agentic skill sets.",
     "tags": ["Testing", "AI Coding", "Agent Skills"],
     "date": "2026-09-24",
     "readingTime": 10
