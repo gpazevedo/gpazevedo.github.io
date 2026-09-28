@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Granular: what a five-day spike taught us about concept-level curriculum mapping — Gustavo Azevedo</title>
+<meta name="description" content="A spec-driven, five-day spike built a concept-level map of a university CS catalogue, aligned it to CS2023 and measured it honestly. What it answered, what it did not, and how Kiro specs shaped the build."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/granular-curriculum-mapping-spike.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/granular-curriculum-mapping-spike.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Granular: what a five-day spike taught us about concept-level curriculum mapping"/>
+<meta property="og:description" content="A spec-driven, five-day spike built a concept-level map of a university CS catalogue, aligned it to CS2023 and measured it honestly. What it answered, what it did not, and how Kiro specs shaped the build."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-09-27T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-09-27T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="AI systems"/>
+<meta property="article:tag" content="Evaluation"/>
+<meta property="article:tag" content="Spec-driven development"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Granular: what a five-day spike taught us about concept-level curriculum mapping"/>
+<meta name="twitter:description" content="A spec-driven, five-day spike built a concept-level map of a university CS catalogue, aligned it to CS2023 and measured it honestly. What it answered, what it did not, and how Kiro specs shaped the build."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Granular: what a five-day spike taught us about concept-level curriculum mapping","description":"A spec-driven, five-day spike built a concept-level map of a university CS catalogue, aligned it to CS2023 and measured it honestly. What it answered, what it did not, and how Kiro specs shaped the build.","datePublished":"2026-09-27","dateModified":"2026-09-27","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/granular-curriculum-mapping-spike.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/granular-curriculum-mapping-spike.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Granular: what a five-day spike taught us about concept-level curriculum mapping","item":"https://gpazevedo.github.io/blog/eng/granular-curriculum-mapping-spike.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+  /* Post-local: raster diagrams and lists. Move to site-blog.css if reused. */
+  .fig { margin: 2rem 0 2.75rem; }
+  /* The SVGs paint their own background and switch palettes with
+     prefers-color-scheme, so the frame is only a border. */
+  .fig .fig-frame {
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .fig svg { display: block; width: 100%; height: auto; }
+  .fig figcaption {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .02em;
+    color: var(--ink-muted);
+    margin-top: .75rem;
+    line-height: 1.55;
+  }
+  .page ol, .page ul { margin: 0 0 1.6rem 1.4rem; padding: 0; }
+  .page li { margin-bottom: .45rem; font-weight: 300; }
+  .page li strong { font-weight: 600; color: var(--ink); }
+  .page td strong { font-weight: 600; color: var(--ink); }
+  .step-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin: 1.8rem 0 .3rem;
+  }
+  .step-label + p { margin-top: 0; }
+  .table-note { font-size: .88rem; font-style: italic; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">AI systems</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>AI systems</span>
+    <span class="dot">·</span>
+    <time datetime="2026-09-27">September 2026</time>
+    <span class="dot">·</span>
+    <span>11 min read</span>
+  </div>
+
+  <h1>Granular: what a five-day spike taught us about <em>concept-level curriculum mapping</em></h1>
+  <p class="deck">In five days, a spec-driven spike built Granular: a system that reads a university's published CS catalogue, maps each course to concepts in the CS2023 curriculum standard, infers which concepts depend on which, and answers &ldquo;what should I learn next?&rdquo; in plain English.</p>
+
+  <div class="tldr">
+    <div class="tldr-label">TL;DR</div>
+    <p>The spike showed that <strong>a concept-level curriculum map can be built and honestly measured.</strong></p>
+    <p>It did not yet show that the map works at the grain of weekly learning modules, which is the next question.</p>
+  </div>
+
+  <h2>Why a spike</h2>
+
+  <p>Curriculum systems treat a course as one large, fixed block. The catalogue says CS 374 requires CS 225, but not which ideas from CS 225 it actually builds on. Our initiative wants to move from that &ldquo;macro&rdquo; view to an &ldquo;atomic&rdquo; one: if a student struggles in a week's module, the system should be able to point to the prerequisite concept they probably missed.</p>
+
+  <p>That product idea rests on a layer nobody had shown could be built or trusted: a map of concepts, finer than courses, with dependencies between them. So before designing a product, we ran a time-boxed spike to answer five questions:</p>
+
+  <ol>
+    <li>Can catalogue prose be turned into concepts aligned to a shared vocabulary, accurately enough to use?</li>
+    <li>Can dependencies between concepts be inferred without a model inventing them, and scored against something objective?</li>
+    <li>Can what an institution publishes be kept strictly apart from what the system guesses?</li>
+    <li>Can a student's plain-English goal be matched to courses by concept coverage?</li>
+    <li>Can different catalogue platforms feed one common schema?</li>
+  </ol>
+
+  <p>The spike was built as a research artefact, not a product: one discipline (computer science), one primary institution, loud failures preferred over quiet workarounds.</p>
+
+  <h2>What the spike answered</h2>
+
+  <p>Three of the five questions got a clear yes. Dependency inference works but is weak, and the platform question turned up a finding we did not expect.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Question</th><th>Answer</th><th>How strong the evidence is</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>1. Concepts aligned to a shared vocabulary</td>
+          <td><strong>Yes, with a verifier.</strong> 677 concepts from 94 UIUC CS courses, each aligned to one of 81 CS2023 knowledge units or left unaligned.</td>
+          <td>Moderate. An LLM judge put alignment precision at 0.649; a verifier fix then rejected all 9 known false matches and kept all 4 true ones. Not yet re-measured across the full set.</td>
+        </tr>
+        <tr>
+          <td>2. Concept dependencies, inferred and scored</td>
+          <td><strong>Partly.</strong> Structural signals recover 48% of withheld prerequisites, but precision is 0.073 (F1 0.127).</td>
+          <td>Weak to moderate. The withheld set is drawn after inference ran, so the recall figure is not leakage-free.</td>
+        </tr>
+        <tr>
+          <td>3. Published and guessed facts kept apart</td>
+          <td><strong>Yes.</strong> They are separate types, enforced when records are built, not by naming convention.</td>
+          <td>Strong. Covered by the 241-test suite.</td>
+        </tr>
+        <tr>
+          <td>4. Plain-English goal to courses</td>
+          <td><strong>Yes, end to end.</strong> A query resolves to knowledge units, then to courses ranked by relevance and &ldquo;N of M concepts covered&rdquo;.</td>
+          <td>Demonstrated. An 18-query relevance evaluation exists; its results are not recorded in the repository.</td>
+        </tr>
+        <tr>
+          <td>5. Many platforms, one schema</td>
+          <td><strong>Yes for the schema, no for scraping.</strong> Three adapters feed one schema. Purdue's Modern Campus Acalog pages sat behind bot protection, which pushed the spike to UIUC's static catalogue.</td>
+          <td>Strong. The realistic route to Acalog catalogues is the vendor API, not public HTML.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <blockquote><p>The most reusable outcome may not be the code. It is the evaluation method: several separate numbers instead of one flattering score, failures always reported, and each caveat stated next to the number it qualifies.</p></blockquote>
+
+  <h2>Architecture</h2>
+
+  <p>Granular is four offline stages that write two stores. Everything a student touches only reads those stores.</p>
+
+  <figure class="fig">
+    <div class="fig-frame">
+      <svg xmlns='http://www.w3.org/2000/svg' width='760' height='748' font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox='0 0 760 748' role='img' aria-label='An offline pipeline writes two stores; everything users touch only reads them' font-size='13'><title>Granular architecture</title><style>svg{--cds-text-primary:#1f1f1e;--cds-text-secondary:#5f5e5a;--cds-chart-axis:#b4b2a9;--cds-chart-grid:#e4e2dc;--cds-chart-reference-tint:#f1efe9;--cds-chart-categorical-1:#2c6fd6;--cds-chart-categorical-2:#e4622a;--cds-chart-status-good:#2a9d3f;--cds-chart-status-warning:#e0a800;--cds-chart-status-critical:#d23b3b;--bg:#ffffff}@media (prefers-color-scheme: dark){svg{--cds-text-primary:#ecebe7;--cds-text-secondary:#a9a7a0;--cds-chart-axis:#6b6962;--cds-chart-grid:#3a3935;--cds-chart-reference-tint:#2a2926;--cds-chart-categorical-1:#5c95f0;--cds-chart-categorical-2:#f0834f;--cds-chart-status-good:#4cc063;--cds-chart-status-warning:#f2c230;--cds-chart-status-critical:#f06464;--bg:#1e1d1b}}</style><rect width='760' height='748' fill='#ffffff' style='fill:var(--bg)'/><defs><marker id='arch-arrow' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='6' markerHeight='6' orient='auto-start-reverse'><path d='M0 0L10 5L0 10z' fill='#b4b2a9' style='fill:var(--cds-chart-axis)'/></marker></defs><rect x='16' y='64' width='728' height='172' rx='8' fill='#f1efe9' style='fill:var(--cds-chart-reference-tint)'/><rect x='16' y='276' width='728' height='176' rx='8' fill='#f1efe9' style='fill:var(--cds-chart-reference-tint)'/><rect x='16' y='492' width='728' height='232' rx='8' fill='#f1efe9' style='fill:var(--cds-chart-reference-tint)'/><rect x='24' y='38' width='12' height='12' rx='3' fill='#2c6fd6' fill-opacity='0.12' stroke='#2c6fd6' stroke-width='2' style='fill:var(--cds-chart-categorical-1);stroke:var(--cds-chart-categorical-1)'/><rect x='282' y='38' width='12' height='12' rx='3' fill='#e4622a' fill-opacity='0.12' stroke='#e4622a' stroke-width='2' style='fill:var(--cds-chart-categorical-2);stroke:var(--cds-chart-categorical-2)'/><path d='M490 44H514' stroke='#b4b2a9' stroke-width='1.25' stroke-dasharray='4 3' style='stroke:var(--cds-chart-axis)'/><text x='24' y='28' text-anchor='start' font-size='15' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>An offline pipeline writes two stores; everything users touch only reads them</text><text x='42' y='48' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>declared: published by the institution</text><text x='300' y='48' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>inferred: probabilistic</text><text x='520' y='48' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>dashed: read-only access</text><text x='32' y='88' text-anchor='start' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Build</text><text x='76' y='88' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>offline, run once per iteration</text><text x='32' y='300' text-anchor='start' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Store</text><text x='76' y='300' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>written only by the build</text><text x='32' y='516' text-anchor='start' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Serve</text><text x='76' y='516' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>reads the stores, never writes</text><text x='300' y='268' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>embeddings, read back</text><text x='480' y='268' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>writes</text><text x='648' y='268' text-anchor='end' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>reads, writes edges</text><text x='332' y='476' text-anchor='end' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>KU embeddings</text><text x='478' y='476' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>graph reads</text><text x='664' y='476' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>read-only</text><g><rect x='24' y='100' width='160' height='120' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='104' y='124' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Catalogue sources</text><text x='104' y='140' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>UIUC catalogue</text><text x='104' y='156' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>Purdue Acalog</text><text x='104' y='172' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>purdue.io OData</text><text x='104' y='188' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>CS2023 standard</text></g><g><rect x='208' y='100' width='160' height='120' rx='8' fill='#2c6fd6' fill-opacity='0.12' stroke='#2c6fd6' stroke-width='2' style='fill:var(--cds-chart-categorical-1);stroke:var(--cds-chart-categorical-1)'/><text x='288' y='124' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Ingestion</text><text x='288' y='140' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>granular-ingest</text><text x='288' y='156' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>parses, never infers</text><text x='288' y='172' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>canonical JSONL</text><text x='288' y='188' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>+ source provenance</text></g><g><rect x='392' y='100' width='160' height='120' rx='8' fill='#e4622a' fill-opacity='0.12' stroke='#e4622a' stroke-width='2' style='fill:var(--cds-chart-categorical-2);stroke:var(--cds-chart-categorical-2)'/><text x='472' y='124' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Concept extraction</text><text x='472' y='140' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>granular-extract</text><text x='472' y='156' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>LLM extracts concepts</text><text x='472' y='172' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>align to CS2023:</text><text x='472' y='188' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>retrieve, rerank,</text><text x='472' y='204' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>reject, LLM verify</text></g><g><rect x='576' y='100' width='160' height='120' rx='8' fill='#e4622a' fill-opacity='0.12' stroke='#e4622a' stroke-width='2' style='fill:var(--cds-chart-categorical-2);stroke:var(--cds-chart-categorical-2)'/><text x='656' y='124' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Dependencies</text><text x='656' y='140' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>granular-infer</text><text x='656' y='156' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>structural signals</text><text x='656' y='172' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>no model calls</text><text x='656' y='188' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>keep score ≥ 0.55</text><text x='656' y='204' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>break any cycles</text></g><g><rect x='208' y='316' width='152' height='72' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='284' y='340' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>pgvector</text><text x='284' y='356' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>KU and concept</text><text x='284' y='372' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>embeddings</text></g><g><rect x='376' y='316' width='360' height='120' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='556' y='340' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Neo4j · openCypher only</text></g><g><rect x='392' y='348' width='156' height='72' rx='8' fill='#2c6fd6' fill-opacity='0.12' stroke='#2c6fd6' stroke-width='2' style='fill:var(--cds-chart-categorical-1);stroke:var(--cds-chart-categorical-1)'/><text x='470' y='372' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Structural record</text><text x='470' y='388' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>Course</text><text x='470' y='404' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>PREREQUISITE</text></g><g><rect x='564' y='348' width='156' height='72' rx='8' fill='#e4622a' fill-opacity='0.12' stroke='#e4622a' stroke-width='2' style='fill:var(--cds-chart-categorical-2);stroke:var(--cds-chart-categorical-2)'/><text x='642' y='372' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Concept graph</text><text x='642' y='388' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>Concept · ALIGNED_TO</text><text x='642' y='404' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>DEPENDS_ON</text></g><g><rect x='24' y='564' width='160' height='72' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='104' y='588' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Next.js frontend</text><text x='104' y='604' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>plain-English query</text><text x='104' y='620' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>course detail view</text></g><g><rect x='208' y='532' width='344' height='176' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='224' y='556' text-anchor='start' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>API · FastAPI</text></g><g><rect x='224' y='564' width='148' height='56' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='298' y='588' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>QueryResolver</text><text x='298' y='604' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>embed + LLM rerank</text></g><g><rect x='388' y='564' width='148' height='56' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='462' y='588' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>DiscoverService</text><text x='462' y='604' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>rank, guard wording</text></g><g><rect x='224' y='636' width='312' height='56' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='380' y='660' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Advisory queries</text><text x='380' y='676' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>readiness · unlock · overlap · course detail</text></g><g><rect x='576' y='532' width='160' height='168' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='656' y='556' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Evaluation</text><text x='656' y='572' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>granular-eval</text><text x='656' y='588' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>held-out F1 by band</text><text x='656' y='604' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>ablation by signal</text><text x='656' y='620' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>alignment precision</text><text x='656' y='636' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>discover relevance</text><text x='656' y='652' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>LLM as judge</text><text x='656' y='668' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>reports to disk,</text><text x='656' y='684' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>never to the stores</text></g><g fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'><path d='M184 160H208' marker-end='url(#arch-arrow)'/><path d='M368 160H392' marker-end='url(#arch-arrow)'/><path d='M552 160H576' marker-end='url(#arch-arrow)'/><path d='M408 220V252H284V316' marker-start='url(#arch-arrow)' marker-end='url(#arch-arrow)'/><path d='M472 220V316' marker-end='url(#arch-arrow)'/><path d='M656 220V316' marker-start='url(#arch-arrow)' marker-end='url(#arch-arrow)'/><path d='M372 592H388' marker-end='url(#arch-arrow)'/><path d='M184 600H208' marker-start='url(#arch-arrow)' marker-end='url(#arch-arrow)'/></g><g fill='none' stroke='#b4b2a9' stroke-width='1.25' stroke-dasharray='5 4' style='stroke:var(--cds-chart-axis)'><path d='M340 388V564' marker-end='url(#arch-arrow)'/><path d='M470 436V564' marker-end='url(#arch-arrow)'/><path d='M564 436V664H536' marker-end='url(#arch-arrow)'/><path d='M656 436V532' marker-end='url(#arch-arrow)'/></g></svg>
+    </div>
+    <figcaption>Fig. 1 — Granular architecture · build, store, serve. An offline pipeline writes two stores; everything users touch only reads them.</figcaption>
+  </figure>
+
+  <p><strong>Two layers, kept apart.</strong> The structural record holds what the institution publishes: courses, requirement rules and prerequisites. Each record carries its source URL, retrieval time and adapter version. The concept graph holds what the system infers: concepts, their CS2023 alignment and the dependencies between them.</p>
+
+  <p><strong>Alignment only ever narrows.</strong> Each extracted concept is matched to one CS2023 knowledge unit in four stages:</p>
+
+  <ol>
+    <li>Retrieve the top candidates by embedding similarity.</li>
+    <li>Rerank them with co-occurrence, course level and a small department nudge (+0.05, never a filter).</li>
+    <li>Reject any candidate that would break a published prerequisite order.</li>
+    <li>Ask an LLM whether the winner is genuinely that topic, not a word overlap.</li>
+  </ol>
+
+  <p>No stage can add a candidate an earlier stage removed. If the LLM check fails, the concept keeps its match rather than losing it to an outage.</p>
+
+  <p><strong>No model decides a dependency.</strong> Edges are scored from structure alone: course level (weight 0.45), published prerequisites (0.40) and knowledge-unit co-occurrence (0.15). An edge never points from a lower-level course to a higher one, and cycles are broken at their weakest edge.</p>
+
+  <p><strong>Serving is read-only.</strong> A plain-English query is embedded, matched to knowledge units in pgvector, and filtered by an LLM for intent. Courses come back with a relevance score and a coverage count such as &ldquo;8 of 11 concepts&rdquo;. A guard blocks wording like &ldquo;you can take&rdquo; or &ldquo;you should&rdquo;, because the system has no authority to grant anything. No student data is stored: a completed-course list lives for one request only.</p>
+
+  <p>All graph queries are plain openCypher, with no Neo4j extensions. Moving to Amazon Neptune or Memgraph should be a configuration change, not a rewrite.</p>
+
+  <h3>How a course is stored</h3>
+
+  <figure class="fig">
+    <div class="fig-frame">
+      <svg xmlns='http://www.w3.org/2000/svg' width='760' height='764' font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox='0 0 760 764' role='img' aria-label='A course is a declared node; its concepts are inferred nodes that point to it' font-size='13'><title>How a course is stored in Granular</title><style>svg{--cds-text-primary:#1f1f1e;--cds-text-secondary:#5f5e5a;--cds-chart-axis:#b4b2a9;--cds-chart-grid:#e4e2dc;--cds-chart-reference-tint:#f1efe9;--cds-chart-categorical-1:#2c6fd6;--cds-chart-categorical-2:#e4622a;--cds-chart-status-good:#2a9d3f;--cds-chart-status-warning:#e0a800;--cds-chart-status-critical:#d23b3b;--bg:#ffffff}@media (prefers-color-scheme: dark){svg{--cds-text-primary:#ecebe7;--cds-text-secondary:#a9a7a0;--cds-chart-axis:#6b6962;--cds-chart-grid:#3a3935;--cds-chart-reference-tint:#2a2926;--cds-chart-categorical-1:#5c95f0;--cds-chart-categorical-2:#f0834f;--cds-chart-status-good:#4cc063;--cds-chart-status-warning:#f2c230;--cds-chart-status-critical:#f06464;--bg:#1e1d1b}}</style><rect width='760' height='764' fill='#ffffff' style='fill:var(--bg)'/><defs><marker id='model-arrow' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='6' markerHeight='6' orient='auto-start-reverse'><path d='M0 0L10 5L0 10z' fill='#b4b2a9' style='fill:var(--cds-chart-axis)'/></marker></defs><text x='24' y='28' text-anchor='start' font-size='15' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>A course is a declared node; its concepts are inferred nodes that point to it</text><rect x='24' y='40' width='12' height='12' rx='3' fill='#2c6fd6' fill-opacity='0.12' stroke='#2c6fd6' stroke-width='2' style='fill:var(--cds-chart-categorical-1);stroke:var(--cds-chart-categorical-1)'/><text x='42' y='50' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>declared: parsed from the catalogue</text><rect x='270' y='40' width='12' height='12' rx='3' fill='#e4622a' fill-opacity='0.12' stroke='#e4622a' stroke-width='2' style='fill:var(--cds-chart-categorical-2);stroke:var(--cds-chart-categorical-2)'/><text x='288' y='50' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>inferred: produced by the pipeline</text><rect x='506' y='40' width='12' height='12' rx='3' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='524' y='50' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>vocabulary and storage</text><g><rect x='24' y='192' width='712' height='420' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='40' y='216' text-anchor='start' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Neo4j graph</text><text x='40' y='596' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>Also written: SIMILAR_TO between concepts, and RejectedInferredEdge nodes as an audit trail</text></g><g><rect x='24' y='72' width='712' height='88' rx='8' fill='#2c6fd6' fill-opacity='0.12' stroke='#2c6fd6' stroke-width='2' style='fill:var(--cds-chart-categorical-1);stroke:var(--cds-chart-categorical-1)'/><text x='40' y='96' text-anchor='start' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Canonical record · data/ingestion/uiuc/courses.jsonl · one line per course</text><text x='40' y='112' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>course_id · subject_code · course_number · title · description · credits · level · cross_listings</text><text x='40' y='128' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>authority: derived · provenance: source_url, retrieved_at, adapter name and version</text><text x='40' y='144' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>declared_prerequisites: each rule keeps its verbatim text, plus a structured form if machine-checkable</text></g><g><rect x='48' y='232' width='240' height='88' rx='8' fill='#2c6fd6' fill-opacity='0.12' stroke='#2c6fd6' stroke-width='2' style='fill:var(--cds-chart-categorical-1);stroke:var(--cds-chart-categorical-1)'/><text x='168' y='256' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Course</text><text x='168' y='272' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>course_id: CS-374</text><text x='168' y='288' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>subject_code · course_number</text><text x='168' y='304' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>title · level · description</text></g><g><rect x='472' y='232' width='240' height='88' rx='8' fill='#2c6fd6' fill-opacity='0.12' stroke='#2c6fd6' stroke-width='2' style='fill:var(--cds-chart-categorical-1);stroke:var(--cds-chart-categorical-1)'/><text x='592' y='256' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Course</text><text x='592' y='272' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>course_id: CS-225</text><text x='592' y='288' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>a prerequisite of CS-374</text><text x='592' y='304' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>same properties</text></g><g><rect x='48' y='360' width='240' height='88' rx='8' fill='#e4622a' fill-opacity='0.12' stroke='#e4622a' stroke-width='2' style='fill:var(--cds-chart-categorical-2);stroke:var(--cds-chart-categorical-2)'/><text x='168' y='384' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Concept</text><text x='168' y='400' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>concept_id · label</text><text x='168' y='416' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>confidence · model_id</text><text x='168' y='432' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>alignment_status</text></g><g><rect x='472' y='360' width='240' height='88' rx='8' fill='#e4622a' fill-opacity='0.12' stroke='#e4622a' stroke-width='2' style='fill:var(--cds-chart-categorical-2);stroke:var(--cds-chart-categorical-2)'/><text x='592' y='384' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Concept</text><text x='592' y='400' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>concept_id · label</text><text x='592' y='416' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>extracted from CS-225</text><text x='592' y='432' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>same properties</text></g><g><rect x='260' y='488' width='240' height='72' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='380' y='512' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>KnowledgeUnit (CS2023)</text><text x='380' y='528' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>ku_id · label</text><text x='380' y='544' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>knowledge_area · tier</text></g><g><rect x='24' y='652' width='712' height='88' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='40' y='676' text-anchor='start' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>pgvector · embeddings table</text><text x='40' y='692' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>id · entity_type · label · vector(1536) · model_id</text><text x='40' y='708' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>one row per Concept (entity_type 'concept') and per KnowledgeUnit ('knowledge_unit')</text><text x='40' y='724' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>cosine-similarity index; no foreign key, rows match graph nodes by id</text></g><text x='176' y='184' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>loaded by granular-extract; programmes stay on disk</text><text x='380' y='268' text-anchor='middle' font-size='11.5' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>PREREQUISITE</text><text x='380' y='292' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>verbatim_text</text><text x='176' y='344' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>EXTRACTED_FROM</text><text x='600' y='344' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>EXTRACTED_FROM</text><text x='380' y='396' text-anchor='middle' font-size='11.5' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>DEPENDS_ON</text><text x='380' y='420' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>confidence · model_id</text><text x='176' y='480' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>ALIGNED_TO</text><text x='584' y='480' text-anchor='end' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>ALIGNED_TO</text><text x='388' y='636' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>joined by concept_id and ku_id</text><g fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'><path d='M168 160V232' marker-end='url(#model-arrow)'/><path d='M288 276H472' marker-end='url(#model-arrow)'/><path d='M168 360V320' marker-end='url(#model-arrow)'/><path d='M592 360V320' marker-end='url(#model-arrow)'/><path d='M288 404H472' marker-end='url(#model-arrow)'/><path d='M168 448V524H260' marker-end='url(#model-arrow)'/><path d='M592 448V524H500' marker-end='url(#model-arrow)'/></g><g fill='none' stroke='#b4b2a9' stroke-width='1.25' stroke-dasharray='4 3' style='stroke:var(--cds-chart-axis)'><path d='M380 612V652' marker-end='url(#model-arrow)'/></g></svg>
+    </div>
+    <figcaption>Fig. 2 — How a course is stored · disk, Neo4j, pgvector. A course is a declared node; its concepts are inferred nodes that point to it.</figcaption>
+  </figure>
+
+  <p>A course lives in three places. On disk, the canonical record keeps everything parsed from the catalogue, including each prerequisite rule's verbatim wording.</p>
+
+  <p>The extraction step loads each course into Neo4j as a declared <code>Course</code> node, linked to its prerequisites by <code>PREREQUISITE</code> edges. Programme records are not loaded; they stay on disk.</p>
+
+  <p>Concepts are inferred nodes. Each points back to its course (<code>EXTRACTED_FROM</code>) and to one CS2023 knowledge unit (<code>ALIGNED_TO</code>). <code>DEPENDS_ON</code> links concepts across courses: it is the inferred counterpart of a declared prerequisite, and it records the confidence and model behind it.</p>
+
+  <p>Embeddings sit in a separate pgvector table, one row per concept or knowledge unit. They match graph nodes by id only; nothing enforces the link.</p>
+
+  <h2>How we built it with Kiro</h2>
+
+  <p>The spike took five days, 8 to 12 September 2026: 57 commits across 21 pull requests. It was spec-first. Requirements and designs for all six packages were in the repository before the first line of code.</p>
+
+  <div class="step-label">01 · The brief</div>
+  <p><strong>The project brief doubled as steering.</strong> It was written to be loaded straight into Kiro. Capabilities were phrased in EARS notation, the rules were written as enforceable invariants, and section numbers were kept stable so a session could be pointed at &ldquo;§5.2&rdquo;.</p>
+
+  <div class="step-label">02 · Steering</div>
+  <p><strong>Three steering files, loaded into every session.</strong> All three are marked <code>inclusion: always</code>:</p>
+  <ul>
+    <li><code>product.md</code> sets the scope and lists deliberate cuts, such as no student records.</li>
+    <li><code>structure.md</code> fixes the stack, the invariants, the spec order and the vocabulary.</li>
+    <li><code>decisions.md</code> records settled choices and says plainly that &ldquo;a Kiro spec session must not relitigate them&rdquo;.</li>
+  </ul>
+
+  <div class="step-label">03 · Specs</div>
+  <p><strong>One spec per package, in dependency order.</strong> The order was canonical schema, catalogue ingestion, concept extraction, graph inference, evaluation harness, then advisory queries. Each spec has a <code>requirements.md</code> with numbered EARS criteria and a <code>design.md</code>. Here is part of one requirement:</p>
+
+<pre><code>### REQ-CE-02 — Concept extraction from course descriptions
+
+- FOR EACH Course record with a non-empty description, THE SYSTEM SHALL
+  run concept extraction and produce one or more Concept records.
+- THE SYSTEM SHALL use a language model for extraction and SHALL record
+  the model identifier on every Concept record per REQ-CS-08.</code></pre>
+
+  <div class="step-label">04 · Pull requests</div>
+  <p><strong>One package per pull request.</strong> All six packages landed on day one, with the test suite growing from 34 to 147 tests.</p>
+
+  <div class="step-label">05 · Drift</div>
+  <p><strong>Specs were corrected when reality disagreed.</strong> The ingestion design gained a &ldquo;Source reality&rdquo; section once Purdue's pages turned out to be blocked. The evaluation harness's <code>tasks.md</code> was later rewritten to mark each task done, adapted or partly done.</p>
+
+  <h3>The task graph Kiro defined</h3>
+
+  <figure class="fig">
+    <div class="fig-frame">
+      <svg xmlns='http://www.w3.org/2000/svg' width='760' height='840' font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox='0 0 760 840' role='img' aria-label='Only one of six specs got a Kiro task list, and two of its links were never wired' font-size='13'><title>Granular Kiro task graph</title><style>svg{--cds-text-primary:#1f1f1e;--cds-text-secondary:#5f5e5a;--cds-chart-axis:#b4b2a9;--cds-chart-grid:#e4e2dc;--cds-chart-reference-tint:#f1efe9;--cds-chart-categorical-1:#2c6fd6;--cds-chart-categorical-2:#e4622a;--cds-chart-status-good:#2a9d3f;--cds-chart-status-warning:#e0a800;--cds-chart-status-critical:#d23b3b;--bg:#ffffff}@media (prefers-color-scheme: dark){svg{--cds-text-primary:#ecebe7;--cds-text-secondary:#a9a7a0;--cds-chart-axis:#6b6962;--cds-chart-grid:#3a3935;--cds-chart-reference-tint:#2a2926;--cds-chart-categorical-1:#5c95f0;--cds-chart-categorical-2:#f0834f;--cds-chart-status-good:#4cc063;--cds-chart-status-warning:#f2c230;--cds-chart-status-critical:#f06464;--bg:#1e1d1b}}</style><rect width='760' height='840' fill='#ffffff' style='fill:var(--bg)'/><defs><marker id='task-arrow' viewBox='0 0 10 10' refX='9' refY='5' markerWidth='6' markerHeight='6' orient='auto-start-reverse'><path d='M0 0L10 5L0 10z' fill='#b4b2a9' style='fill:var(--cds-chart-axis)'/></marker></defs><text x='24' y='28' text-anchor='start' font-size='15' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Only one of six specs got a Kiro task list, and two of its links were never wired</text><rect x='24' y='40' width='12' height='12' rx='3' fill='#2a9d3f' fill-opacity='0.12' stroke='#2a9d3f' stroke-width='1.5' style='fill:var(--cds-chart-status-good);stroke:var(--cds-chart-status-good)'/><text x='42' y='50' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>done</text><rect x='96' y='40' width='12' height='12' rx='3' fill='#e0a800' fill-opacity='0.12' stroke='#e0a800' stroke-width='1.5' style='fill:var(--cds-chart-status-warning);stroke:var(--cds-chart-status-warning)'/><text x='114' y='50' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>done with deviations</text><rect x='260' y='40' width='12' height='12' rx='3' fill='#d23b3b' fill-opacity='0.12' stroke='#d23b3b' stroke-width='1.5' style='fill:var(--cds-chart-status-critical);stroke:var(--cds-chart-status-critical)'/><text x='278' y='50' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>partly done</text><path d='M372 46H396' stroke='#b4b2a9' stroke-width='1.25' stroke-dasharray='4 3' style='stroke:var(--cds-chart-axis)'/><text x='404' y='50' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>planned in the design, not wired</text><text x='24' y='84' text-anchor='start' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>Spec order set in the steering file structure.md</text><g><rect x='24' y='96' width='104' height='56' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='76' y='120' text-anchor='middle' font-size='12' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>schema</text><text x='76' y='136' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>no tasks.md</text></g><g><rect x='146' y='96' width='104' height='56' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='198' y='120' text-anchor='middle' font-size='12' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>ingestion</text><text x='198' y='136' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>no tasks.md</text></g><g><rect x='267' y='96' width='104' height='56' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='319' y='120' text-anchor='middle' font-size='12' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>extraction</text><text x='319' y='136' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>no tasks.md</text></g><g><rect x='389' y='96' width='104' height='56' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='441' y='120' text-anchor='middle' font-size='12' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>inference</text><text x='441' y='136' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>no tasks.md</text></g><g><rect x='510' y='96' width='104' height='56' rx='8' fill='#2c6fd6' fill-opacity='0.12' stroke='#2c6fd6' stroke-width='2' style='fill:var(--cds-chart-categorical-1);stroke:var(--cds-chart-categorical-1)'/><text x='562' y='120' text-anchor='middle' font-size='12' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>evaluation</text><text x='562' y='136' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>12 tasks</text></g><g><rect x='632' y='96' width='104' height='56' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='684' y='120' text-anchor='middle' font-size='12' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>advisory</text><text x='684' y='136' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>no tasks.md</text></g><g><rect x='8' y='176' width='744' height='640' rx='8' fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'/><text x='24' y='200' text-anchor='start' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>evaluation-harness / tasks.md</text></g><g><rect x='24' y='216' width='160' height='56' rx='8' fill='#2a9d3f' fill-opacity='0.12' stroke='#2a9d3f' stroke-width='1.5' style='fill:var(--cds-chart-status-good);stroke:var(--cds-chart-status-good)'/><text x='104' y='240' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>EvalConfig</text><text x='104' y='256' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 1 · done</text></g><g><rect x='576' y='216' width='160' height='56' rx='8' fill='#e0a800' fill-opacity='0.12' stroke='#e0a800' stroke-width='1.5' style='fill:var(--cds-chart-status-warning);stroke:var(--cds-chart-status-warning)'/><text x='656' y='240' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Dept. regression</text><text x='656' y='256' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 8 · adapted</text></g><g><rect x='24' y='304' width='160' height='56' rx='8' fill='#e0a800' fill-opacity='0.12' stroke='#e0a800' stroke-width='1.5' style='fill:var(--cds-chart-status-warning);stroke:var(--cds-chart-status-warning)'/><text x='104' y='328' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>ArtefactStore</text><text x='104' y='344' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 2 · mostly done</text></g><g><rect x='208' y='304' width='160' height='56' rx='8' fill='#e0a800' fill-opacity='0.12' stroke='#e0a800' stroke-width='1.5' style='fill:var(--cds-chart-status-warning);stroke:var(--cds-chart-status-warning)'/><text x='288' y='328' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>HeldOutSplit</text><text x='288' y='344' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 3 · adapted</text></g><g><rect x='392' y='304' width='160' height='56' rx='8' fill='#2a9d3f' fill-opacity='0.12' stroke='#2a9d3f' stroke-width='1.5' style='fill:var(--cds-chart-status-good);stroke:var(--cds-chart-status-good)'/><text x='472' y='328' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Reproduction</text><text x='472' y='344' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 5 · done</text></g><g><rect x='208' y='392' width='160' height='56' rx='8' fill='#2a9d3f' fill-opacity='0.12' stroke='#2a9d3f' stroke-width='1.5' style='fill:var(--cds-chart-status-good);stroke:var(--cds-chart-status-good)'/><text x='288' y='416' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>MetricCalculator</text><text x='288' y='432' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 4 · done</text></g><g><rect x='576' y='392' width='160' height='56' rx='8' fill='#e0a800' fill-opacity='0.12' stroke='#e0a800' stroke-width='1.5' style='fill:var(--cds-chart-status-warning);stroke:var(--cds-chart-status-warning)'/><text x='656' y='416' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>JudgementSet</text><text x='656' y='432' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 6 · adapted</text></g><g><rect x='208' y='480' width='160' height='56' rx='8' fill='#2a9d3f' fill-opacity='0.12' stroke='#2a9d3f' stroke-width='1.5' style='fill:var(--cds-chart-status-good);stroke:var(--cds-chart-status-good)'/><text x='288' y='504' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>FailureReporter</text><text x='288' y='520' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 7 · done</text></g><g><rect x='392' y='480' width='160' height='56' rx='8' fill='#e0a800' fill-opacity='0.12' stroke='#e0a800' stroke-width='1.5' style='fill:var(--cds-chart-status-warning);stroke:var(--cds-chart-status-warning)'/><text x='472' y='504' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>AblationRunner</text><text x='472' y='520' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 9 · adapted</text></g><g><rect x='208' y='568' width='160' height='56' rx='8' fill='#2a9d3f' fill-opacity='0.12' stroke='#2a9d3f' stroke-width='1.5' style='fill:var(--cds-chart-status-good);stroke:var(--cds-chart-status-good)'/><text x='288' y='592' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>ReportBuilder</text><text x='288' y='608' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 10 · done</text></g><g><rect x='208' y='656' width='160' height='56' rx='8' fill='#d23b3b' fill-opacity='0.12' stroke='#d23b3b' stroke-width='1.5' style='fill:var(--cds-chart-status-critical);stroke:var(--cds-chart-status-critical)'/><text x='288' y='680' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>EvalRunner + CLI</text><text x='288' y='696' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 11 · partial</text></g><g><rect x='208' y='744' width='160' height='56' rx='8' fill='#2a9d3f' fill-opacity='0.12' stroke='#2a9d3f' stroke-width='1.5' style='fill:var(--cds-chart-status-good);stroke:var(--cds-chart-status-good)'/><text x='288' y='768' text-anchor='middle' font-size='13' font-weight='600' fill='#1f1f1e' style='fill:var(--cds-text-primary)'>Packaging</text><text x='288' y='784' text-anchor='middle' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>task 12 · done</text></g><text x='648' y='580' text-anchor='end' font-size='11.5' fill='#5f5e5a' style='fill:var(--cds-text-secondary)'>planned, never wired</text><g fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'><path d='M128 124H146' marker-end='url(#task-arrow)'/><path d='M250 124H267' marker-end='url(#task-arrow)'/><path d='M371 124H389' marker-end='url(#task-arrow)'/><path d='M493 124H510' marker-end='url(#task-arrow)'/><path d='M614 124H632' marker-end='url(#task-arrow)'/><path d='M562 152V176' marker-end='url(#task-arrow)'/></g><g fill='none' stroke='#b4b2a9' stroke-width='1.25' style='stroke:var(--cds-chart-axis)'><path d='M104 272V304' marker-end='url(#task-arrow)'/><path d='M184 244H288V304' marker-end='url(#task-arrow)'/><path d='M288 360V392' marker-end='url(#task-arrow)'/><path d='M288 448V480' marker-end='url(#task-arrow)'/><path d='M288 536V568' marker-end='url(#task-arrow)'/><path d='M288 624V656' marker-end='url(#task-arrow)'/><path d='M288 712V744' marker-end='url(#task-arrow)'/><path d='M368 420H472V480' marker-end='url(#task-arrow)'/><path d='M472 536V606H368' marker-end='url(#task-arrow)'/><path d='M392 332H380V586H368' marker-end='url(#task-arrow)'/><path d='M552 332H656V392' marker-end='url(#task-arrow)'/><path d='M104 360V684H208' marker-end='url(#task-arrow)'/></g><g fill='none' stroke='#b4b2a9' stroke-width='1.25' stroke-dasharray='5 4' style='stroke:var(--cds-chart-axis)'><path d='M656 448V676H368' marker-end='url(#task-arrow)'/><path d='M736 244H744V692H368' marker-end='url(#task-arrow)'/></g></svg>
+    </div>
+    <figcaption>Fig. 3 — Kiro task graph · 6 specs, 12 tasks in evaluation-harness. Only one of six specs got a task list, and two of its links were never wired.</figcaption>
+  </figure>
+
+  <p>The steering files set an order for six specs, but only the evaluation harness got a <code>tasks.md</code>, with 12 tasks. That file records each task's status but not its dependencies. The arrows here are each task's main inputs, read from the task descriptions. <code>EvalConfig</code> and <code>ArtefactStore</code> feed almost every task, so they are drawn once.</p>
+
+  <p>Six tasks were done as specified, five shipped with deviations, and the runner and CLI are only partly done. The expert judgement set (task 6) and the department regression gate (task 8) were built but never wired into the runner.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>What landed</th><th>Tests</th></tr></thead>
+      <tbody>
+        <tr><td style="white-space:nowrap">10–12 Sep</td><td>System overview, 14 architecture decisions, task list reconciled with the code</td><td>241</td></tr>
+        <tr><td>10 Sep</td><td>Fixes driven by the new evaluations: a stricter verifier, a fair ablation threshold</td><td>241</td></tr>
+        <tr><td>9 Sep</td><td>Three quality evaluations; LLM verification of alignments; LLM rerank of queries; readiness, unlock and overlap queries</td><td>240</td></tr>
+        <tr><td>9 Sep</td><td>First end-to-end run: switch to UIUC, Docker stores, Bedrock and Anthropic support, extraction fixes, threshold tuning, batched graph writes</td><td>—</td></tr>
+        <tr><td>8 Sep</td><td>Steering files, EARS requirements and designs for six packages, then all six packages</td><td style="white-space:nowrap">34 → 147</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Three lessons stood out:</p>
+
+  <ul>
+    <li><strong>A settled-decisions file saves a lot of time.</strong> Without it, each new session tends to reopen scope.</li>
+    <li><strong>Rules enforced in code outlast rules in prose.</strong> Because the invariants live in the schema's constructors, generated code could not quietly break them.</li>
+    <li><strong>Specs drift quickly.</strong> Day two was mostly about what the specs had not foreseen, so the specs have to be updated as reality lands, not afterwards.</li>
+  </ul>
+
+  <h2>The evaluation loop</h2>
+
+  <p>Most of what the spike learned came from measuring, finding a specific defect and fixing it at the source. Each row below is one commit.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>What the measurement showed</th><th>Fix</th><th>Before</th><th>After</th></tr></thead>
+      <tbody>
+        <tr><td>The ablation's course-level-only condition scored zero because it faced a threshold built for all signals combined</td><td>Scale the threshold per condition</td><td>F1 0.0</td><td>F1 0.001, against 0.113 with all signals</td></tr>
+        <tr><td>The verifier accepted neighbouring disciplines, such as antenna &ldquo;transmission&rdquo; as networking and optics as graphics</td><td>Name those confusions explicitly in the verifier prompt</td><td>Precision 0.649</td><td>13 of 13 test cases right, 9 false matches rejected</td></tr>
+        <tr><td>Writing edges one per transaction was slow</td><td>Batch writes, 5,000 rows per transaction</td><td>~40 min</td><td>~10.6 min</td></tr>
+        <tr><td>77% of edges sat in the 0.40–0.50 confidence band, mostly false</td><td>Raise the minimum score from 0.35 to 0.55</td><td>F1 0.023, 364,054 edges</td><td>F1 0.127, 44,997 edges</td></tr>
+        <tr><td>37 of 40 withheld prerequisites pointed outside CS</td><td>Also ingest MATH, ECE, CSE and STAT (94 to 389 courses)</td><td>Recall 0.075</td><td>Recall 0.552</td></tr>
+        <tr><td>Inference produced no edges: course numbers and prerequisites never reached the graph</td><td>Write course metadata and <code>PREREQUISITE</code> edges first</td><td>0 edges</td><td>23,205 edges</td></tr>
+        <tr><td>About 44 of 94 extraction responses failed to parse</td><td>Ask for a JSON object; coerce near-misses</td><td>244 concepts</td><td>677 concepts</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-note">Rows are newest first. Raising the threshold cost some recall, from 0.552 to 0.483.</p>
+
+  <p>The evaluations also surfaced things that were not bugs, and the spike wrote them down instead of hiding them. The structural reject stage turned out to be redundant: edges can never point upward in course level, so they cannot form the cycles it exists to remove. And the headline recall is not leakage-free, because the withheld prerequisites are chosen after inference has already seen them.</p>
+
+  <h2>What it did not answer, and what comes next</h2>
+
+  <p>The biggest open question is grain. The spike only ever read catalogue descriptions of about 100 words per course. Weekly learning objectives are a different kind of text, and nobody has yet tested whether they yield a useful concept graph.</p>
+
+  <p>Other gaps:</p>
+
+  <ul>
+    <li><strong>Intervention is untested.</strong> No learner data was used, so we do not know whether concept dependencies predict where students actually struggle.</li>
+    <li><strong>Novel edges were never judged.</strong> The blinded expert review of inferred edges is implemented but has not been run. Until it runs, the pipeline's contribution beyond published prerequisites is unproven.</li>
+    <li><strong>The numbers are hard to reproduce.</strong> They come from commit messages; no evaluation run artefacts are committed to the repository.</li>
+    <li><strong>The prerequisite parser loses choices.</strong> For CS 374, &ldquo;One of CS 173, MATH 213; CS 225&rdquo; becomes three separate requirements, so the &ldquo;one of&rdquo; is lost.</li>
+    <li><strong>Breadth is narrow.</strong> It covers one institution and one discipline. The CS2023 vocabulary file is a careful reconstruction, not a parse of the standard.</li>
+  </ul>
+
+  <p>The next step is a second, narrow spike on grain before any production build:</p>
+
+  <ol>
+    <li>Take a handful of courses with public week-by-week objectives.</li>
+    <li>Extract and align concepts at module level.</li>
+    <li>Infer dependencies between modules, across courses.</li>
+    <li>Test &ldquo;struggled in module N, so the missing prerequisite is X&rdquo; against blinded expert judgement, using the same evaluation method.</li>
+  </ol>
+
+  <div class="callout">
+    <div class="callout-label">The bar for building</div>
+    <p>If that holds, the production platform has something proven to rest on. <strong>If it does not, we find out before building one.</strong></p>
+  </div>
+
+  <h2>Sources</h2>
+
+  <p>All figures come from the Granular repository at commit <code>36aaf96</code> (12 September 2026) and its commit history.</p>
+
+  <ul>
+    <li><a href="https://github.com/gpazevedo/granular">Granular repository</a></li>
+    <li><a href="https://github.com/gpazevedo/granular/blob/main/SYSTEM_OVERVIEW.md">System overview</a></li>
+    <li><a href="https://github.com/gpazevedo/granular/blob/main/ARCHITECTURE_DECISIONS.md">Architecture decisions</a></li>
+    <li><a href="https://github.com/gpazevedo/granular/tree/main/.kiro/steering">Kiro steering files</a></li>
+    <li><a href="https://github.com/gpazevedo/granular/tree/main/.kiro/specs">Kiro specs</a></li>
+    <li><a href="https://github.com/gpazevedo/granular/blob/main/.kiro/specs/catalogue-ingestion/design.md">Catalogue ingestion design, &ldquo;Source reality&rdquo;</a></li>
+    <li><a href="https://github.com/gpazevedo/granular/blob/main/project_definition_kiro.md">Original project brief</a></li>
+    <li><a href="https://github.com/gpazevedo/granular/commits/main">Commit history</a></li>
+  </ul>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="../eng/specifying-and-measuring-ai-systems.html" class="related-post-card">
+        <div class="rpc-tag">AI systems</div>
+        <div class="rpc-title">Specifying and measuring an AI system</div>
+      </a>
+      <a href="../eng/requirement-traceability.html" class="related-post-card">
+        <div class="rpc-tag">Testing</div>
+        <div class="rpc-title">Every requirement has a test, and a check that proves it</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &middot; AI Solution Architect &middot; September 2026</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

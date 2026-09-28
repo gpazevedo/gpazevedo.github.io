@@ -6,7 +6,17 @@
   <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
   <language>en-us</language>
-  <lastBuildDate>Thu, 24 Sep 2026 00:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Sun, 27 Sep 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>Granular: what a five-day spike taught us about concept-level curriculum mapping</title>
+      <link>https://gpazevedo.github.io/blog/eng/granular-curriculum-mapping-spike.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/granular-curriculum-mapping-spike.html</guid>
+      <pubDate>Sun, 27 Sep 2026 00:00:00 +0000</pubDate>
+      <description>A spec-driven, five-day spike built a concept-level map of a university CS catalogue, aligned it to CS2023 and measured it honestly. What it answered, what it did not, and how Kiro specs shaped the build.</description>
+      <category>AI systems</category>
+      <category>Evaluation</category>
+      <category>Spec-driven development</category>
+    </item>
     <item>
       <title>Every requirement has a test, and a check that proves it</title>
       <link>https://gpazevedo.github.io/blog/eng/requirement-traceability.html</link>

@@ -2,6 +2,15 @@
    Add one entry per file in this folder. Ties keep the order listed here. */
 window.engPosts = [
   {
+    "slug": "granular-curriculum-mapping-spike",
+    "file": "granular-curriculum-mapping-spike.html",
+    "title": "Granular: what a five-day spike taught us about concept-level curriculum mapping",
+    "description": "A spec-driven, five-day spike built a concept-level map of a university CS catalogue, aligned it to CS2023 and measured it honestly. What it answered, what it did not, and how Kiro specs shaped the build.",
+    "tags": ["AI systems", "Evaluation", "Spec-driven development"],
+    "date": "2026-09-27",
+    "readingTime": 11
+  },
+  {
     "slug": "requirement-traceability",
     "file": "requirement-traceability.html",
     "title": "Every requirement has a test, and a check that proves it",
