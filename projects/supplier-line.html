@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="index, follow"/>
+<meta name="author" content="Gustavo Peixoto de Azevedo"/>
+<title>Supplier Line — Gustavo Peixoto de Azevedo</title>
+<meta name="description" content="A real-time voice agent on Amazon Nova 2 Sonic that answers purchase-order status from a browser softphone or an Amazon Connect call. A check digit stops a misheard code from reading out the wrong order, a barge-in stops playback in 57 ms, and a session rotates past Sonic's 8-minute connection limit with no lost caller audio. Built end to end by an AI orchestrator running 23 work streams from a written plan."/>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/projects/supplier-line.html"/>
+<meta property="og:title" content="Supplier Line"/>
+<meta property="og:description" content="A real-time voice agent on Amazon Nova 2 Sonic that answers purchase-order status from a browser softphone or an Amazon Connect call. A check digit stops a misheard code from reading out the wrong order, a barge-in stops playback in 57 ms, and a session rotates past Sonic's 8-minute connection limit with no lost caller audio. Built end to end by an AI orchestrator running 23 work streams from a written plan."/>
+<meta property="og:image" content="https://gpazevedo.github.io/blog/eng/supplier-line-architecture.png"/>
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Supplier Line"/>
+<meta name="twitter:description" content="A real-time voice agent on Amazon Nova 2 Sonic that answers purchase-order status from a browser softphone or an Amazon Connect call. A check digit stops a misheard code from reading out the wrong order, a barge-in stops playback in 57 ms, and a session rotates past Sonic's 8-minute connection limit with no lost caller audio. Built end to end by an AI orchestrator running 23 work streams from a written plan."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/blog/eng/supplier-line-architecture.png"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareSourceCode","name":"Supplier Line","description":"A real-time voice agent on Amazon Nova 2 Sonic that answers purchase-order status from a browser softphone or an Amazon Connect call. A check digit stops a misheard code from reading out the wrong order, a barge-in stops playback in 57 ms, and a session rotates past Sonic's 8-minute connection limit with no lost caller audio. Built end to end by an AI orchestrator running 23 work streams from a written plan.","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/projects/supplier-line.html","keywords":"Voice AI, Nova Sonic, Amazon Connect"}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../blog/buyer-team-blog.css">
+<link rel="stylesheet" href="../blog/site-blog.css">
+<style>
+  .bt-figure img { display: block; width: 100%; height: auto; }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../index.html">Home</a></li>
+    <li><a href="../index.html#ai-projects">AI Projects</a></li>
+    <li><a href="../index.html#blog">Blog</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../index.html#ai-projects">AI Projects</a>
+    <span class="sep">›</span>
+    <span class="current">Supplier Line</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Project</span>
+    <span class="dot">·</span>
+    <span>Voice AI</span>
+    <span class="dot">·</span>
+    <span>Deployed · on demand</span>
+  </div>
+
+  <h1>Supplier Line</h1>
+
+  <p class="deck">A real-time voice agent on Amazon Nova 2 Sonic that answers purchase-order status from a browser softphone or an Amazon Connect call. A caller reads out a code; the agent looks it up and speaks the status back, and a handful of small components keep that answer trustworthy under the failure modes speech models actually have.</p>
+
+  <hr>
+
+  <h2>What it does</h2>
+
+  <p>A supplier calls in, reads out a five-digit purchase-order code, and hears its
+     status: shipped or not, the amount, the order date, the delivery date. Two front
+     doors reach the same agent — a browser softphone that talks to a session host
+     directly over a WebSocket, and an Amazon Connect phone call routed through a Lex
+     bot running Nova Sonic speech-to-speech. Both give the same answer in the same
+     words, because both call the same lookup and rendering code.</p>
+
+  <figure class="bt-figure">
+    <img src="../blog/eng/supplier-line-architecture.svg" alt="Architecture diagram of Supplier Line in AWS us-east-1. Browser pages reach CloudFront, which serves the site from S3 and forwards /ws and /api through an ALB to a Fargate ARM64 session host that streams to Amazon Nova 2 Sonic on Bedrock. The app stack exists only during an approved window. A persistent stack holds ECR, the traces bucket, SSM parameters, a reaper Lambda, Amazon Connect with its Lex bot and PO status Lambda, GitHub OIDC roles and alerts."/>
+    <figcaption class="bt-figcaption">A temporary app stack for each approved window, and a persistent stack with no hourly charges.</figcaption>
+  </figure>
+
+  <h2>What makes a speech model trustworthy here</h2>
+
+  <p>A speech-to-speech model will happily read out an order it misheard, answer from
+     memory instead of looking a code up again, or go quiet after a lookup. Supplier
+     Line prevents each of those with a small, specific component rather than a longer
+     prompt:</p>
+
+  <ul>
+    <li><strong>A check digit in every code.</strong> The last digit is computed from
+        the other four, so any single misheard digit fails validation and the agent
+        asks the caller to repeat it, instead of reading out someone else's order.</li>
+    <li><strong>An answer guard.</strong> If the model starts speaking order details in
+        a turn with no lookup behind it, the host stops that audio before the caller
+        hears it and tells the model to look the order up first.</li>
+    <li><strong>A session rotator.</strong> Nova Sonic connections last at most eight
+        minutes; the app allows fifteen-minute calls. Past six minutes, the host opens
+        a second connection in the background, replays what the caller was actually
+        heard to say, and switches over — a 1 ms gap and no lost caller audio in its
+        live test.</li>
+    <li><strong>A trace on every call.</strong> Each turn records what the model planned
+        to say, what it generated, and what the caller actually heard, and six
+        automated checks read every trace: no data spoken without a lookup, no
+        unbounded silence, no audio lost across a rotation.</li>
+  </ul>
+
+  <p>In its first live test on AWS, a spoken interruption stopped playback in 57 ms, and
+     one request was misheard as PO-13345 — a code that fails its own check digit. The
+     caller was asked to repeat it, one digit at a time, instead of getting an answer
+     for the wrong order.</p>
+
+  <h2>Built by an AI orchestrator, not by hand</h2>
+
+  <p>The app's code was not written directly. One Claude orchestrator, working from a
+     written plan and a shared <code>CLAUDE.md</code> brief, ran 23 work streams across
+     parallel agents, each test-first in its own git worktree, model sized to the
+     stream's risk. The orchestrator never wrote feature code itself — its job was
+     verification: re-running what an agent reported, rather than trusting the report.</p>
+
+  <p>That check caught real gaps. Three streams reported success on work that did not
+     work, including six silent audio files an agent had marked complete with ticks. A
+     final review on a stronger model, with every automated test green, still found
+     seven defects that would have broken the first real deploy — among them a
+     teardown Lambda that had failed silently on all 81 of its runs. The full account,
+     including the loop, the human checkpoints and what would change next time, is in
+     the write-up below.</p>
+
+  <h2>Running cost and scope</h2>
+
+  <ul>
+    <li>The web-facing stack — CloudFront, an ALB, one ARM64 Fargate task — deploys only
+        through a GitHub workflow approved for a one-to-eight-hour window, and a reaper
+        Lambda deletes it at expiry.</li>
+    <li>The persistent stack — the container registry, the traces bucket, Amazon
+        Connect, the reaper — carries no hourly charges while idle.</li>
+    <li>English only, no phone number of its own, no login beyond an access code, and
+        no reasoning model behind the lookup. Deliberate cuts for a short build, each
+        recorded in the repository's decision records.</li>
+  </ul>
+
+  <h2>Further reading</h2>
+  <ul>
+    <li><a href="../blog/eng/supplier-line-voice-agent.html">Inside a real-time AI voice agent: what each part of Supplier Line does</a> — the components, the traces, the live-test numbers</li>
+    <li><a href="../blog/eng/ai-sdlc-voice-agent.html">How an orchestrator-driven AI SDLC built a real-time AI voice app</a> — how 23 AI-agent work streams built it, and what the checks caught</li>
+    <li><a href="https://github.com/gpazevedo/supplier-line">github.com/gpazevedo/supplier-line</a></li>
+  </ul>
+
+</article>
+
+</body>
+</html>
