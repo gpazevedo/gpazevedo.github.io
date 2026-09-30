@@ -2,6 +2,24 @@
    Add one entry per file in this folder. Ties keep the order listed here. */
 window.engPosts = [
   {
+    "slug": "supplier-line-voice-agent",
+    "file": "supplier-line-voice-agent.html",
+    "title": "Inside a real-time AI voice agent: what each part of Supplier Line does",
+    "description": "How a Nova 2 Sonic voice agent catches misheard codes, stops in 57 ms when interrupted, survives the 8-minute stream limit, and traces what every caller heard.",
+    "tags": ["Voice AI"],
+    "date": "2026-09-30",
+    "readingTime": 14
+  },
+  {
+    "slug": "ai-sdlc-voice-agent",
+    "file": "ai-sdlc-voice-agent.html",
+    "title": "How an orchestrator-driven AI SDLC built a real-time AI voice app",
+    "description": "An AI orchestrator built a real-time voice app from a written plan. Its checks caught false success reports, seven deploy-breaking defects and a teardown Lambda failing silently.",
+    "tags": ["AI Coding"],
+    "date": "2026-09-27",
+    "readingTime": 12
+  },
+  {
     "slug": "granular-curriculum-mapping-spike",
     "file": "granular-curriculum-mapping-spike.html",
     "title": "Granular: what a five-day spike taught us about concept-level curriculum mapping",

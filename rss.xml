@@ -6,7 +6,23 @@
   <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
   <language>en-us</language>
-  <lastBuildDate>Sun, 27 Sep 2026 00:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Wed, 30 Sep 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>Inside a real-time AI voice agent: what each part of Supplier Line does</title>
+      <link>https://gpazevedo.github.io/blog/eng/supplier-line-voice-agent.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/supplier-line-voice-agent.html</guid>
+      <pubDate>Wed, 30 Sep 2026 00:00:00 +0000</pubDate>
+      <description>How a Nova 2 Sonic voice agent catches misheard codes, stops in 57 ms when interrupted, survives the 8-minute stream limit, and traces what every caller heard.</description>
+      <category>Voice AI</category>
+    </item>
+    <item>
+      <title>How an orchestrator-driven AI SDLC built a real-time AI voice app</title>
+      <link>https://gpazevedo.github.io/blog/eng/ai-sdlc-voice-agent.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/ai-sdlc-voice-agent.html</guid>
+      <pubDate>Sun, 27 Sep 2026 00:00:00 +0000</pubDate>
+      <description>An AI orchestrator built a real-time voice app from a written plan. Its checks caught false success reports, seven deploy-breaking defects and a teardown Lambda failing silently.</description>
+      <category>AI Coding</category>
+    </item>
     <item>
       <title>Granular: what a five-day spike taught us about concept-level curriculum mapping</title>
       <link>https://gpazevedo.github.io/blog/eng/granular-curriculum-mapping-spike.html</link>
