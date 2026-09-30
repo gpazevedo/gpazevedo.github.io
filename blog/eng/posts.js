@@ -15,7 +15,7 @@ window.engPosts = [
     "file": "ai-sdlc-voice-agent.html",
     "title": "How an orchestrator-driven AI SDLC built a real-time AI voice app",
     "description": "An AI orchestrator built a real-time voice app from a written plan. Its checks caught false success reports, seven deploy-breaking defects and a teardown Lambda failing silently.",
-    "tags": ["AI Coding"],
+    "tags": ["AI Engineering"],
     "date": "2026-09-27",
     "readingTime": 12
   },

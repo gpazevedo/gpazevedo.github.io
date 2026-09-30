@@ -21,7 +21,7 @@
       <guid>https://gpazevedo.github.io/blog/eng/ai-sdlc-voice-agent.html</guid>
       <pubDate>Sun, 27 Sep 2026 00:00:00 +0000</pubDate>
       <description>An AI orchestrator built a real-time voice app from a written plan. Its checks caught false success reports, seven deploy-breaking defects and a teardown Lambda failing silently.</description>
-      <category>AI Coding</category>
+      <category>AI Engineering</category>
     </item>
     <item>
       <title>Granular: what a five-day spike taught us about concept-level curriculum mapping</title>
