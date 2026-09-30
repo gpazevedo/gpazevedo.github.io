@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>How an orchestrator-driven AI SDLC built a real-time AI voice app — Gustavo Azevedo</title>
+<meta name="description" content="An AI orchestrator built a real-time voice app from a written plan. Its checks caught false success reports, seven deploy-breaking defects and a teardown Lambda failing silently."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/ai-sdlc-voice-agent.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/ai-sdlc-voice-agent.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="How an orchestrator-driven AI SDLC built a real-time AI voice app"/>
+<meta property="og:description" content="An AI orchestrator built a real-time voice app from a written plan. Its checks caught false success reports, seven deploy-breaking defects and a teardown Lambda failing silently."/>
+<meta property="og:image" content="https://gpazevedo.github.io/blog/eng/supplier-line-architecture.png"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-09-27T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-09-30T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="AI Coding"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="How an orchestrator-driven AI SDLC built a real-time AI voice app"/>
+<meta name="twitter:description" content="An AI orchestrator built a real-time voice app from a written plan. Its checks caught false success reports, seven deploy-breaking defects and a teardown Lambda failing silently."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/blog/eng/supplier-line-architecture.png"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"How an orchestrator-driven AI SDLC built a real-time AI voice app","description":"An AI orchestrator built a real-time voice app from a written plan. Its checks caught false success reports, seven deploy-breaking defects and a teardown Lambda failing silently.","datePublished":"2026-09-27","dateModified":"2026-09-30","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/ai-sdlc-voice-agent.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/ai-sdlc-voice-agent.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"How an orchestrator-driven AI SDLC built a real-time AI voice app","item":"https://gpazevedo.github.io/blog/eng/ai-sdlc-voice-agent.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+  .bt-figure img { display: block; width: 100%; height: auto; }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">AI SDLC</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>AI Coding</span>
+    <span class="dot">·</span>
+    <time datetime="2026-09-27">September 2026</time>
+    <span class="dot">·</span>
+    <span>12 min read</span>
+  </div>
+
+  <h1>How an orchestrator-driven AI SDLC <em>built a real-time AI voice app</em></h1>
+
+  <p class="deck">I built Supplier Line, a real-time voice agent on <strong>Amazon Nova 2 Sonic</strong> reachable from a browser or an <strong>Amazon Connect</strong> call, without writing its code. One Claude orchestrator, working in <strong>Herdr</strong> terminal panes, ran 23 work streams from a written plan, each agent test-first in its own git worktree. The process is worth copying for what it caught. Three agents reported success on work that did not work, and the orchestrator found out by running it. With every test green, a final review found seven defects, each of which would have broken the first deploy. And a human check found that the Lambda that tears down my deploys had failed on all 81 of its runs. This post lays out the loop, the gates and the human checkpoints that caught them, and what I would change, so you can use them on your own agent-built projects.</p>
+
+  <p>The app answers one question: a supplier reads out a purchase-order code and hears its status. What it does on a call, and which component does what, is in <a href="supplier-line-voice-agent.html">the companion post</a>; the code is <a href="https://github.com/gpazevedo/supplier-line">on GitHub</a>. This post is about how it was built. It made a good test of an AI-driven process because much of it, from barge-in to IAM, can only be verified against the real model and the real cloud.</p>
+
+  <figure class="bt-figure">
+    <a href="supplier-line-architecture.svg"><img src="supplier-line-architecture.svg" alt="Architecture diagram of Supplier Line in AWS us-east-1. Browser pages (softphone, trace viewer, Connect calling page) reach CloudFront, which serves the site from S3 and forwards /ws and /api through an ALB to a Fargate ARM64 session host that streams to Amazon Nova 2 Sonic on Bedrock. The app stack exists only during an approved window. A persistent stack holds ECR, the traces bucket, SSM parameters, the reaper Lambda, Amazon Connect with its Lex bot and PO status Lambda, GitHub OIDC roles and alerts. GitHub Actions workflows deploy through those roles."/></a>
+    <figcaption class="bt-figcaption">What was built: a temporary app stack for each approved window, and a persistent stack with no hourly charges. Select to enlarge</figcaption>
+  </figure>
+
+  <h2>From a conversation to a plan agents could run</h2>
+
+  <p>The plan started in a conversation with Claude on September 26. I wanted a voice app to go alongside Buyer Team, so that suppliers could ask about a purchase order by phone and hear its status. We first wrote a full design, then reviewed it and cut it down to a two-day slice. The slice kept one headline, precise barge-in proven by traces. The review also produced findings that shaped the build, such as Amazon Connect keeping its own orchestration when Sonic is the speech model. Every stream got a row with its output, a "done when" test and a skill, for most streams Matt Pocock's test-driven development skill. The plan ended with four trace checks that decide acceptance; the build grew them to six.</p>
+
+  <p>In a second conversation I turned that plan into something agents could run. We wrote <code>CLAUDE.md</code> as the shared brief: the fixed decisions, the out-of-scope list, the trace contract and an honesty rule for the README. Then we worked through how to run it. Herdr would keep parallel agents visible. Pure-code streams could run anywhere, but anything that needed Bedrock, my ears or the Connect console stayed with me. Claude Managed Agents would add setup without speeding up the critical path, so I left it out. The most useful idea from that session was to match the model to the stream. That became the model column, and the plan grew to 23 streams as the build taught me more.</p>
+
+  <p>The result was two files. <code>docs/build-plan.md</code> gives each work stream its output, its done criteria, its skill and its model. <code>CLAUDE.md</code> holds the rules every agent reads first: which AWS profile to use, never deploy, never skip a hook, stop and report on any access-denied error. The model column is a budget decision: Haiku 4.5 for mechanical work, Sonnet 5 by default, and Opus 5.5 for the orchestrator, the real-time audio streams, IAM and Connect, the reaper that enforces my consent, and the final review. Opus costs twice what Sonnet does, so escalating a failing stream is cheap next to a broken demo.</p>
+
+  <h2>The loop</h2>
+
+  <p>The orchestrator never writes feature code. For each stream it follows the same eight steps, with up to four agents running at once, each visible in its own Herdr pane.</p>
+
+  <figure class="bt-figure">
+    <a href="supplier-line-ai-sdlc.svg"><img src="supplier-line-ai-sdlc.svg" alt="Diagram of the AI SDLC. A specification (the build plan and CLAUDE.md) feeds an Opus orchestrator, which reports to the owner and takes decisions back. Each stream runs an eight-step loop: brief, isolate in a git worktree, build, commit with pre-commit hooks, independent verification by the orchestrator, merge, push with pre-push hooks, and CI. A failed verification goes back to the agent or reruns on a stronger model. Below are the phases with human checkpoints H0 to H4, and four guardrails: scoped AWS access, denied commands, consent-gated deploys and a reaper Lambda."/></a>
+    <figcaption class="bt-figcaption">The loop every stream goes through, the phases and checkpoints, and the guardrails. Select to enlarge</figcaption>
+  </figure>
+
+  <ol style="margin-bottom:1.3em">
+    <li><strong>Brief.</strong> The stream's row from the plan, plus anything learned since.</li>
+    <li><strong>Isolate.</strong> A git worktree and branch, a sibling pane, and an agent on the stream's model.</li>
+    <li><strong>Build.</strong> Test-first, root cause before any fix, checked against real Bedrock.</li>
+    <li><strong>Commit.</strong> pre-commit hooks: formatting, linting, secret scanning, workflow and config checks.</li>
+    <li><strong>Verify.</strong> The orchestrator re-runs the tests and trace checks, and its own replay against real Bedrock.</li>
+    <li><strong>Merge</strong> into <code>main</code>, in plan order.</li>
+    <li><strong>Push.</strong> pre-push hooks: typecheck, tests including an axe accessibility check, CDK checks, trace checks.</li>
+    <li><strong>CI.</strong> The same hooks on GitHub, plus the ARM64 image build and a health check, with no AWS credentials.</li>
+  </ol>
+
+  <p>Step 5 is the one that earns its keep. It is the only step where someone other than the agent runs the agent's work.</p>
+
+  <h2>Done means the orchestrator ran it</h2>
+
+  <p>Three streams reported success on work that did not work. Each was caught because the orchestrator ran the thing instead of reading the report.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Stream</th><th>What the agent reported</th><th>What the orchestrator found</th></tr></thead>
+      <tbody>
+        <tr><td>Phrase capture, on Haiku</td><td>"All audio files committed", with ticks</td><td>Six silent WAV files. Sonic had never spoken. Rerun on Sonnet: nine real recordings, each transcript matching its phrase.</td></tr>
+        <tr><td>Caller-clip player</td><td>All six scenarios pass</td><td>Run exactly as the deploy workflow runs it, it crashed on start: pnpm forwards the <code>--</code> separator to the script. The fix also found traces landing in the wrong folder.</td></tr>
+        <tr><td>Accessibility pass</td><td>Axe finds no WCAG 2.2 AA violations</td><td>True locally, red in CI: the test's server bound <code>localhost</code>, which resolved differently on the runner. Fixed by binding <code>127.0.0.1</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>None of these agents was lying in any useful sense. Each checked what it thought mattered. So the orchestrator's check is written from the outside: the command the workflow uses, the audio the caller hears, the CI runner rather than the notebook. The third row also has a lesson for the orchestrator: it merged before CI had seen that branch and turned <code>main</code> red for a few minutes. CI is a gate, so it belongs before the merge.</p>
+
+  <h2>Prove the cause, measure the change</h2>
+
+  <p>Every audio stream is done only when recorded caller clips, replayed against real Bedrock, pass: the answer spoken word for word, no caller audio lost at a rotation, and every trace passing six automated checks. Two rules sat on top of that: prove the root cause before fixing, and keep only changes you can measure.</p>
+
+  <ul style="margin-bottom:1.3em">
+    <li><strong>A bug hiding behind old fixtures.</strong> After I re-recorded the caller clips with less noise, session rotation stopped working. I pause after "purchase order P O", so Sonic started replying and I talked over it, and the code that tracks when a reply is complete kept waiting for the interrupted one. The old clips never caused a barge-in, so the bug had been there all along.</li>
+    <li><strong>A guess stopped.</strong> When a call looked up the wrong code, the agent logged every tool call next to the caller's transcript before changing anything. Sonic had ended my turn in the pause between digit groups and filled in the rest. Less sensitive turn detection fixed it. AWS's guidance suggests temperature 0 for tool calls; the agent measured it, saw no gain, and kept 0.7.</li>
+    <li><strong>My own diagnosis overturned.</strong> Codes were misheard only after a rotation, so I asked for a rotation fix. The agent dumped every event each connection received, found them identical, and reproduced the bug on a connection that had never rotated. The cause was the paused "dash" in "P O, dash, one zero four eight two". The agent stopped saying "dash", the host began holding lookups for digits not yet spoken, and I re-recorded the clip the way callers would now speak. The agent's wording shapes the caller's wording.</li>
+  </ul>
+
+  <h2>The checkpoints only I could pass</h2>
+
+  <p>The plan has five human checkpoints, H0 to H4. Agents cannot pass them, by design: they need my credentials, my ears or my approval.</p>
+
+  <p>The listening check, H2, mattered most during the build. Every automated check was green, and the first thing I said on the softphone was looked up as PO-12345, the example code written into the system prompt. No replay had ever produced it. Recording the clips was a checkpoint too: the first take had room noise only 10 dB below my voice, which would have made every later audio test partly a test of the room.</p>
+
+  <div class="callout">
+    <div class="callout-label">Design that saved the demo</div>
+    <p>Every purchase-order code carries a check digit, and any single wrong digit fails it. <strong>So a misheard code never read out another order's data</strong>: the agent asked me to repeat instead. It happened in the live test too, when one request was heard as PO-13345. A later rule, enforced by a trace check, made sure order data is never spoken without a lookup.</p>
+  </div>
+
+  <p>The most useful checkpoint was the dullest one: a reaper self-test, a tiny stack tagged to expire in five minutes, and two emails to watch for. Neither came. The reaper had failed on all 81 runs since the first deploy: it lists stacks with a call AWS authorises as <code>ListStacks</code>, and its role only had <code>DescribeStacks</code>. The unit tests mocked AWS, and <code>cdk-nag</code> flags permissions that are too broad, not missing ones. The emails had a second cause: I had never confirmed the alert subscription, and the topic's HTTPS-only policy blocked the alarm from publishing anyway. The guardrail that enforces my consent had never worked, and only a human running it end to end, then asking "where are my emails?", found out. A safety net is not tested until you have watched it catch something.</p>
+
+  <h2>The final review found what no check could</h2>
+
+  <p>The plan ends with a review stream on Opus: security, least-privilege IAM, the consent controls, accessibility, correctness. Every test passed and CI was green, and it still found seven blocking defects, each of which would have broken the first real deploy: the image crashed at startup because files were missing from it; the host's role granted an IAM action that does not exist, which IAM accepts without complaint; the host could not start Connect calls outside my developer profile; deployed traces went nowhere and the smoke test checked old files; the web pages were never uploaded; and one unauthenticated request crashed the host.</p>
+
+  <p>They share a pattern with the reaper. Local tests run with broad developer credentials, mocked AWS clients and files on disk, so whatever exists only in the deployed environment stays invisible until someone reads the code against what AWS actually does. CI now builds the image and waits for it to report healthy, and the templates carry tests for the exact permissions each role gets.</p>
+
+  <h2>Three runs to a green deploy</h2>
+
+  <p>H3 is the first real deploy: I start <code>demo-up</code>, approve it, and its smoke test replays six caller scenarios against the running app, including a connection rotation. Before it even started, the nightly teardown job could not log in to AWS, because GitHub now puts numeric owner and repo IDs in its identity tokens and our roles trusted the old format. Then the first smoke test was turned away: the access code in GitHub did not match the one in AWS.</p>
+
+  <p>The first real run passed four of six scenarios, and the failures were real model behaviour: once Sonic looked an order up and never spoke the result, and once, after a rotation, it answered from memory. The host now nudges Sonic with a text message when a result stays unspoken, and holds back order details spoken without a lookup. The second run passed five of six, and its trace showed a garbled answer. The agent transcribed the recording of what the caller heard, and it was perfect; the bug was in how the trace matched Sonic's sentence confirmations. The third run was green, and its six traces are now fixtures that CI checks on every push. Rare model behaviour only shows up against the real service, and the audio, not the log, is the ground truth.</p>
+
+  <h2>Guardrails that held</h2>
+
+  <ul style="margin-bottom:1.3em">
+    <li><strong>A denied command stops the agent.</strong> One agent's first step was a <code>gh api</code> call to read AWS's sample code, and it was denied. It stopped and asked instead of trying another route; the orchestrator fetched the sample and handed it over.</li>
+    <li><strong>The orchestrator is fenced too.</strong> When it tried to start an agent with automatic approvals, the permission layer blocked it, because I had not agreed to that.</li>
+    <li><strong>Deploys need me.</strong> The app stack deploys only through a workflow I approve in a GitHub Environment, for one to eight hours, and the reaper deletes it at expiry, now that it demonstrably works.</li>
+    <li><strong>Pushing is delegated, with limits.</strong> A stream that passes the orchestrator's own verification merges and pushes without asking. Human checkpoints and anything touching infrastructure still wait for me.</li>
+  </ul>
+
+  <h2>What I would change</h2>
+
+  <p>The loop is not fast. The stream that fixed the misheard codes ran for almost four hours through nine versions, because each change was measured against real Bedrock before the next. It paid off, and a few things would make it cheaper next time:</p>
+
+  <ul style="margin-bottom:1.3em">
+    <li><strong>Deploy something real early.</strong> A throwaway deploy after the first phase would have surfaced most of the review's findings a day earlier, before they piled up.</li>
+    <li><strong>Get to the human checkpoints sooner.</strong> Ten minutes on a real mic found what hours of replays did not.</li>
+    <li><strong>Run CI on the branch before merging.</strong> It is the only check that runs somewhere other than my notebook.</li>
+    <li><strong>Size the model to the risk, not the task's shape.</strong> Phrase capture looked mechanical but needed a live model, and Haiku faked it.</li>
+  </ul>
+
+  <p>The app is built. All 23 streams are merged, the first real deploy passed its smoke test on the third run, and its traces are checked by CI on every push. The only checkpoint left is recording the demo video.</p>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="../eng/supplier-line-voice-agent.html" class="related-post-card">
+        <div class="rpc-tag">Voice AI</div>
+        <div class="rpc-title">Inside a real-time AI voice agent: what each part of Supplier Line does</div>
+      </a>
+      <a href="../eng/requirement-traceability.html" class="related-post-card">
+        <div class="rpc-tag">Testing</div>
+        <div class="rpc-title">Every requirement has a test, and a check that proves it</div>
+      </a>
+      <a href="../eng/specifying-and-measuring-ai-systems.html" class="related-post-card">
+        <div class="rpc-tag">AI systems</div>
+        <div class="rpc-title">Specifying and measuring an AI system</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &middot; AI Solution Architect &middot; September 2026</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

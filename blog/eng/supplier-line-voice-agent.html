@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Inside a real-time AI voice agent: what each part of Supplier Line does — Gustavo Azevedo</title>
+<meta name="description" content="How a Nova 2 Sonic voice agent catches misheard codes, stops in 57 ms when interrupted, survives the 8-minute stream limit, and traces what every caller heard."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/supplier-line-voice-agent.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/supplier-line-voice-agent.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Inside a real-time AI voice agent: what each part of Supplier Line does"/>
+<meta property="og:description" content="How a Nova 2 Sonic voice agent catches misheard codes, stops in 57 ms when interrupted, survives the 8-minute stream limit, and traces what every caller heard."/>
+<meta property="og:image" content="https://gpazevedo.github.io/blog/eng/supplier-line-architecture.png"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-09-30T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-09-30T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Voice AI"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Inside a real-time AI voice agent: what each part of Supplier Line does"/>
+<meta name="twitter:description" content="How a Nova 2 Sonic voice agent catches misheard codes, stops in 57 ms when interrupted, survives the 8-minute stream limit, and traces what every caller heard."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/blog/eng/supplier-line-architecture.png"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Inside a real-time AI voice agent: what each part of Supplier Line does","description":"How a Nova 2 Sonic voice agent catches misheard codes, stops in 57 ms when interrupted, survives the 8-minute stream limit, and traces what every caller heard.","datePublished":"2026-09-30","dateModified":"2026-09-30","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/supplier-line-voice-agent.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/supplier-line-voice-agent.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Inside a real-time AI voice agent: what each part of Supplier Line does","item":"https://gpazevedo.github.io/blog/eng/supplier-line-voice-agent.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+  .bt-figure img { display: block; width: 100%; height: auto; }
+  .shot-row { display: grid; grid-template-columns: 2fr 2fr 1fr; gap: .75rem; align-items: start; padding: .75rem; }
+  @media (max-width: 640px) { .shot-row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Voice AI</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Voice AI</span>
+    <span class="dot">·</span>
+    <time datetime="2026-09-30">September 2026</time>
+    <span class="dot">·</span>
+    <span>14 min read</span>
+  </div>
+
+  <h1>Inside a real-time AI voice agent: <em>what each part of Supplier Line does</em></h1>
+
+  <p class="deck">A speech-to-speech model will read out an order it misheard, answer from memory, or go quiet after a lookup. Supplier Line, a voice agent on <strong>Amazon Nova 2 Sonic</strong> that answers purchase-order status from a browser or an <strong>Amazon Connect</strong> call, prevents all three with a few small components you can reuse. In its live test on AWS, a check digit caught a misheard code before it could read out the wrong order. A spoken interruption stopped playback in 57 milliseconds. A call moved past Sonic's eight-minute connection limit with a 1-millisecond gap and no lost caller audio. And every call left a trace of what the caller actually heard, which automated checks re-read on every push. This post walks through one call and names the component behind each of those results.</p>
+
+  <p>The code is <a href="https://github.com/gpazevedo/supplier-line">on GitHub</a>. How it was built, by an orchestrator running AI agents, is <a href="ai-sdlc-voice-agent.html">the other post</a>. The numbers below come from the app's first successful real deploy, a smoke test that replayed six recorded calls against the running app on AWS.</p>
+
+  <h2>A call, end to end</h2>
+
+  <p>The caller opens the softphone, enters the access code and presses Call. From then on, three parts cooperate:</p>
+
+  <ul style="margin-bottom:1.3em">
+    <li><strong>The browser</strong> captures the microphone as 16 kHz audio in an AudioWorklet and plays the agent's 24 kHz voice through a second one, reporting several times a second how much it has actually played.</li>
+    <li><strong>The session host</strong>, a small Node service, holds one WebSocket per call and one bidirectional stream to Nova 2 Sonic. It relays audio both ways, answers Sonic's tool calls, and records what happened.</li>
+    <li><strong>Nova 2 Sonic</strong> listens, decides when the caller has finished, calls the lookup tool, and speaks.</li>
+  </ul>
+
+  <figure class="bt-figure">
+    <a href="supplier-line-session-host.svg"><img src="supplier-line-session-host.svg" alt="Diagram of the session host during one call. The softphone's capture worklet sends 16 kHz caller audio over a WebSocket; the host sends back agent audio, turn markers, flush messages and transcript. Inside the host: the WebSocket server with access code and limits, the Sonic session with reading hold, answer guard, speak nudge and failure behaviours, the rotator with current and next connections, the response tracker, turns and ledger, and history for the next connection. The host talks to Nova 2 Sonic, calls get_po_status, and writes traces."/></a>
+    <figcaption class="bt-figcaption">One call inside the session host, with the module behind each part. Select to enlarge</figcaption>
+  </figure>
+
+  <figure class="bt-figure">
+    <a href="supplier-line-softphone-call-light.png"><img src="supplier-line-softphone-call-light.png" alt="The Supplier Line softphone during a call, light scheme. A status chip reads "On a call. Ask for the status of a purchase order." The transcript shows the caller asking about purchase order P O one zero four eight two, the agent answering that it shipped from Summit Fasteners with its amount, order date and due date, the caller asking "And the delivery date?" and the agent answering that delivery is due on October twenty-fourth, twenty twenty-six."/></a>
+    <figcaption class="bt-figcaption">The softphone during a call, simulated for the screenshot. The first answer is the app's real rendering for PO-10482</figcaption>
+  </figure>
+
+  <p>A typical exchange sounds like this:</p>
+
+  <blockquote><p>"What's the status of purchase order P O one zero four eight two?" — "Let me check that. Purchase order one zero four eight two from Summit Fasteners has shipped. The amount is forty-five thousand two hundred sixteen euros and eighteen cents. It was ordered on October fourth, twenty twenty-six, and delivery is due on October twenty-fourth, twenty twenty-six."</p></blockquote>
+
+  <p>Across the 20 lookup turns in the live test, Sonic started speaking a median 1.5 seconds after the caller's last words. When it takes longer than that, the host fills the gap with a recorded "One moment." (more on that below); in the live test that happened on 10 of the 20, all in the long call that rotated connections.</p>
+
+  <h2>Getting the code right</h2>
+
+  <p>Purchase-order codes are the hardest part of the call. People read them in groups, with pauses ("P O one ... zero four ... eight two"), and a speech model can decide the caller has finished at the first pause. Three components keep that from producing a wrong answer.</p>
+
+  <ul style="margin-bottom:1.3em">
+    <li><strong>A check digit in every code</strong> (<code>packages/tools/src/data/po-code.ts</code>). The last digit is computed from a weighted sum of the other four, so any single wrong digit makes the code invalid. A misheard code never reads out another order. In the live test's long call, one request was heard as PO-13345, and the caller heard "Sorry, purchase order one three three four five doesn't look like a valid purchase order code. Could you say it again, one digit at a time?"</li>
+    <li><strong>The reading hold</strong> (<code>packages/host/src/sonic/reading.ts</code>). If Sonic calls the lookup before the caller has said all five digits, the host holds the call. When the rest of the code arrives, it tells Sonic the caller is still reading, and Sonic calls again with the whole code. In testing it caught early calls such as PO-10400, and the lookup ran as PO-10482 about half a second after the last digit.</li>
+    <li><strong>A strict tool schema</strong> (<code>packages/tools/src/po-status</code>). The lookup accepts only <code>PO-</code> followed by exactly five digits. The agent itself never says "dash" or gives an example code, because Nova 2 Sonic readily repeats phrases from its prompt, and callers echo the agent's wording.</li>
+  </ul>
+
+  <h2>Speaking only what the lookup returned</h2>
+
+  <p>The lookup returns data and a finished sentence, its rendering. The system prompt tells Sonic to speak that rendering exactly, and three components make sure it did.</p>
+
+  <ul style="margin-bottom:1.3em">
+    <li><strong>The renderings</strong> (<code>packages/tools/src/render</code>, <code>packages/tools/src/po-status/render.ts</code>) turn amounts, dates and codes into speech: integer cents become "forty-five thousand two hundred sixteen euros and eighteen cents", codes are read digit by digit, and each order has a due date plus, when it is late, the new expected date.</li>
+    <li><strong>The answer guard</strong> (<code>packages/host/src/sonic/answer-guard.ts</code>). If Sonic starts speaking order details in a turn with no lookup, from memory of an earlier answer, the host stops that audio before the caller hears it and tells Sonic to look the order up.</li>
+    <li><strong>The speak nudge</strong> (<code>packages/host/src/sonic/speak-nudge.ts</code>). Occasionally Sonic receives a result and never speaks it. If a result stays unspoken for three seconds, the host sends Sonic a text message asking it to speak the result now, using Nova 2 Sonic's cross-modal input.</li>
+  </ul>
+
+  <p>The same rule appears in the traces as a check: any turn that speaks order data without a lookup result fails.</p>
+
+  <h2>A conversation, not a menu</h2>
+
+  <p><strong>Interruptions.</strong> Sonic detects when the caller talks over it and signals the host, which tells the browser to drop the audio it has queued. In the live test, "Wait, stop" 2.4 seconds into an answer stopped playback within 57 milliseconds, and the agent replied "Sure." The host waits until Sonic is ready before accepting caller audio, because a backlog of queued audio can make Sonic believe its answer has already finished, and then it sends no interruption signal at all.</p>
+
+  <p><strong>Silence.</strong> If no agent audio has started 1.5 seconds after the caller finishes (<code>packages/host/src/sonic/filler-timer.ts</code>), the caller hears "One moment." once. If the lookup itself takes more than three seconds (<code>packages/host/src/sonic/tool-timeout.ts</code>), they hear "Still checking, one moment.", the host retries once, and it discards a late first answer. If Sonic cannot be reached at all, the caller hears "Sorry, this line can't take your call right now. Please try again shortly." These phrases were recorded from Sonic itself in the same voice, Matthew, so they sound like the agent and are ready to play instantly.</p>
+
+  <h2>Calls longer than eight minutes</h2>
+
+  <p>A Nova 2 Sonic connection lasts at most eight minutes, and the app allows fifteen-minute calls. The rotator (<code>packages/host/src/sonic/rotator.ts</code>) follows AWS's session-continuation pattern: after six minutes, once the agent starts speaking, it opens a second connection in the background, keeps the last three seconds of caller audio, replays the conversation into the new connection and switches over.</p>
+
+  <p>Two details make it work in practice. The replayed history uses what the caller <em>heard</em>, taken from the playback ledger, not what Sonic generated, so an interrupted answer is not remembered as complete. And the new connection is told which order the lookup found last, so a follow-up such as "and the delivery date?" still leads to a lookup instead of a guess. In the live test, the rotation happened 381 seconds into the call with a 1 millisecond gap, and all 7.4 seconds of caller audio received during the handover reached Sonic.</p>
+
+  <h2>Two front doors</h2>
+
+  <p><strong>The softphone</strong> is a single page with the access code, a Call button, a status line and the transcript. <strong>The Connect calling page</strong> asks the host to start an Amazon Connect call (<code>StartWebRTCContact</code>) and joins it with the Amazon Chime SDK. On that path Connect runs its own contact flow and a Lex bot whose speech model is set to Nova 2 Sonic speech-to-speech, with the same voice. The bot calls the same lookup code as the host, through a Lambda function, so both doors give the same answer in the same words.</p>
+
+  <figure class="bt-figure">
+    <a href="supplier-line-connect-idle-dark.png"><img src="supplier-line-connect-idle-dark.png" alt="The Supplier Line Connect calling page in the dark scheme, idle: an access code field, a Call button and a status chip reading not on a call."/></a>
+    <figcaption class="bt-figcaption">The Connect calling page, dark scheme: the same design, joining an Amazon Connect call instead of the host directly</figcaption>
+  </figure>
+
+  <h3>Working within Amazon Connect</h3>
+
+  <p>Connect gives you a managed voice channel on its own terms. Four of them shaped the design, and each has a clear answer.</p>
+
+  <ul style="margin-bottom:1.3em">
+    <li><strong>Connect runs the conversation.</strong> With Nova Sonic as its speech model, Connect still routes every turn through its contact flow and Lex intents, so Sonic can't call tools the way it does in the host. Supplier Line models the lookup as one intent whose slot accepts exactly five digits, fulfilled by a Lambda that wraps the host's lookup and rendering code. The check digit and the exact wording carry over unchanged.</li>
+    <li><strong>Part of the setup lives outside infrastructure as code.</strong> Switching the bot to Nova Sonic speech-to-speech is a setting in the Connect admin website, and redeploying the bot resets it. So Connect lives in the persistent stack, which is never torn down, and the few manual steps are a short written checklist. The app stack comes and goes with every demo window without touching them.</li>
+    <li><strong>One voice everywhere.</strong> Connect offers four Nova Sonic voices. Choosing Matthew for both front doors means callers hear the same agent whichever way they come in.</li>
+    <li><strong>Least privilege, within Connect's limits.</strong> Starting a browser call needs <code>StartWebRTCContact</code> on a contact flow. The flow's IDs live in the persistent stack, and CDK's deploy role can't read them at deploy time. So the host's role gets the action on this account's contact flows only, and a template test locks that grant in.</li>
+  </ul>
+
+  <p>With no phone number, the Connect calling page is the bridge. It takes the same access code as the softphone, asks the host to start the contact, and joins it with the Chime SDK, so a browser reaches a real Connect contact flow.</p>
+
+  <h2>Seeing what the caller heard</h2>
+
+  <p>Every call writes a trace: one JSON file per session, in S3 when deployed. Each turn records how much audio Sonic planned, how much it generated and how much the browser actually played, plus latency, barge-in time, fillers and connection rotations. Six automated checks read every trace: the caller never heard more than was generated, a barge-in stopped playback quickly, a lookup's rendering was spoken in full, no order data was spoken without a lookup, silence never lasted too long, and a rotation lost no caller audio. The traces from the live test are committed to the repo, so these checks run against real deployed behaviour on every push.</p>
+
+  <figure class="bt-figure">
+    <a href="supplier-line-viewer-bargein-dark.png"><img src="supplier-line-viewer-bargein-dark.png" alt="The trace viewer, dark scheme, showing a real call from the live test. Turn 0: planned 9350 ms, generated 6360 ms, heard 2450 ms, with a dashed barge-in marker and the line "Barge-in at 2369 ms, playback flushed in 57 ms", followed by the lookup rendering and the words actually spoken. Turn 1: the agent says "Sure.""/></a>
+    <figcaption class="bt-figcaption">A real trace from the live test: the caller interrupted 2.4 s into the answer and heard 2.45 s of it</figcaption>
+  </figure>
+
+  <p>The trace viewer draws those three bars side by side for each turn. It made one bug easy to see: a trace once showed a garbled answer, but a recording of what the caller heard was perfect, and the fault turned out to be in how the trace matched Sonic's sentence confirmations, not in the call.</p>
+
+  <h2>Built for everyone</h2>
+
+  <p>All three pages meet WCAG 2.2 Level AA: text contrast of at least 4.5:1 and 3:1 for controls and chart bars in both light and dark schemes, a visible focus ring that is never hidden, targets of at least 24 pixels, layouts that reflow down to 320 pixels, call state announced to screen readers through a live region, and nothing conveyed by colour alone. An axe check runs on every push against each page, idle and in a simulated call.</p>
+
+  <figure class="bt-figure">
+    <div class="shot-row">
+      <a href="supplier-line-softphone-focus-light.png"><img src="supplier-line-softphone-focus-light.png" alt="The softphone in the light scheme with keyboard focus on the Call button, shown by a thick dark ring; the status chip reads Not on a call."/></a>
+      <a href="supplier-line-softphone-focus-dark.png"><img src="supplier-line-softphone-focus-dark.png" alt="The same softphone view in the dark scheme, with the same visible focus ring on the Call button."/></a>
+      <a href="supplier-line-softphone-call-320.png"><img src="supplier-line-softphone-call-320.png" alt="The softphone during a call at 320 pixels wide, with the layout reflowed into a single column and no horizontal scrolling."/></a>
+    </div>
+    <figcaption class="bt-figcaption">WCAG 2.2 AA in practice: a visible focus ring in both schemes, and the same page reflowed at 320 px. Axe reports 0 violations on every page</figcaption>
+  </figure>
+
+  <h2>Safe to run in the open</h2>
+
+  <figure class="bt-figure">
+    <a href="supplier-line-architecture.svg"><img src="supplier-line-architecture.svg" alt="Architecture diagram of Supplier Line in AWS us-east-1: browser pages reach CloudFront, which serves the site from S3 and forwards /ws and /api through an ALB to a Fargate session host that streams to Amazon Nova 2 Sonic. The app stack exists only during an approved window. A persistent stack holds ECR, the traces bucket, SSM parameters, the reaper Lambda, Amazon Connect with its Lex bot and lookup Lambda, GitHub roles and alerts."/></a>
+    <figcaption class="bt-figcaption">The deployment: a temporary app stack for each approved window, and a persistent stack with no hourly charges. Select to enlarge</figcaption>
+  </figure>
+
+  <ul style="margin-bottom:1.3em">
+    <li><strong>An access code</strong> guards both the WebSocket and the Connect endpoint, checked before any model call. Softphone calls last at most fifteen minutes, with a spoken one-minute warning, and at most two run at once.</li>
+    <li><strong>The app exists only while I say so.</strong> The web-facing stack, CloudFront, a load balancer and one ARM64 Fargate task, deploys only through a GitHub workflow I approve, for one to eight hours.</li>
+    <li><strong>A reaper Lambda</strong> checks every ten minutes and deletes the stack when its window expires, with email alerts, an alarm if it fails, and a heartbeat alarm if it stops running.</li>
+    <li><strong>The rest costs almost nothing idle.</strong> The persistent stack holds the container registry, the traces bucket, the Connect instance and the reaper, with no hourly charges.</li>
+  </ul>
+
+  <h2>What is not built</h2>
+
+  <p>The app speaks English only. Barge-in is detected by the model, not by the browser. There is no phone number, no login beyond the access code, and no reasoning model behind the lookup. These were deliberate cuts for a short build, and each is written down in the repository's decision records.</p>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="../eng/ai-sdlc-voice-agent.html" class="related-post-card">
+        <div class="rpc-tag">AI Coding</div>
+        <div class="rpc-title">How an orchestrator-driven AI SDLC built a real-time AI voice app</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &middot; AI Solution Architect &middot; September 2026</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>
