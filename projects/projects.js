@@ -6,6 +6,40 @@
    Order here is the display order — there is no date sort. */
 window.aiProjects = [
   {
+    "slug": "supplier-line",
+    "file": "supplier-line.html",
+    "title": "Supplier Line",
+    "description": "A real-time voice agent on Amazon Nova 2 Sonic that answers purchase-order status from a browser softphone or an Amazon Connect call. A check digit stops a misheard code from reading out the wrong order, a barge-in stops playback in 57 ms, and a session rotates past Sonic's 8-minute connection limit with no lost caller audio. Built end to end by an AI orchestrator running 23 work streams from a written plan.",
+    "tags": [
+      "Voice AI",
+      "Nova Sonic",
+      "Amazon Connect"
+    ],
+    "status": "Deployed · on demand",
+    "stack": [
+      "Amazon Nova 2 Sonic",
+      "Amazon Connect",
+      "AWS Fargate",
+      "CloudFront",
+      "AWS CDK",
+      "GitHub OIDC"
+    ],
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/gpazevedo/supplier-line"
+      },
+      {
+        "label": "How it works",
+        "href": "blog/eng/supplier-line-voice-agent.html"
+      },
+      {
+        "label": "How it was built",
+        "href": "blog/eng/ai-sdlc-voice-agent.html"
+      }
+    ]
+  },
+  {
     "slug": "buyer-team",
     "file": "buyer-team.html",
     "title": "Buyer Team",
