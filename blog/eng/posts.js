@@ -2,6 +2,33 @@
    Add one entry per file in this folder. Ties keep the order listed here. */
 window.engPosts = [
   {
+    "slug": "multi-fork-inventory",
+    "file": "multi-fork-inventory.html",
+    "title": "Dozens of forks, one codebase: find out what each fork does",
+    "description": "Before consolidating dozens of forks of a Spring Boot SaaS, inventory them: fingerprint every unit, compare each fork three ways, track changes by patch-id, and let AI name behavior under a judge.",
+    "tags": ["Legacy Modernization"],
+    "date": "2026-10-23",
+    "readingTime": 16
+  },
+  {
+    "slug": "multi-fork-variability",
+    "file": "multi-fork-variability.html",
+    "title": "Dozens of forks, one codebase: model every variant, then prove nothing changed",
+    "description": "Turn a multi-fork inventory into variants with concrete values, pick the smallest variation mechanism for each, and prove behavior survived by mirroring reads live and replaying writes offline.",
+    "tags": ["Legacy Modernization"],
+    "date": "2026-10-23",
+    "readingTime": 14
+  },
+  {
+    "slug": "multi-fork-cutover",
+    "file": "multi-fork-cutover.html",
+    "title": "Dozens of forks, one codebase: move every tenant, then keep the forks from growing back",
+    "description": "Cutting tenants over from dozens of forks to one codebase: shared-deployment prerequisites, three tenant tiers and their paths, flag governance with an audit trail, and the organizational rules that stop new forks.",
+    "tags": ["Legacy Modernization"],
+    "date": "2026-10-23",
+    "readingTime": 14
+  },
+  {
     "slug": "supplier-line-voice-agent",
     "file": "supplier-line-voice-agent.html",
     "title": "Inside a real-time AI voice agent: what each part of Supplier Line does",
