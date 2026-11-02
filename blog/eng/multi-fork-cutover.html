@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Dozens of forks, one codebase: move every tenant, then keep the forks from growing back — Gustavo Azevedo</title>
+<meta name="description" content="Cutting tenants over from dozens of forks to one codebase: shared-deployment prerequisites, three tenant tiers and their paths, flag governance with an audit trail, and the organizational rules that stop new forks."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/multi-fork-cutover.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/multi-fork-cutover.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Dozens of forks, one codebase: move every tenant, then keep the forks from growing back"/>
+<meta property="og:description" content="Cutting tenants over from dozens of forks to one codebase: shared-deployment prerequisites, three tenant tiers and their paths, flag governance with an audit trail, and the organizational rules that stop new forks."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-10-23T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-10-23T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Legacy Modernization"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Dozens of forks, one codebase: move every tenant, then keep the forks from growing back"/>
+<meta name="twitter:description" content="Cutting tenants over from dozens of forks to one codebase: shared-deployment prerequisites, three tenant tiers and their paths, flag governance with an audit trail, and the organizational rules that stop new forks."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Dozens of forks, one codebase: move every tenant, then keep the forks from growing back","description":"Cutting tenants over from dozens of forks to one codebase: shared-deployment prerequisites, three tenant tiers and their paths, flag governance with an audit trail, and the organizational rules that stop new forks.","datePublished":"2026-10-23","dateModified":"2026-10-23","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/multi-fork-cutover.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/multi-fork-cutover.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Dozens of forks, one codebase: move every tenant, then keep the forks from growing back","item":"https://gpazevedo.github.io/blog/eng/multi-fork-cutover.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+  /* Cutover-paths diagram: theme-aware via the design tokens. */
+  .mf-svg .box    { fill: var(--surface); stroke: var(--rule); stroke-width: 1.5; }
+  .mf-svg .box-t  { fill: var(--teal-light);  stroke: var(--teal);  stroke-width: 1.5; }
+  .mf-svg .box-a  { fill: var(--amber-light); stroke: var(--amber); stroke-width: 1.5; }
+  .mf-svg .box-b  { fill: var(--blue-light);  stroke: var(--blue);  stroke-width: 1.5; }
+  .mf-svg .move   { fill: var(--coral-light); stroke: var(--coral); stroke-width: 2; }
+  .mf-svg .arrow  { stroke: var(--ink-muted); stroke-width: 1.5; fill: none; marker-end: url(#mf-arrow3); }
+  .mf-svg .head   { fill: var(--ink-muted); }
+  .mf-svg .lane   { fill: var(--ink); font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: .06em; }
+  .mf-svg .lbl    { fill: var(--ink); font-family: var(--sans); font-size: 12px; font-weight: 500; }
+  .mf-svg .sub    { fill: var(--ink-muted); font-family: var(--sans); font-size: 11px; }
+  .mf-svg .rule   { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 4 4; }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Legacy Modernization</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Legacy Modernization</span>
+    <span class="dot">·</span>
+    <time datetime="2026-10-23">October 2026</time>
+    <span class="dot">·</span>
+    <span>14 min read</span>
+  </div>
+
+  <h1>Dozens of forks, one codebase: <em>move every tenant, then keep the forks from growing back</em></h1>
+  <p class="deck">The last part of the playbook: what a shared deployment needs, how each kind of tenant moves, and the rules that keep one codebase from becoming dozens again.</p>
+
+  <div class="tldr">
+    <div class="tldr-label">TL;DR</div>
+    <p><strong>The problem.</strong> After <a href="multi-fork-inventory.html">the inventory</a> and <a href="multi-fork-variability.html">the variability model</a>, the base can reproduce every variant a fork's tenants use. Now real customers have to move onto it, some of them under contracts that treat any change as an event, and the organization that produced the forks has to stop producing them.</p>
+    <p><strong>What you get.</strong> The four things a shared deployment needs before the first tenant arrives; three tenant tiers, each with its own cutover path; two kinds of flags kept strictly apart, with an owner, an expiry and an audit trail; the order of work; and the governance, metrics and risks that decide whether any of it lasts.</p>
+    <p><strong>Why it's worth your time.</strong> Moving a tenant swaps all the code under it at once. That's fine for most tenants, and it isn't for the ones whose contracts require each change to be switched separately. There are two ways to make the move a non-event, and which one fits depends on a single question about what the contract controls.</p>
+    <p><strong>Status.</strong> A design, written before it was run, like the rest of the series.</p>
+    <p><strong>Part 3 of 3.</strong> Follows <a href="multi-fork-inventory.html">Part 1: the inventory</a> and <a href="multi-fork-variability.html">Part 2: variability and proof</a>.</p>
+  </div>
+
+  <p>Parts 1 and 2 were about knowing. This one is about moving: real tenants, real production systems, and a calendar. It's also about the part no tool fixes. The forks exist because, for years, copying the code was the easiest way to say yes to a customer. If that's still true the day the last fork is retired, the first new fork appears the week after.</p>
+
+  <h2>Build the base one fork at a time</h2>
+
+  <p>The base absorbs every variant; the fork branches aren't refactored. When the base can reproduce every variant a fork's tenants use, that fork has nothing left to refactor, and its tenants move onto the base's code with the right configuration. Meanwhile the forks become three things:</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-blue">❄</div><div class="tcard-title">Frozen</div></div>
+      <p>No changes except urgent fixes, and every urgent fix is applied to the base too.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-amber">⌕</div><div class="tcard-title">The reference</div></div>
+      <p>Codex reads a fork's implementation and reimplements it as a variant in the base. Nothing is merged from the fork.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-teal">⚖</div><div class="tcard-title">The oracle</div></div>
+      <p>Replaying a tenant's traffic against the fork and against the base with that tenant's configuration proves behavior survived.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-coral">✕</div><div class="tcard-title">Not a destination</div></div>
+      <p>From day one, all new tenant-specific work goes into the base behind a variation point, never into a fork branch.</p>
+    </div>
+  </div>
+
+  <p>Start with the fork closest to the base, since it needs the fewest variants. Add its variants to the base one variant per pull request, with the base's default behavior unchanged and replay as the merge gate, so no tenant's behavior changes yet. Cut its tenants over, learn, and move to the next fork. Each fork needs fewer new variation points than the last, because the shared variants already exist.</p>
+
+  <p><strong>Decide the base-side changes before any tenant moves.</strong> For every "stale" item from the inventory, choose between keeping the fork's old behavior (it becomes a variant in the base) and adopting the base's version, as you would for bug and security fixes. Adopted changes do alter a tenant's behavior at cutover, so tell the tenant in advance.</p>
+
+  <h2>What a shared deployment needs first</h2>
+
+  <p>One deployment serving every tenant needs four things in the base before any fork's tenants can move onto it.</p>
+
+  <h3>1 · Every code path knows which tenant it's serving</h3>
+
+  <p>HTTP requests are the easy case. The usual places it breaks: scheduled jobs, message consumers, async executors, outbound calls, and caches. A cache key without the tenant ID leaks data between tenants. A fork that only ever served its own customers may never have needed a tenant context at all, which is why the census records how each fork identifies tenants.</p>
+
+  <h3>2 · Jobs run once per cluster</h3>
+
+  <p>Every <code>@Scheduled</code> method fires on every pod of a shared deployment, so jobs need a cluster lock (ShedLock) or a clustered scheduler. Each run then fans out per tenant. A value that differs per tenant, such as reminding after 7 or 15 days, is a per-tenant check inside that one run. Only a difference in <em>when</em> the job runs (cron, time zone) needs a tenant-aware scheduler such as JobRunr, Quartz or db-scheduler.</p>
+
+  <h3>3 · One set of dependencies</h3>
+
+  <p>The shared deployment runs only the base's platform. The forks stay on their own Java and Spring Boot versions, since nothing is merged from them; variants are reimplemented in the base. So upgrade the base to the target platform <em>before</em> the first tenant moves. Only forks that must catch up in place (Option B, below) upgrade too.</p>
+
+  <h3>4 · Isolation, and connections sized by server</h3>
+
+  <p>A bug in one variant can now reach every tenant. Add a kill switch per variant per tenant, rate limits per tenant, and logs and metrics tagged by tenant and variant.</p>
+
+  <p>Connection pools follow the database topology. Size them per database server, never per tenant: with many tenants, a pool each would exhaust the server's connection limit. Schema-per-tenant can share one pool and set the schema at checkout. Database-per-tenant needs bounded pools created on demand and closed when idle, or a multiplexing proxy such as PgBouncer or RDS Proxy. Session-level settings can pin RDS Proxy connections, so test that before relying on it.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Before consolidating single-tenant code into a shared deployment, audit the <strong>five places tenant context gets lost</strong> (jobs, consumers, async work, outbound calls, cache keys) and put a <strong>cluster lock on every scheduled job</strong>. Both failures are silent until two tenants share a pod.</p>
+  </div>
+
+  <h2>Three tenant tiers, three paths</h2>
+
+  <p>Tenants move one at a time, and each tenant's tier decides how. Whoever owns the contracts places each tenant in a tier.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tier</th><th>Requirement</th><th>Path</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Standard</strong></td><td>Nothing beyond the SLA</td><td>A single cutover per tenant</td></tr>
+        <tr class="row-gov"><td><strong>Functional control</strong></td><td>Each <em>behavior</em> change switched on separately</td><td>Option A</td></tr>
+        <tr class="row-quality"><td><strong>Code isolation</strong></td><td>Each <em>code-path</em> change switched on separately</td><td>Option B</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure class="diagram">
+    <svg class="mf-svg" viewBox="0 0 700 330" role="img" aria-label="Three cutover paths. Standard: configure every variant to the fork's behavior, compare with mirroring and replay, switch routing, keep the fork as fallback. Option A: a behavior-neutral move with even bug fixes off, then each behavior change flipped separately per tenant. Option B: catch the fork up with the base in place, one change at a time behind flags, switch variant by variant, and move only when the fork's diff from the base is zero, as an infrastructure change.">
+      <defs>
+        <marker id="mf-arrow3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="head" d="M0,0 L10,5 L0,10 z"/>
+        </marker>
+      </defs>
+
+      <text class="lane" x="20" y="24">STANDARD</text>
+      <rect class="box-t" x="20" y="36" width="150" height="54" rx="8"/>
+      <text class="lbl" x="95" y="59" text-anchor="middle">Config = fork behavior</text>
+      <text class="sub" x="95" y="76" text-anchor="middle">every variant set</text>
+      <rect class="box-t" x="200" y="36" width="150" height="54" rx="8"/>
+      <text class="lbl" x="275" y="59" text-anchor="middle">Mirror + replay</text>
+      <text class="sub" x="275" y="76" text-anchor="middle">days</text>
+      <rect class="move" x="380" y="36" width="130" height="54" rx="8"/>
+      <text class="lbl" x="445" y="59" text-anchor="middle">Move</text>
+      <text class="sub" x="445" y="76" text-anchor="middle">switch routing</text>
+      <rect class="box" x="540" y="36" width="140" height="54" rx="8"/>
+      <text class="lbl" x="610" y="59" text-anchor="middle">Fork as fallback</text>
+      <text class="sub" x="610" y="76" text-anchor="middle">until stable</text>
+      <path class="arrow" d="M170,63 L196,63"/><path class="arrow" d="M350,63 L376,63"/><path class="arrow" d="M510,63 L536,63"/>
+
+      <line class="rule" x1="20" y1="112" x2="680" y2="112"/>
+
+      <text class="lane" x="20" y="136">OPTION A · FUNCTIONAL CONTROL</text>
+      <rect class="box-a" x="20" y="148" width="150" height="54" rx="8"/>
+      <text class="lbl" x="95" y="171" text-anchor="middle">Config = fork exactly</text>
+      <text class="sub" x="95" y="188" text-anchor="middle">even bug fixes off</text>
+      <rect class="box-a" x="200" y="148" width="150" height="54" rx="8"/>
+      <text class="lbl" x="275" y="171" text-anchor="middle">Mirror + replay</text>
+      <text class="sub" x="275" y="188" text-anchor="middle">weeks, not days</text>
+      <rect class="move" x="380" y="148" width="130" height="54" rx="8"/>
+      <text class="lbl" x="445" y="171" text-anchor="middle">Neutral move</text>
+      <text class="sub" x="445" y="188" text-anchor="middle">no behavior change</text>
+      <rect class="box-a" x="540" y="148" width="140" height="54" rx="8"/>
+      <text class="lbl" x="610" y="171" text-anchor="middle">Flip each change</text>
+      <text class="sub" x="610" y="188" text-anchor="middle">per tenant, on schedule</text>
+      <path class="arrow" d="M170,175 L196,175"/><path class="arrow" d="M350,175 L376,175"/><path class="arrow" d="M510,175 L536,175"/>
+
+      <line class="rule" x1="20" y1="224" x2="680" y2="224"/>
+
+      <text class="lane" x="20" y="248">OPTION B · CODE ISOLATION</text>
+      <rect class="box-b" x="20" y="260" width="150" height="54" rx="8"/>
+      <text class="lbl" x="95" y="283" text-anchor="middle">Catch the fork up</text>
+      <text class="sub" x="95" y="300" text-anchor="middle">release by release, flags</text>
+      <rect class="box-b" x="200" y="260" width="150" height="54" rx="8"/>
+      <text class="lbl" x="275" y="283" text-anchor="middle">Switch per variant</text>
+      <text class="sub" x="275" y="300" text-anchor="middle">in the fork deployment</text>
+      <rect class="box-b" x="380" y="260" width="130" height="54" rx="8"/>
+      <text class="lbl" x="445" y="283" text-anchor="middle">Diff = zero</text>
+      <text class="sub" x="445" y="300" text-anchor="middle">fork runs base code</text>
+      <rect class="move" x="540" y="260" width="140" height="54" rx="8"/>
+      <text class="lbl" x="610" y="283" text-anchor="middle">Move</text>
+      <text class="sub" x="610" y="300" text-anchor="middle">infrastructure only</text>
+      <path class="arrow" d="M170,287 L196,287"/><path class="arrow" d="M350,287 L376,287"/><path class="arrow" d="M510,287 L536,287"/>
+    </svg>
+    <figcaption>Where the <strong>move</strong> happens in each path: in A it carries no behavior change, in B no code change.</figcaption>
+  </figure>
+
+  <h3>The standard cutover</h3>
+
+  <ol style="margin-bottom:1.3em">
+    <li><strong>Load the tenant's configuration:</strong> every variant set to its fork's behavior.</li>
+    <li><strong>Apply the additive migrations</strong> and validate the base's entity model against the tenant's database.</li>
+    <li><strong>Compare:</strong> mirror the tenant's live reads to the shared deployment, replay its captured writes against a snapshot. Each variant maps to known units, so each divergence points at a specific variant.</li>
+    <li><strong>Switch routing</strong> at the gateway.</li>
+    <li><strong>Keep the fork deployment as a fallback</strong> until things are stable. The fork's code must still run against the tenant's database during that window, which is why the schema changes were additive.</li>
+  </ol>
+
+  <p>A tenant of any tier can also run on its own <strong>dedicated deployment of the base</strong> when it needs infrastructure isolation: noisy neighbors, data residency, its own maintenance window. That's a deployment choice, not a tier. The move still swaps all the code at once, so it doesn't satisfy a code-isolation requirement.</p>
+
+  <h3>Option A: a behavior-neutral move, then per-variant switches</h3>
+
+  <p>For contracts that govern changes in <strong>functional behavior</strong>.</p>
+
+  <ul>
+    <li><strong>Before the move,</strong> every variant reproduces the fork's behavior exactly, including the old behavior for base-side changes the fork never received. Even bug fixes stay off for this tenant until each is switched on individually.</li>
+    <li><strong>Evidence:</strong> session replay plus a longer period of mirrored reads than usual, weeks rather than days. Together they show the move changes nothing.</li>
+    <li><strong>After the move,</strong> every behavior change, whether adopting the base's version or standardizing, is a separate per-tenant flag flip, scheduled as the contract requires.</li>
+    <li><strong>Cost:</strong> no fork refactoring. These tenants follow the standard path with stricter configuration and a higher bar of evidence.</li>
+  </ul>
+
+  <h3>Option B: per-variant code switches in the fork deployment</h3>
+
+  <p>For risk profiles that require <strong>each code change to be isolated</strong>, so a problem can only ever affect one variant.</p>
+
+  <ol style="margin-bottom:1.3em">
+    <li><strong>Catch the fork up with the base, one release at a time,</strong> with every base-side behavior change behind a flag that defaults to the old behavior for these tenants. git-imerge pins each conflict to the pair of commits that caused it. Each step is a release tag that must build and pass its tests; a platform jump such as <code>javax</code> to <code>jakarta</code> uses OpenRewrite recipes at the release where the base made it.</li>
+    <li><strong>Switch variant by variant.</strong> For each variant, the unified path sits beside the old one, chosen per tenant by a migration flag (branch by abstraction). For side-effect-free logic, run both paths and log divergences: the Scientist pattern, Scientist4J in Java.</li>
+    <li><strong>Move with no code change.</strong> When the fork's diff from the base reaches zero, its deployment is already running the base's code, and moving to the shared deployment is an infrastructure change only.</li>
+  </ol>
+
+  <p><strong>Cost:</strong> the catch-up touches every tenant on that fork. One strict tenant puts its whole fork on this path, so budget Option B per fork, not per tenant, and start it as soon as the inventory has classified the base-side changes. It's the longest piece of work; run it in parallel.</p>
+
+  <div class="callout">
+    <div class="callout-label">The question that decides A or B</div>
+    <p>Do the strict contracts govern changes in <strong>functional behavior</strong>, or <strong>any change to the code</strong> that serves the tenant? If it's behavior, Option A covers these tenants and no fork has to be refactored in place. Ask the contract owners early; the answer can remove the program's longest workstream. And whatever the answer, security fixes usually can't wait for per-variant scheduling, so check each contract's terms for emergency changes.</p>
+  </div>
+
+  <p>Whatever the path, every flip of a <strong>stateful</strong> variant applies the switch strategy recorded in <a href="multi-fork-variability.html">Part 2</a>: drain, migrate or version the in-flight work before the flag counts as switched. In a full cutover, in-flight work on the fork either drains there before routing changes or is migrated with the tenant's data. And the old path must be able to read whatever the new one wrote until the fallback window closes.</p>
+
+  <h2>Flags: two kinds, never mixed</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th></th><th>Variant configuration</th><th>Migration flag</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Purpose</strong></td><td>Which behavior a tenant gets</td><td>Old vs. unified path during a switch</td></tr>
+        <tr><td><strong>Lifetime</strong></td><td>Permanent</td><td>Days to weeks</td></tr>
+        <tr><td><strong>Removed</strong></td><td>When the variant is retired</td><td>When every tenant on the fork is on the unified path</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Give every migration flag an owner and an expiry date, and make CI fail on expired ones. Otherwise the flags become the next layer of debt. One tenant configuration and flag service serves the shared deployment and the caught-up Option B forks alike, so a tenant's settings carry over unchanged when it moves.</p>
+
+  <p>For contract-sensitive tenants, <strong>each flip is a change record</strong>. Log who flipped it and when, which tenant and variant, the approval reference, the replay or mirrored-traffic evidence behind it, and the fallback window. If a contract requires notice before behavior changes, the tenant's list of pending variants <em>is</em> its change calendar. And a kill switch per variant per tenant keeps every reversal a single flag change.</p>
+
+  <h3>Tracking to zero</h3>
+
+  <p>Every (variant, fork, tenant) combination moves through the same states:</p>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">1</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Decided</div><div class="pipe-desc">Drop, adopt the base's behavior, or preserve.</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">2</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">In the base</div><div class="pipe-desc">Implemented behind its variation point, default unchanged.</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">3</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Verified</div><div class="pipe-desc">Replay and mirrored reads show the tenant can't tell the difference.</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">4</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Switched on</div><div class="pipe-desc">With its audit record.</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">5</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Old code removed</div><div class="pipe-desc">The only state that actually reduces the codebase.</div></div>
+    </div>
+  </div>
+
+  <p>The concept × fork matrix from Part 1 becomes the burn-down chart: every cell that isn't "same" is work left. A per-tenant view shows how many of each tenant's variants are on the unified path. Rerun the inventory weekly; the cache makes it cheap.</p>
+
+  <h3>A view the contract owners can read</h3>
+
+  <p>Contract owners and reviewers need to see what can change for each tenant without reading code. A view generated from the inventory adapts the runtime adaptability viewpoint of Tekinerdogan and Sözer, which records what can adapt independently of the mechanism. It needs one extension: the active mode is per tenant, not system-wide.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Table</th><th>Rows × columns</th><th>Cell values</th></tr></thead>
+      <tbody>
+        <tr><td>Variation points</td><td>Variation point × variant</td><td>A (adapted: value or mode), R (replaced), RS (replaced with state)</td></tr>
+        <tr><td>Tenant modes</td><td>Tenant × variation point</td><td>The tenant's active variant</td></tr>
+        <tr><td>Deployment</td><td>Tenant × deployment</td><td>Fork or shared, plus cutover state: mirroring reads (both copies run), switched with fallback open (one copy serves), done</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Generate it from the inventory store; never maintain it by hand. With hundreds of variants and dozens of tenants, only generated tables stay current, and the authors themselves note their notation needs tool support at scale.</p>
+
+  <h2>The order of work</h2>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">1</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Census</div><div class="pipe-desc">Code, build files and dependencies, tenancy model, schemas.</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">2</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Upgrade the base</div><div class="pipe-desc">To the target Java and Spring Boot versions. The forks keep theirs.</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">3</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Harden tenant context in the base</div><div class="pipe-desc">Jobs once per cluster, consumers, async work, caches.</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">4</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Inventory pilot, then the full inventory</div><div class="pipe-desc">Two forks first; then every fork, and the variability model.</div><div class="pipe-pass">✓ coverage, accuracy, cost and rubric pass → scale</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">5</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Mechanism pilot</div><div class="pipe-desc">Each variation mechanism proven end to end on a real variant.</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">6</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Fork by fork, closest first</div><div class="pipe-desc">Its variants into the base, one per pull request.</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">7</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Cut over that fork's tenants</div><div class="pipe-desc">One at a time, by tier.</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">8</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Retire the fork</div><div class="pipe-desc">Its deployment and its branch.</div></div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">9</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body"><div class="pipe-title">Standardize over time</div><div class="pipe-desc">Variant by variant and tenant by tenant, wherever the business agrees.</div></div>
+    </div>
+  </div>
+
+  <p>Three things run in parallel from the start: <strong>capturing usage and traffic</strong>, because the evidence needs weeks; <strong>the Option B catch-ups</strong>, as soon as the inventory has classified the base-side changes; and <strong>the no-new-divergence rule</strong>, from day one.</p>
+
+  <p>If a cloud move is also on the roadmap, make convergence its precondition: move the unified base once, rather than lifting and shifting dozens of forks. Design one artifact that can run pooled (multi-tenant) or siloed (one tenant per deployment), keep tenant configuration in a config service and secrets in a secrets manager, and tag observability by tenant from the start.</p>
+
+  <h2>The half no tool fixes</h2>
+
+  <p>Convergence only holds with a sponsor who will stop new forks, and with protected capacity for the team doing it. The questions worth asking in week one:</p>
+
+  <ul>
+    <li><strong>Intent.</strong> Grow the product, maintain it, or migrate its customers elsewhere? (Part 1's first table.)</li>
+    <li><strong>Authority.</strong> Can new forks be stopped? Who approves customer-specific requests from now on?</li>
+    <li><strong>Capacity.</strong> How much of the team goes to convergence versus maintenance? Something like 70/30 at first is realistic; zero means it doesn't happen.</li>
+    <li><strong>Success.</strong> What does success look like at 6 and 12 months, and how will it be measured?</li>
+    <li><strong>Contracts.</strong> Does any agreement promise specific behavior or a dedicated version?</li>
+    <li><strong>People.</strong> Is anyone from the original team still here? They're the most valuable asset and the biggest key-person risk.</li>
+  </ul>
+
+  <h3>Governance against new forks</h3>
+
+  <ul>
+    <li>A <strong>"no new forks" policy</strong>, agreed with product and commercial leadership.</li>
+    <li>Every customer request goes through <strong>one intake</strong>.</li>
+    <li>A small <strong>architecture forum</strong>, with product and customer success, places each request on the variation ladder from Part 2: configuration, flag, extension point, or no.</li>
+    <li>A <strong>review gate in CI</strong> (an AI reviewer plus ArchUnit) enforces the rule automatically.</li>
+  </ul>
+
+  <p>Organize a dedicated convergence squad beside a maintenance team, rotating people between them to spread knowledge, and let the team that designs the extension points own them. Bring customer success in early: some customizations are cheaper to negotiate away than to preserve.</p>
+
+  <h3>What leadership should see</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Metric</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr><td>Active forks</td><td>Shows fragmentation falling</td></tr>
+        <tr><td>% of customers on the unified base</td><td>Measures real progress</td></tr>
+        <tr><td>Time for a fix to reach every customer</td><td>Turns the cost of forking into time</td></tr>
+        <tr><td>Hours per security patch</td><td>Turns the cost of forking into money</td></tr>
+        <tr><td>AI acceleration: forks analyzed per week, AI-generated tests accepted, agent PR merge rate</td><td>Evidence that the tooling is paying for itself</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The risks that sink these programs</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Risk</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td>The temptation to rewrite from scratch</td><td>Strangler-style convergence, customer by customer</td></tr>
+        <tr><td>A customer regression during cutover</td><td>Characterization tests, mirrored reads, replayed writes, one tenant at a time</td></tr>
+        <tr><td>Burnout between convergence and support</td><td>Protect the capacity split</td></tr>
+        <tr><td>Losing the original team's knowledge</td><td>Retain people and capture what they know early</td></tr>
+        <tr><td>A parallel infrastructure plan that moves the forks as they are</td><td>Align with its owner in week one</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>The questions that change the plan</h2>
+
+  <p>A design written before reading the code should end with what it doesn't know. Each of these changes the plan depending on the answer:</p>
+
+  <ul>
+    <li><strong>What do the strict contracts govern:</strong> functional behavior, or any code change? The answer decides between Option A and Option B.</li>
+    <li><strong>What's the database topology</strong> (per fork, per tenant, shared), the engine, and the number of tenants per fork? Together they set connection pooling. The census answers it.</li>
+    <li><strong>How wide is the Java and Spring Boot version spread?</strong> The census answers it too.</li>
+    <li><strong>Is the commit history meaningful</strong> (clear messages, ticket IDs), or was it squashed? That affects provenance quality, not which concepts are found.</li>
+    <li><strong>Can the forks' outbound traffic be recorded</strong> (egress proxy or mesh, TLS interception)? If not, outbound behavior is verified by characterization tests alone.</li>
+  </ul>
+
+  <div class="bt-callout">
+    Across three parts the pattern is the same. <strong>Measure before deciding, decide before moving, and move one variant and one tenant at a time</strong>, with evidence the change can't fake. The technique gets the forks back into one codebase. Only the governance keeps them there.
+  </div>
+
+  <div class="related-posts">
+    <div class="related-posts-label">The series</div>
+    <div class="related-posts-grid">
+      <a href="multi-fork-inventory.html" class="related-post-card">
+        <div class="rpc-tag">Legacy Modernization</div>
+        <div class="rpc-title">Part 1 · Dozens of forks, one codebase: find out what each fork does</div>
+      </a>
+      <a href="multi-fork-variability.html" class="related-post-card">
+        <div class="rpc-tag">Legacy Modernization</div>
+        <div class="rpc-title">Part 2 · Dozens of forks, one codebase: model every variant, then prove nothing changed</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; October 2026</p>
+    <p>Part 3 of 3 · A design, written before it was run. <a href="multi-fork-inventory.html">Part 1: the inventory</a> · <a href="multi-fork-variability.html">Part 2: variability and proof</a></p>
+    <p>Runtime view adapted from B. Tekinerdogan and H. Sözer, "An Architecture Viewpoint for Modeling Dynamically Configurable Software Systems", in <em>Managing Trade-offs in Adaptable Software Architectures</em>, chapter 4.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Dozens of forks, one codebase: model every variant, then prove nothing changed — Gustavo Azevedo</title>
+<meta name="description" content="Turn a multi-fork inventory into variants with concrete values, pick the smallest variation mechanism for each, and prove behavior survived by mirroring reads live and replaying writes offline."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/multi-fork-variability.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/multi-fork-variability.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Dozens of forks, one codebase: model every variant, then prove nothing changed"/>
+<meta property="og:description" content="Turn a multi-fork inventory into variants with concrete values, pick the smallest variation mechanism for each, and prove behavior survived by mirroring reads live and replaying writes offline."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-10-23T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-10-23T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Legacy Modernization"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Dozens of forks, one codebase: model every variant, then prove nothing changed"/>
+<meta name="twitter:description" content="Turn a multi-fork inventory into variants with concrete values, pick the smallest variation mechanism for each, and prove behavior survived by mirroring reads live and replaying writes offline."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Dozens of forks, one codebase: model every variant, then prove nothing changed","description":"Turn a multi-fork inventory into variants with concrete values, pick the smallest variation mechanism for each, and prove behavior survived by mirroring reads live and replaying writes offline.","datePublished":"2026-10-23","dateModified":"2026-10-23","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/multi-fork-variability.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/multi-fork-variability.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Dozens of forks, one codebase: model every variant, then prove nothing changed","item":"https://gpazevedo.github.io/blog/eng/multi-fork-variability.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+  /* Mirror-vs-replay diagram: theme-aware via the design tokens. */
+  .mf-svg .box    { fill: var(--surface); stroke: var(--rule); stroke-width: 1.5; }
+  .mf-svg .box-t  { fill: var(--teal-light);  stroke: var(--teal);  stroke-width: 1.5; }
+  .mf-svg .box-a  { fill: var(--amber-light); stroke: var(--amber); stroke-width: 1.5; }
+  .mf-svg .box-c  { fill: var(--coral-light); stroke: var(--coral); stroke-width: 1.5; }
+  .mf-svg .arrow  { stroke: var(--ink-muted); stroke-width: 1.5; fill: none; marker-end: url(#mf-arrow); }
+  .mf-svg .head   { fill: var(--ink-muted); }
+  .mf-svg .lane   { fill: var(--ink); font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: .06em; }
+  .mf-svg .lbl    { fill: var(--ink); font-family: var(--sans); font-size: 12.5px; font-weight: 500; }
+  .mf-svg .sub    { fill: var(--ink-muted); font-family: var(--sans); font-size: 11px; }
+  .mf-svg .rule   { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 4 4; }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Legacy Modernization</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Legacy Modernization</span>
+    <span class="dot">·</span>
+    <time datetime="2026-10-23">October 2026</time>
+    <span class="dot">·</span>
+    <span>14 min read</span>
+  </div>
+
+  <h1>Dozens of forks, one codebase: <em>model every variant, then prove nothing changed</em></h1>
+  <p class="deck">The inventory says what each fork does. This part decides how one codebase will do all of it, and how you'll know it does.</p>
+
+  <div class="tldr">
+    <div class="tldr-label">TL;DR</div>
+    <p><strong>The problem.</strong> <a href="multi-fork-inventory.html">Part 1</a> produced a concept × fork matrix: every behavior, and where each fork differs. One codebase now has to reproduce every difference a tenant still uses, switchable per tenant at runtime, without any tenant noticing the move.</p>
+    <p><strong>What you get.</strong> A variability model whose variants carry concrete values, intent and usage evidence. Each kind of difference maps to the smallest mechanism that fits it, variants that leave work in flight get an explicit switch strategy, and data-model differences follow a schema-first rule. Then the proof: mirror live reads, replay captured writes offline, filter the noise the way Diffy does, and put guardrails around the AI doing the refactoring.</p>
+    <p><strong>Why it's worth your time.</strong> Mirroring and replay look interchangeable and aren't: <strong>a mirrored write executes twice</strong>. And an AI that refactors code and edits the tests in the same pull request can "prove" a regression correct.</p>
+    <p><strong>Status.</strong> A design, written before it was run, like the rest of the series.</p>
+    <p><strong>Part 2 of 3.</strong> After <a href="multi-fork-inventory.html">the inventory</a>; <a href="multi-fork-cutover.html">Part 3</a> covers cutting tenants over and the governance that stops the forks from growing back.</p>
+  </div>
+
+  <p>An inventory is a description. Nobody can deploy a description. Between the matrix from Part 1 and a tenant running on the unified code, three questions need answers: what exactly has to vary, how the code will vary it, and how anyone will know the tenant's behavior survived.</p>
+
+  <p>The first two are design. The third is the one that decides whether the program is trusted, and it has to start on day one, because the evidence takes weeks to collect.</p>
+
+  <h2>From concepts to variants</h2>
+
+  <p>The inventory's real purpose is to list every distinct behavior the unified code must reproduce. For each concept, the versions across all forks are grouped into <strong>variants</strong>, and each variant records enough to design its variation point:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>What it holds</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Variant</strong></td><td>Groups of forks that behave the same. Fingerprints give code-level groups; AI merges groups that behave alike and differ only in how they're written</td><td>Status per fork isn't enough; the code needs one implementation per behavior</td></tr>
+        <tr><td><strong>Structured difference</strong></td><td>The kind of difference and the value per fork: not "the cadence differs" but 7 days vs. 15</td><td>The inventory then produces each fork's future configuration directly</td></tr>
+        <tr><td><strong>Base-side intent</strong></td><td>Bug fix, security fix, new capability, behavior change or refactoring</td><td>Fixes are adopted; behavior changes become variants</td></tr>
+        <tr><td><strong>Fork-side intent</strong></td><td>Contractual feature, hotfix, probable bug or unknown, judged from code plus commit messages and ticket IDs</td><td>A probable bug may be behavior a tenant depends on, so it goes to the decision queue, not the bin</td></tr>
+        <tr><td><strong>Usage evidence</strong></td><td>Whether any tenant exercises it</td><td>Dead variants are deleted, not configured</td></tr>
+        <tr><td><strong>Test coverage</strong></td><td>JaCoCo, per unit, per fork</td><td>Shows which variants have no safety net</td></tr>
+        <tr><td><strong>Data impact</strong></td><td>Entities, columns and migrations it needs</td><td>Feeds the schema work below</td></tr>
+        <tr><td><strong>Dependencies</strong></td><td>Variants that always appear together</td><td>They must move together</td></tr>
+        <tr><td><strong>Tenant mapping</strong></td><td>Which tenants use it, not just which forks</td><td>Tenants on the same fork may already differ through that fork's own configuration tables</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Two details are easy to miss. A missing concept is a variant too: the feature turned off. And because AI writes part of this record, every record carries the pinned model and the prompt version that produced it. An illustrative record:</p>
+
+  <pre><code>concept: reminders.follow-up-cadence          # stable ID from the hierarchy
+variation_point: config.value
+variants:
+  - id: v1                                    # the base's behavior
+    value: { days: 7 }
+    forks: [base, fork-a, fork-c]
+  - id: v2
+    value: { days: 15 }
+    forks: [fork-b]
+    fork_intent: contractual
+    usage: { tenants: 3, hits_30d: 18240 }
+  - id: v0                                    # concept absent: feature off
+    forks: [fork-d]
+    usage: { tenants: 1 }
+stateful: true
+switch_strategy: drain
+provenance: { model: pinned-model-id, prompt_version: v3 }</code></pre>
+
+  <h3>Variants that leave work in flight</h3>
+
+  <p>Some variants leave work in progress in their own shape: an approval halfway through its steps, a reminder cycle already scheduled, a cache built by the old code, rows in the old data layout. Switching a tenant to another variant mid-flight can break that work. So every variant is marked <strong>stateful or stateless</strong>, and every stateful variant gets exactly one switch strategy:</p>
+
+  <div class="sampling-tiers">
+    <div class="tier tier-always">
+      <div class="tier-badge">Drain</div>
+      <div class="tier-text"><strong>New work goes to the new variant;</strong> work already in flight finishes on the old one. Simplest when in-flight work ends on its own.</div>
+    </div>
+    <div class="tier tier-threshold">
+      <div class="tier-badge">Migrate</div>
+      <div class="tier-text"><strong>Convert the in-flight state at the switch,</strong> with a tested conversion. For work that would never drain, like long-lived schedules.</div>
+    </div>
+    <div class="tier tier-sampled">
+      <div class="tier-badge">Version</div>
+      <div class="tier-text"><strong>Each record remembers which variant created it,</strong> and both variants stay readable until the old records expire.</div>
+    </div>
+  </div>
+
+  <p>The strategy is recorded with the variant, so it's applied the same way at every switch: a per-variant flip, a full cutover or a switch back. Switching back is the case that bites: the old path has to be able to read whatever the new path wrote while it was on.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Record differences as <strong>values, not adjectives</strong> ("7 vs. 15 days", not "the cadence differs"), and give every stateful variant <strong>one named switch strategy</strong>: drain, migrate or version. The first makes configuration fall out of the inventory; the second makes switching back a plan instead of a hope.</p>
+  </div>
+
+  <h2>Pick the smallest mechanism that fits</h2>
+
+  <p>A small kit of standard mechanisms covers every variant, and each kind of difference maps to one of them. For each difference, use the lowest rung that solves it; each rung up brings more power, more risk and more cost.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Rung</th><th>Kind of difference</th><th>Mechanism</th><th>Tools</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>A different value</td><td>Configuration resolved per tenant</td><td><code>@ConfigurationProperties</code>, a config service</td></tr>
+        <tr><td>2</td><td>Modules a customer bought</td><td>Entitlements, kept separate from flags</td><td>A small service of your own</td></tr>
+        <tr><td>3</td><td>Behavior on or off</td><td>Feature flag evaluated with the tenant as context</td><td>OpenFeature as the API</td></tr>
+        <tr><td>4</td><td>Custom fields and validations</td><td>Metadata</td><td>JSON columns plus JSON Schema</td></tr>
+        <tr><td>5</td><td>Rules and workflows that vary</td><td>A rules or workflow engine</td><td>DMN, Drools, Camunda, Flowable, Temporal</td></tr>
+        <tr><td>6</td><td>Alternative logic; a different external system</td><td>Strategy interface, or ports and adapters, chosen per tenant</td><td>Spring Plugin's <code>PluginRegistry</code></td></tr>
+        <tr><td>7</td><td>Extra steps; truly bespoke code</td><td>Extension points, domain events a tenant module listens to, plugins</td><td>Customer modules in the build; PF4J</td></tr>
+        <tr class="row-gov"><td>—</td><td>A different data model</td><td>Additive superset schema, extension tables or JSON attributes</td><td>Applied before the fork's tenants move (below)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <blockquote><p>A feature flag is not configuration. Permanent differences go into entitlements, configuration or extension points; flags are short-lived and have an owner.</p></blockquote>
+
+  <h3>Runtime, not startup</h3>
+
+  <p>In a shared deployment, every mechanism must resolve per tenant <em>at runtime</em>. That rules out two Spring favorites: <code>@Profile</code> and <code>@ConditionalOnProperty</code> decide once, at startup, so they can't select variants when one process serves every tenant. What works instead:</p>
+
+  <ul>
+    <li><strong>Resolve the tenant once</strong> (JWT, subdomain or header) and propagate it with a <code>ScopedValue</code> or <code>ThreadLocal</code>, including into async work and messaging.</li>
+    <li><strong>Select per request:</strong> a <code>PluginRegistry</code> picks the tenant's implementation, falling back to the core behavior.</li>
+    <li><strong>Use domain events</strong> so extensions can react without the core knowing they exist.</li>
+    <li><strong>Enforce the boundary in CI:</strong> ArchUnit fails the build if the core depends on an extension; japicmp or revapi versions the extension API; every extension has contract tests.</li>
+  </ul>
+
+  <p>Prove each mechanism end to end on one real variant before applying it widely. Design each concept's variation point when it's first touched, for <em>all</em> the variants the inventory found, even if only some are implemented now.</p>
+
+  <div class="callout">
+    <div class="callout-label">Anti-patterns</div>
+    <p><code>if (tenantId.equals("acme"))</code> scattered through the core. Permanent flags with no owner. A plugin per customer for what configuration solves. A generic do-it-yourself platform. Customer scripts without a sandbox. <strong>Each one rebuilds the fork, just inside a single branch.</strong></p>
+  </div>
+
+  <h3>Keep the number of variation points low</h3>
+
+  <ul>
+    <li><strong>Delete</strong> variants no tenant uses.</li>
+    <li><strong>Push the business to standardize</strong> where variants differ trivially. Some customizations are cheaper to negotiate away than to preserve.</li>
+    <li><strong>Group</strong> the remaining variation into a small number of tenant profiles.</li>
+    <li><strong>Test only the configurations that exist</strong> (one per fork or tenant group), not every combination of flags.</li>
+    <li><strong>But test the transitions.</strong> Switching one variant at a time creates combinations no tenant ever ran. Flag every pair of concepts whose call slices write the same entity fields; a person reviews how they interact, and their transitional combinations get explicit tests.</li>
+    <li><strong>Run every tenant profile inside one booted <code>@SpringBootTest</code> context,</strong> resolved at runtime through the tenant context. <code>@ActiveProfiles</code>, mocked beans or per-tenant property overrides each force a new context, so CI time would grow with every profile.</li>
+  </ul>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Map each <em>kind</em> of difference to <strong>one standard mechanism</strong> and climb the ladder only when the lower rung fails. Then make the test suite share a single Spring context across tenant profiles, or the price of every new profile is paid in CI minutes forever.</p>
+  </div>
+
+  <h2>Data-model variants: conform the schema before routing</h2>
+
+  <p>Code variants are the easy half. Forks also changed their schemas, and those differences block unification. Find them by building, not reading:</p>
+
+  <ul>
+    <li>Apply each fork's Flyway or Liquibase migrations to an empty database with Testcontainers.</li>
+    <li>Diff the resulting schemas (Atlas schema diff or SchemaCrawler).</li>
+    <li>Diff them against the real production schemas too, read-only. Manual hotfixes often leave production apart from the migrations.</li>
+  </ul>
+
+  <p>Flag the conflicts: the same table or column with a different type or meaning in different forks. Expect migration version numbers to collide, too; forks almost certainly reused them, so their migration histories can't be merged. Define the unified target schema, write one migration per fork that brings its database there, and re-baseline every database at a new common version.</p>
+
+  <p>The order matters. Hibernate builds one entity model at startup, shared by every tenant, so <strong>each tenant's database must already satisfy the base's model when its tenants move</strong>. The per-fork migration gets there with additive changes only: new columns are nullable or defaulted, so the fork's code can still write during the fallback window. Validating the base's entity model against each tenant's database is a cutover gate. Moving data between databases is a separate, later decision.</p>
+
+  <p>Data-model variants themselves use <strong>expand/contract</strong>: add the new structure beside the old, backfill or dual-write, switch reads per tenant, then remove the old structure. Changes stay additive while any fallback window is open.</p>
+
+  <h2>Proof, part one: which variants are actually used</h2>
+
+  <p>Production traffic and logs serve two purposes: showing which variants are really used, and proving behavior was preserved. Start capturing immediately. Usage evidence needs weeks of data, and it's the cheapest way to shrink the program.</p>
+
+  <ul>
+    <li><strong>Entry-point usage</strong> comes from access logs, job execution logs and consumer metrics: hit counts per entry point per tenant. That marks each unit and variant used or unused.</li>
+    <li><strong>Variants inside a method</strong> (a branch, not an entry point) need line-level evidence. Run a JaCoCo agent on one production instance per fork for a few weeks; its coverage maps straight onto the fingerprinted methods from Part 1.</li>
+  </ul>
+
+  <h2>Proof, part two: mirror reads, replay writes</h2>
+
+  <p>Two techniques sound the same and aren't. <strong>Mirroring</strong> sends a copy of live traffic to the new build as it happens. <strong>Replay</strong> runs captured traffic later, against a snapshot. They aren't interchangeable, because a mirrored write executes a second time.</p>
+
+  <figure class="diagram">
+    <svg class="mf-svg" viewBox="0 0 700 300" role="img" aria-label="Two lanes. Top lane, live mirroring for reads only: live traffic reaches the gateway, which sends it to the fork that serves the response and a copy to a shadow of the new build with a read-only database role and stubbed outbound calls; responses are compared. Bottom lane, offline replay for writes: captured requests and consumed messages per tenant, in order, are replayed against a snapshot copy twice on the original fork and once on the new build; what differs between the two original runs is noise and is ignored; responses, database effects and outbound calls are compared.">
+      <defs>
+        <marker id="mf-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="head" d="M0,0 L10,5 L0,10 z"/>
+        </marker>
+      </defs>
+
+      <text class="lane" x="20" y="26">LIVE MIRRORING · READS ONLY</text>
+      <rect class="box" x="20" y="44" width="120" height="58" rx="8"/>
+      <text class="lbl" x="80" y="70" text-anchor="middle">Live traffic</text>
+      <text class="sub" x="80" y="88" text-anchor="middle">GET, read-only ops</text>
+      <rect class="box" x="180" y="44" width="110" height="58" rx="8"/>
+      <text class="lbl" x="235" y="70" text-anchor="middle">Gateway</text>
+      <text class="sub" x="235" y="88" text-anchor="middle">copies the request</text>
+      <rect class="box-t" x="335" y="36" width="170" height="34" rx="8"/>
+      <text class="lbl" x="420" y="58" text-anchor="middle">Fork · serves the user</text>
+      <rect class="box-a" x="335" y="78" width="170" height="40" rx="8"/>
+      <text class="lbl" x="420" y="95" text-anchor="middle">Shadow · new build</text>
+      <text class="sub" x="420" y="110" text-anchor="middle">read-only DB role, stubs</text>
+      <rect class="box-c" x="550" y="54" width="130" height="50" rx="8"/>
+      <text class="lbl" x="615" y="76" text-anchor="middle">Compare</text>
+      <text class="sub" x="615" y="93" text-anchor="middle">responses</text>
+      <path class="arrow" d="M140,73 L176,73"/>
+      <path class="arrow" d="M290,66 L331,55"/>
+      <path class="arrow" d="M290,80 L331,95"/>
+      <path class="arrow" d="M505,55 L546,70"/>
+      <path class="arrow" d="M505,98 L546,88"/>
+
+      <line class="rule" x1="20" y1="146" x2="680" y2="146"/>
+
+      <text class="lane" x="20" y="178">OFFLINE REPLAY · WRITES</text>
+      <rect class="box" x="20" y="196" width="140" height="70" rx="8"/>
+      <text class="lbl" x="90" y="222" text-anchor="middle">Captured session</text>
+      <text class="sub" x="90" y="240" text-anchor="middle">requests + messages,</text>
+      <text class="sub" x="90" y="255" text-anchor="middle">in order, per tenant</text>
+      <rect class="box" x="200" y="196" width="120" height="70" rx="8"/>
+      <text class="lbl" x="260" y="222" text-anchor="middle">Snapshot copy</text>
+      <text class="sub" x="260" y="240" text-anchor="middle">taken when</text>
+      <text class="sub" x="260" y="255" text-anchor="middle">capture began</text>
+      <rect class="box-t" x="360" y="186" width="160" height="40" rx="8"/>
+      <text class="lbl" x="440" y="203" text-anchor="middle">Original fork × 2</text>
+      <text class="sub" x="440" y="218" text-anchor="middle">differences = noise</text>
+      <rect class="box-a" x="360" y="236" width="160" height="40" rx="8"/>
+      <text class="lbl" x="440" y="253" text-anchor="middle">New build × 1</text>
+      <text class="sub" x="440" y="268" text-anchor="middle">fixed clock, stable IDs</text>
+      <rect class="box-c" x="560" y="196" width="120" height="70" rx="8"/>
+      <text class="lbl" x="620" y="220" text-anchor="middle">Compare</text>
+      <text class="sub" x="620" y="238" text-anchor="middle">responses, DB,</text>
+      <text class="sub" x="620" y="253" text-anchor="middle">outbound calls</text>
+      <path class="arrow" d="M160,231 L196,231"/>
+      <path class="arrow" d="M320,224 L356,210"/>
+      <path class="arrow" d="M320,238 L356,252"/>
+      <path class="arrow" d="M520,208 L556,222"/>
+      <path class="arrow" d="M520,254 L556,242"/>
+    </svg>
+    <figcaption><strong>Reads</strong> are mirrored live; <strong>writes</strong> are replayed later against a snapshot, three times.</figcaption>
+  </figure>
+
+  <ul>
+    <li><strong>Live mirroring, reads only.</strong> The shadow deployment connects with a read-only database role and its outbound calls are stubbed. A "read" that secretly writes fails loudly instead of changing data.</li>
+    <li><strong>Session replay for writes.</strong> Capture each tenant's requests and consumed messages in their original order, and replay them against a snapshot taken when capture began. IDs that one response created and the next request sent are rewritten to the IDs the replay created; GoReplay's middleware sees both responses, so it can do that.</li>
+    <li><strong>Scheduled jobs:</strong> compare the database state after a run on a copy of the snapshot.</li>
+    <li><strong>Filter the noise:</strong> replay against the original fork twice and the new build once. Whatever differs between the two original runs (timestamps, IDs, ordering) is noise and is ignored. This is the method Twitter's Diffy popularized.</li>
+    <li><strong>Remove randomness:</strong> inject a fixed <code>Clock</code> and deterministic ID generators in replay mode.</li>
+    <li><strong>Compare outbound calls:</strong> stand in for external systems with WireMock recordings and verify the calls. An email that stops being sent is a behavior change. Recording needs an egress proxy or a mesh sidecar on the fork deployments, which is an infrastructure change; budget for TLS interception and for HTTP clients that ignore proxy settings.</li>
+    <li><strong>Compare database effects,</strong> not just responses, by replaying against snapshot copies.</li>
+    <li><strong>Protect personal data:</strong> mask it before it leaves production. Privacy law (GDPR, LGPD and the like) applies to recorded traffic.</li>
+  </ul>
+
+  <p>Running both code paths inside production, the Scientist pattern, is limited to side-effect-free logic. Rolling back a transaction doesn't unsend messages or emails, or undo cache writes and consumed sequence values.</p>
+
+  <p>Where traffic doesn't reach, <strong>characterization tests</strong> fill the gap: golden-master snapshots with ApprovalTests, Testcontainers for the database, and recorded stand-ins for external systems. For legacy integrations that are hard to repoint, a proxy-based tool like Hoverfly captures real traffic without changing the hosts the code calls. Many integrations aren't HTTP at all (files, SFTP, database views); those get Testcontainers and golden files instead.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p><strong>Mirror reads live; replay writes offline against a snapshot.</strong> Give the shadow a read-only database role so a mislabeled read fails loudly, and run the original twice so its own nondeterminism defines what "different" means.</p>
+  </div>
+
+  <h2>Proof, part three: guardrails for the AI doing the refactoring</h2>
+
+  <p>In this playbook, the base absorbs every variant, and Codex does much of that refactoring: it reads a fork's implementation and reimplements it as a variant in the base, one variant per pull request, in a worktree with write access, with replay as a required CI check and a person reviewing each PR. Nothing is merged from the forks; they become the <strong>reference</strong> Codex reads and the <strong>oracle</strong> replay compares against.</p>
+
+  <p>The biggest risk isn't bad code. It's an agent that changes the tests along with the code and so "proves" a regression is correct. Five rules, for <code>AGENTS.md</code> and CI:</p>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">1</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Frozen tests</div>
+        <div class="pipe-desc">Characterization and parity tests are read-only for the agent. A PR that changes production code and frozen tests fails, or needs separate approval through CODEOWNERS.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">2</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Declared scope</div>
+        <div class="pipe-desc">Each task declares the paths it may touch. CI fails the PR if the diff goes outside them.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">3</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Behavior spec first</div>
+        <div class="pipe-desc">Before an extraction, record the invariants tests often miss (authorization, idempotency, external contracts, performance budgets), and test each: an authorization matrix, replay and retry tests, a JMH or Gatling baseline.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">4</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Evidence in every PR</div>
+        <div class="pipe-desc">Which suites ran, the behavioral diff (none, or explained), the performance comparison. Reviewers check the evidence, not just the code.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">5</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Behavior changes in their own PR</div>
+        <div class="pipe-desc">If convergence needs a behavior change, such as merging two customers' variants, it gets its own PR with a decision record. Never inside a refactoring.</div>
+      </div>
+    </div>
+  </div>
+
+  <p>Three complements make the safety net stronger than it looks:</p>
+
+  <ul>
+    <li><strong>Property-based tests</strong> (jqwik in Java) for mapping rules. Golden masters pin the examples you observed; properties check the rule for any input.</li>
+    <li><strong>Mutation testing</strong> (Pitest) for every AI-generated test. A large suite of weak tests is false confidence.</li>
+    <li><strong>No automatic test regeneration during the migration.</strong> Tools that "maintain" tests after a change record the regression as the new behavior.</li>
+  </ul>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-coral">!</div><div class="tcard-title">The trap in generated unit tests</div></div>
+      <p>Unit-level test generators such as Diffblue Cover capture what the code does today, which is useful for logic hotspots. But unit tests are tied to code structure, so they break en masse exactly when you extract the extension points this program exists to create.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-teal">⇄</div><div class="tcard-title">The cross-fork trick</div></div>
+      <p>Generate tests on the base and run them against each fork. Test failures show behavioral divergence; compile failures show structural divergence. A cheap second opinion on the inventory.</p>
+    </div>
+  </div>
+
+  <h2>What this part adds up to</h2>
+
+  <p>By now each difference has a value, an intent, a usage count, a mechanism and, if it's stateful, a switch strategy. Each fork's database is on the path to the base's schema by additive steps. Usage evidence has been accumulating since day one, and a replay harness can compare any tenant's real sessions, on the fork and on the base, down to the emails it sends.</p>
+
+  <p>What's left is moving people's production systems. <strong><a href="multi-fork-cutover.html">Part 3</a></strong> covers the cutover: the prerequisites of a shared deployment, the tenant tiers that decide how each tenant moves (including contracts that make every change a separate event), how flags are governed and tracked to zero, and the organizational work that stops new forks from appearing the week after the last one is retired.</p>
+
+  <div class="bt-callout">
+    A variant isn't done when the code compiles behind a flag. It's done when <strong>replay shows the tenant can't tell the difference</strong>, and the only tests that could have hidden a regression were ones the agent wasn't allowed to touch.
+  </div>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="multi-fork-inventory.html" class="related-post-card">
+        <div class="rpc-tag">Legacy Modernization</div>
+        <div class="rpc-title">Part 1 · Dozens of forks, one codebase: find out what each fork does</div>
+      </a>
+      <a href="multi-fork-cutover.html" class="related-post-card">
+        <div class="rpc-tag">Legacy Modernization</div>
+        <div class="rpc-title">Part 3 · Dozens of forks, one codebase: move every tenant, then keep the forks from growing back</div>
+      </a>
+      <a href="requirement-traceability.html" class="related-post-card">
+        <div class="rpc-tag">Testing</div>
+        <div class="rpc-title">Every requirement has a test, and a check that proves it</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; October 2026</p>
+    <p>Part 2 of 3 · A design, written before it was run. <a href="multi-fork-inventory.html">Part 1: the inventory</a>. <a href="multi-fork-cutover.html">Part 3: cutover and governance</a>.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

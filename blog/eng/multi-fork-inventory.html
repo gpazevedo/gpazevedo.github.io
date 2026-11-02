@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>Dozens of forks, one codebase: find out what each fork does — Gustavo Azevedo</title>
+<meta name="description" content="Before consolidating dozens of forks of a Spring Boot SaaS, inventory them: fingerprint every unit, compare each fork three ways, track changes by patch-id, and let AI name behavior under a judge."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/multi-fork-inventory.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/multi-fork-inventory.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="Dozens of forks, one codebase: find out what each fork does"/>
+<meta property="og:description" content="Before consolidating dozens of forks of a Spring Boot SaaS, inventory them: fingerprint every unit, compare each fork three ways, track changes by patch-id, and let AI name behavior under a judge."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-10-23T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-10-23T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Legacy Modernization"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Dozens of forks, one codebase: find out what each fork does"/>
+<meta name="twitter:description" content="Before consolidating dozens of forks of a Spring Boot SaaS, inventory them: fingerprint every unit, compare each fork three ways, track changes by patch-id, and let AI name behavior under a judge."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Dozens of forks, one codebase: find out what each fork does","description":"Before consolidating dozens of forks of a Spring Boot SaaS, inventory them: fingerprint every unit, compare each fork three ways, track changes by patch-id, and let AI name behavior under a judge.","datePublished":"2026-10-23","dateModified":"2026-10-23","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/multi-fork-inventory.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/multi-fork-inventory.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Dozens of forks, one codebase: find out what each fork does","item":"https://gpazevedo.github.io/blog/eng/multi-fork-inventory.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+  /* Three-way diagram: theme-aware via the design tokens. */
+  .mf-svg .base   { stroke: var(--teal);  fill: none; stroke-width: 3; }
+  .mf-svg .fork   { stroke: var(--amber); fill: none; stroke-width: 3; }
+  .mf-svg .c-base { fill: var(--teal); }
+  .mf-svg .c-fork { fill: var(--amber); }
+  .mf-svg .c-key  { fill: var(--surface); stroke-width: 3; }
+  .mf-svg .k-base { stroke: var(--teal); }
+  .mf-svg .k-fork { stroke: var(--amber); }
+  .mf-svg .lbl    { fill: var(--ink); font-family: var(--mono); font-size: 13px; font-weight: 500; }
+  .mf-svg .sub    { fill: var(--ink-muted); font-family: var(--sans); font-size: 12px; }
+  .mf-svg .span   { stroke: var(--ink-faint); stroke-width: 1.2; stroke-dasharray: 4 4; fill: none; }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Legacy Modernization</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Legacy Modernization</span>
+    <span class="dot">·</span>
+    <time datetime="2026-10-23">October 2026</time>
+    <span class="dot">·</span>
+    <span>16 min read</span>
+  </div>
+
+  <h1>Dozens of forks, one codebase: <em>find out what each fork does</em></h1>
+  <p class="deck">A playbook for consolidating a multi-fork SaaS, starting with the step everyone wants to skip: an inventory you can trust.</p>
+
+  <div class="tldr">
+    <div class="tldr-label">TL;DR</div>
+    <p><strong>The problem.</strong> A Java and Spring Boot SaaS has dozens of customer forks. They're branches of one repository, they all compile, and every one serves tenants who depend on how it behaves today. The goal is one codebase, with every tenant keeping its current behavior and each change switched on one variant and one tenant at a time.</p>
+    <p><strong>What you get.</strong> The first stage of the playbook, the inventory. A deterministic pipeline measures every fork, fingerprints what it does, and classifies each difference against <em>both</em> the point where the fork split off and the base as it is today. AI then names each difference as a behavior, under a judge that decides what is new.</p>
+    <p><strong>Why it's worth your time.</strong> A plain fork-vs-base diff makes every <em>stale</em> fork look heavily <em>customized</em>. A three-way comparison separates the mechanical catch-up work from the real divergence that needs a decision, and that's what keeps the program small enough to finish.</p>
+    <p><strong>Status.</strong> This is a design, written before I read a line of the code it targets. The pilot gates at the end are what it has to prove before it scales.</p>
+    <p><strong>Part 1 of 3.</strong> <a href="multi-fork-variability.html">Part 2</a> turns the inventory into a variability model and proves behavior is preserved with production traffic. <a href="multi-fork-cutover.html">Part 3</a> covers cutting tenants over, including the ones whose contracts make every change a separate event.</p>
+  </div>
+
+  <p>The situation is common after an acquisition. The product was built by a small company that sold customization. Each large customer asked for something slightly different, there was no extension seam in the core, so someone created a branch. Years later there are dozens of branches, each deployed for its own customers, and the team that inherited them can't say what makes one different from another.</p>
+
+  <p>Every fix now has to be applied dozens of times. Every platform upgrade is dozens of upgrades. The obvious move is to merge the forks back, and the obvious move fails, because nobody knows what any of them actually does.</p>
+
+  <blockquote><p>Copying code to vary behavior is the root cause of the multi-fork problem. Any plan that doesn't stop new copies just schedules the next consolidation.</p></blockquote>
+
+  <h2>Before the technique: four causes and one question</h2>
+
+  <p>Forks are a symptom. They usually have four causes, and only the first is technical:</p>
+
+  <ul>
+    <li><strong>Technical.</strong> The core has no seams, so customizing means editing it, and editing it means a branch.</li>
+    <li><strong>Commercial.</strong> Customization was sold as a feature. Contracts may promise specific behavior.</li>
+    <li><strong>Knowledge.</strong> The original team took the <em>why</em> of each difference with them. The current team has the code without the mental model.</li>
+    <li><strong>Governance.</strong> If sales or account management can still promise bespoke behavior, a new fork appears after every convergence.</li>
+  </ul>
+
+  <p>So the first question isn't technical either. <strong>What does the owner intend to do with the product?</strong> The answer picks the approach:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Intent</th><th>Approach</th></tr></thead>
+      <tbody>
+        <tr><td>Invest and grow</td><td>Full convergence: one core with extension points</td></tr>
+        <tr><td>Keep it running for a few years</td><td>Stabilize only: automate patch propagation across forks, no plugin platform</td></tr>
+        <tr><td>Move customers to another product</td><td>Don't converge. Catalogue each customization as a migration requirement</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The rest of this series assumes the first row. The inventory is useful in all three, though: you can't migrate, stabilize or converge what you haven't catalogued.</p>
+
+  <h2>The target, the constraints and the principles</h2>
+
+  <p>The target is a single codebase. In the end-state this playbook was designed for, it runs as one shared multi-tenant deployment. Every tenant keeps its current behavior, and changes are switched on one variant and one tenant at a time.</p>
+
+  <p>The constraints that shape everything below:</p>
+
+  <ul>
+    <li>The forks are <strong>branches of one repository</strong> with shared history, and they all compile. If yours are separate repositories, add them as remotes first; the rest still holds.</li>
+    <li><strong>"Base" means the version new customers get today</strong>, not the forks' common ancestor. The base kept evolving after each fork split off, and that one fact drives most of the design.</li>
+    <li>Production traffic and logs can be captured per fork.</li>
+    <li>Some contracts or risk profiles require each variant to be switched on separately in production (Part 3).</li>
+    <li>The AI tool is OpenAI Codex. The ideas carry over to any agent that can run headless against a working copy and return structured output.</li>
+  </ul>
+
+  <p>And six principles, which the stages below keep coming back to:</p>
+
+  <div class="tradeoff-grid">
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-teal">◇</div><div class="tcard-title">What, not how</div></div>
+      <p>Concepts describe what the system does. The same concept can have different names and code in different forks.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-blue">◎</div><div class="tcard-title">Snapshot first, commits second</div></div>
+      <p>Compare what each fork does <em>today</em>. Use history only to trace where a change came from.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-amber">⑂</div><div class="tcard-title">Git decides who; AI decides what</div></div>
+      <p>Who changed something is a deterministic Git question. What the change means is the only question AI gets.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-coral">#</div><div class="tcard-title">Never analyze the same code twice</div></div>
+      <p>Cache every result by a fingerprint of the content. A variant shared by twelve forks is analyzed once.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-teal">✓</div><div class="tcard-title">Preservation is proven</div></div>
+      <p>Behavior preservation is shown with production traffic and tests, never assumed from a clean diff.</p>
+    </div>
+    <div class="tcard">
+      <div class="tcard-head"><div class="tcard-icon icon-blue">↺</div><div class="tcard-title">Small and reversible</div></div>
+      <p>Every production change is small, and a single switch rolls it back.</p>
+    </div>
+  </div>
+
+  <p>The inventory is six stages. The first four use no AI at all.</p>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">1</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Census</div>
+        <div class="pipe-desc">Size, staleness and lineage of every fork; platform versions; tenancy model.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">2</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Functional inventory</div>
+        <div class="pipe-desc">Split each fork into units and fingerprint them. Parser plus a booted Spring context.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">3</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Three-way classification</div>
+        <div class="pipe-desc">Every unit compared at the split point, the base today and the fork today.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">4</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Provenance</div>
+        <div class="pipe-desc">Where each change came from, by commit SHA and by patch-id.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">5</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Concept extraction and matching</div>
+        <div class="pipe-desc">AI proposes what a difference means; a judge decides whether it's new.</div>
+        <div class="pipe-pass">✓ high confidence → recorded</div>
+        <div class="pipe-fail">✗ low confidence → human review</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">6</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Reconciliation and the concept × fork matrix</div>
+        <div class="pipe-desc">Merge near-duplicates every few forks; separate catch-up from divergence.</div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <h2>Stage 1 · The census comes before any AI</h2>
+
+  <p>Measure first. The census is cheap, deterministic, and it decides the order and the budget of everything after it.</p>
+
+  <p>Give every fork its own working copy with <code>git worktree add</code>. All worktrees share one object store, so dozens of checkouts cost little more than one. Then record, for each fork:</p>
+
+  <pre><code>git merge-base base forkX               # split point, and that commit's date
+git rev-list --count base..forkX        # commits ahead of the base
+git rev-list --count forkX..base        # commits behind the base
+git diff --name-only $(git merge-base base forkX) forkX | wc -l   # files the fork changed</code></pre>
+
+  <p>Three more things come out of the census:</p>
+
+  <ul>
+    <li><strong>The fork tree.</strong> Forks often descend from each other. Two forks that share commits the base doesn't have are parent and child, and parents are processed before children. Don't detect this from split points alone: a child fork usually has the <em>same</em> split point from the base as its parent, so that rule misses exactly the cases you're looking for. Forks with a recent split point are the ones that merge the base regularly.</li>
+    <li><strong>The platform spread.</strong> Java, Spring Boot and key library versions per fork, resolved from the build, not just declared. Only the base moves to the target platform. The spread sets the normalization rules for fingerprints in Stage 2 and the cost of any fork that has to catch up in place.</li>
+    <li><strong>The tenancy model.</strong> How each fork identifies tenants, which tenant-level configuration tables it already has, the database engine and topology, and how many tenants each fork serves.</li>
+  </ul>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Measure every branch with <strong>worktrees, merge-base and ahead/behind counts</strong> before spending a cent on AI. Size and staleness per fork give you a processing order (closest first) and a budget, and they're a few lines of shell.</p>
+  </div>
+
+  <h2>Stage 2 · An inventory with no AI in it</h2>
+
+  <p>A small Java CLI splits each fork into functional units and fingerprints them. It's built on <strong>JavaParser</strong>, with the symbol resolver pointed at each fork's compiled classpath from Maven or Gradle. Each fork is delomboked first, and its generated sources (MapStruct mappers, other annotation processors) are included, so the parser sees the code that actually runs.</p>
+
+  <p>The units it extracts:</p>
+
+  <div class="layer-stack">
+    <div class="layer l1">
+      <div class="layer-meta">
+        <span class="layer-num">Unit 1</span>
+        <span class="layer-name">Entry points</span>
+        <span class="layer-src">where behavior starts</span>
+      </div>
+      <div class="chips">
+        <span class="chip">controller methods</span>
+        <span class="chip">@Scheduled jobs</span>
+        <span class="chip">@KafkaListener · @RabbitListener · @JmsListener</span>
+        <span class="chip">@EventListener</span>
+        <span class="chip">Spring Batch jobs</span>
+        <span class="chip">ApplicationRunner</span>
+        <span class="chip">Feign · WebClient clients</span>
+      </div>
+    </div>
+    <div class="layer l2">
+      <div class="layer-meta">
+        <span class="layer-num">Unit 2</span>
+        <span class="layer-name">Domain units</span>
+        <span class="layer-src">data and switches</span>
+      </div>
+      <div class="chips">
+        <span class="chip">JPA entities</span>
+        <span class="chip">Flyway · Liquibase migrations</span>
+        <span class="chip">@ConfigurationProperties</span>
+        <span class="chip">@ConditionalOnProperty</span>
+      </div>
+    </div>
+    <div class="layer l3">
+      <div class="layer-meta">
+        <span class="layer-num">Unit 3</span>
+        <span class="layer-name">Call slices</span>
+        <span class="layer-src">what each entry point reaches</span>
+      </div>
+      <div class="chips">
+        <span class="chip">application packages only</span>
+        <span class="chip">interface calls → every implementation</span>
+      </div>
+    </div>
+    <div class="layer l4">
+      <div class="layer-meta">
+        <span class="layer-num">Unit 4</span>
+        <span class="layer-name">Behavior outside method bodies</span>
+        <span class="layer-src">the part diffs of Java code miss</span>
+      </div>
+      <div class="chips">
+        <span class="chip">application*.yml per profile</span>
+        <span class="chip">@Query · derived queries</span>
+        <span class="chip">templates · message bundles</span>
+        <span class="chip">security config</span>
+        <span class="chip">filters · interceptors · aspects</span>
+      </div>
+    </div>
+  </div>
+
+  <p>The fourth layer matters more than it looks. A fork that changed only a property value, a derived query method name or an interceptor changes behavior without changing a single method body. Spring Data's derived queries don't even <em>have</em> a body.</p>
+
+  <h3>Three fingerprints per method</h3>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Fingerprint</th><th>Covers</th><th>Catches</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Strict</strong></td><td>The body, without comments or formatting</td><td>Any real code change</td></tr>
+        <tr><td><strong>Loose</strong></td><td>The body with local variable names normalized</td><td>Tells a rename-only change from a real one</td></tr>
+        <tr><td><strong>Declaration</strong></td><td>Signature plus method and class annotations with their values</td><td>A changed <code>@PreAuthorize</code>, <code>@Transactional</code>, <code>@Query</code> or <code>@Cacheable</code> on an identical body</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Package moves such as <code>javax.*</code> to <code>jakarta.*</code> are normalized before fingerprinting. Otherwise the base's platform upgrade would look like a change in every fork.</p>
+
+  <p>Not every point in history needs the full treatment. The base and each fork's head get the compiled inventory. Each fork's split point only needs method fingerprints, and fingerprints need parsing, not compiling, so the files are read straight out of Git with <code>git show &lt;split&gt;:&lt;path&gt;</code>. That matters, because years-old commits often won't build with today's toolchain.</p>
+
+  <h3>Static analysis can't see Spring's wiring, so ask Spring</h3>
+
+  <p>Conditional beans, aspects, interceptors and the links between an event publisher and its listeners are decided at runtime. Each fork's application context is therefore also booted in a test harness, with a Testcontainers database and stubbed outbound calls, and the harness dumps its beans, condition report, request mappings and advisors. That's the same data Actuator exposes at <code>/beans</code>, <code>/conditions</code> and <code>/mappings</code>, captured without touching a single production deployment.</p>
+
+  <p>The dump adds the framework-invoked edges to the call slices. Its request mappings also become the <strong>ground truth for coverage</strong>: if the parser found fewer entry points than Spring registered, the inventory has a hole, and the pilot will catch it.</p>
+
+  <p>If call resolution turns out slow or imprecise, SootUp over the compiled bytecode is the fallback for the call graph.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Fingerprint <strong>declarations separately from bodies</strong>, and inventory what lives outside method bodies. Then boot each variant's Spring context in a test harness and use its request mappings as the ground truth your static inventory has to match.</p>
+  </div>
+
+  <h2>Stage 3 · Compare every fork three ways, not two</h2>
+
+  <p>This is the idea the rest of the playbook stands on.</p>
+
+  <p>The base kept changing after each fork split off. Diff a fork against today's base and every change the base made since the split shows up as a difference, as if the fork had made it. A fork that is merely five years stale looks like the most customized one in the portfolio.</p>
+
+  <p>So each unit is compared at three points:</p>
+
+  <figure class="diagram">
+    <svg class="mf-svg" viewBox="0 0 680 250" role="img" aria-label="Diagram: the base branch runs left to right from M, the split point, to B, the base head. The fork branches off at M and runs above it to F, the fork head. Changes M to B are the base's; changes M to F are the fork's.">
+      <path class="base" d="M40,170 L640,170"/>
+      <path class="fork" d="M150,170 C210,170 220,80 290,80 L640,80"/>
+      <circle class="c-base" cx="80"  cy="170" r="5"/>
+      <circle class="c-base" cx="290" cy="170" r="5"/>
+      <circle class="c-base" cx="400" cy="170" r="5"/>
+      <circle class="c-base" cx="510" cy="170" r="5"/>
+      <circle class="c-fork" cx="360" cy="80" r="5"/>
+      <circle class="c-fork" cx="470" cy="80" r="5"/>
+      <circle class="c-key k-base" cx="150" cy="170" r="9"/>
+      <circle class="c-key k-base" cx="620" cy="170" r="9"/>
+      <circle class="c-key k-fork" cx="620" cy="80" r="9"/>
+      <text class="lbl" x="150" y="204" text-anchor="middle">M</text>
+      <text class="sub" x="150" y="222" text-anchor="middle">split point</text>
+      <text class="lbl" x="620" y="204" text-anchor="middle">B</text>
+      <text class="sub" x="620" y="222" text-anchor="middle">base today</text>
+      <text class="lbl" x="620" y="56" text-anchor="middle">F</text>
+      <text class="sub" x="620" y="38" text-anchor="middle">fork today</text>
+      <text class="sub" x="40" y="160">base</text>
+      <text class="sub" x="300" y="68">fork</text>
+      <path class="span" d="M160,245 L600,245"/>
+      <text class="sub" x="380" y="240" text-anchor="middle">M..B · what the base changed since the split</text>
+      <text class="sub" x="440" y="112" text-anchor="middle">M..F · what the fork changed</text>
+    </svg>
+    <figcaption><strong>M</strong>, <strong>B</strong> and <strong>F</strong>: a fork is judged against where it started, not only against where the base is now.</figcaption>
+  </figure>
+
+  <p>The comparison runs per method, on fingerprints, and rolls up into functional units. Every combination has a meaning and a set of commits to record:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>M</th><th>B</th><th>F</th><th>Status for the fork</th><th>Hashes recorded</th></tr></thead>
+      <tbody>
+        <tr><td>x</td><td>x</td><td>x</td><td>same</td><td>none</td></tr>
+        <tr><td>x</td><td>y</td><td>x</td><td><span class="pill pill-sns">stale</span> the base changed it after the split</td><td>base commits (M..base)</td></tr>
+        <tr class="row-quality"><td>x</td><td>x</td><td>y</td><td><span class="pill pill-rollback">customized</span> the fork changed it</td><td>fork commits (base..fork)</td></tr>
+        <tr><td>x</td><td>y</td><td>y</td><td><span class="pill pill-disable">converged</span> same result on both sides</td><td>both, linked by patch-id</td></tr>
+        <tr class="row-quality"><td>x</td><td>y</td><td>z</td><td><span class="pill pill-rollback">divergent</span> both changed it, differently</td><td>both</td></tr>
+        <tr><td>—</td><td>present</td><td>—</td><td><span class="pill pill-sns">not received</span> the base added it after the split</td><td>base commits</td></tr>
+        <tr class="row-quality"><td>—</td><td>—</td><td>present</td><td><span class="pill pill-rollback">fork-only</span></td><td>fork commits</td></tr>
+        <tr class="row-quality"><td>present</td><td>present</td><td>—</td><td><span class="pill pill-rollback">removed by the fork</span></td><td>the fork commit that removed it</td></tr>
+        <tr class="row-quality"><td>present</td><td>—</td><td>present</td><td><span class="pill pill-halt">legacy</span> the base removed it, the fork kept it</td><td>the base commit that removed it</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Rows with a blue tag are <strong>catch-up gaps</strong>: the fork simply never received the base's changes. That's mechanical work. Shaded rows are <strong>real divergence</strong>: the fork genuinely differs, and someone has to decide what happens to that behavior. A two-way diff can't tell these apart, and in forks that are years old the first group can easily be the larger one.</p>
+
+  <h3>Two traps</h3>
+
+  <ul>
+    <li><strong>Shared helpers.</strong> A change in a common service changes the fingerprint of every entry point that calls it. Group methods that changed together (by class and by commit) and analyze each group once, with the affected entry points as context, instead of once per entry point.</li>
+    <li><strong>Moved methods.</strong> A method moved to another class looks like a removal plus an addition. RefactoringMiner flags moves and renames so they're read as what they are.</li>
+  </ul>
+
+  <p>Results are deduplicated across all forks by content hash. A variant shared by twelve forks is analyzed once.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Whenever two branches have both moved on, classify against the <strong>merge-base as well as both heads</strong>. Stale and customized are different kinds of work with different owners, and only the three-way view separates them.</p>
+  </div>
+
+  <h2>Stage 4 · Provenance: a SHA says where, a patch-id says what</h2>
+
+  <p>Every piece of evidence carries two hashes. The <strong>commit SHA</strong> says where the change came from. The <strong>patch-id</strong> says what the change is. After a cherry-pick, rebase or squash, the same change has a different SHA in every fork it reached, so SHAs alone would report differences that aren't there.</p>
+
+  <pre><code>git blame M..base  -- &lt;file&gt;              # base-side changes, on the changed lines
+git blame base..forkX -- &lt;file&gt;           # fork-side changes; older lines show as boundaries
+git show &lt;sha&gt; | git patch-id --stable    # what the change is, independent of its SHA
+git log --cherry-mark --left-right base...forkX   # commits equivalent on both sides</code></pre>
+
+  <p>On the fork side, lines unchanged since the split show up as boundary lines, so older history drops out by itself.</p>
+
+  <p><strong>First appearance comes from Git, not from processing order.</strong> Among commits with the same patch-id, take the earliest <em>author</em> date: cherry-picks keep the author date and change the committer date. Then pick the fork closest to the root of the fork tree that contains it (<code>git branch --contains</code>). That also catches features that were born in a fork and later carried into the base.</p>
+
+  <p>Provenance runs <em>before</em> any concept extraction. It's deterministic Git work, and its output, the commit messages and ticket IDs behind each change, tells the AI in the next stage why a fork changed something.</p>
+
+  <div class="takeaway">
+    <div class="takeaway-label">Reuse this</div>
+    <p>Key change identity on <strong><code>git patch-id --stable</code></strong>, not the SHA, and date it by author date. It's the only way to recognize the same fix after it has been cherry-picked into a dozen branches.</p>
+  </div>
+
+  <h2>Stage 5 · AI proposes, a judge decides</h2>
+
+  <h3>Start with the base</h3>
+
+  <p>The base is processed first, from its current head, so the concept hierarchy uses the vocabulary of the version new customers get.</p>
+
+  <ul>
+    <li>For each functional unit, Codex extracts <strong>leaf concepts</strong>: a few-word name and one sentence that explains it.</li>
+    <li>Embedding-based clustering groups leaves into <strong>features</strong>, and an LLM names each group. A second pass groups features into <strong>capabilities</strong>.</li>
+    <li><strong>People review the top two levels in full.</strong> Every fork's results are hung on this tree, so this is where review pays off most.</li>
+  </ul>
+
+  <p>Every concept follows three rules. It has a stable ID and a list of aliases; IDs are never deleted, and merged concepts become redirects. It sits at one level of a fixed rubric (capability, feature or rule), and the rubric with a few examples goes into every prompt. And it describes behavior, never implementation.</p>
+
+  <h3>Then the forks, but only what differs</h3>
+
+  <p>Only code that differs from the base reaches the AI, and the extractor never creates concepts directly. There are two kinds of analysis, both cached:</p>
+
+  <ul>
+    <li><strong>Base-side changes</strong> (stale, not received, legacy): what the base added or changed since the split. The cache key is the pair (old version, current version), so forks that split at the same point share one analysis.</li>
+    <li><strong>Fork-side changes</strong> (customized, fork-only, removed): Codex sees M → F, with B as context. Divergent units get all three versions, like a merge conflict.</li>
+  </ul>
+
+  <p>Extraction runs as <code>codex exec</code> in the fork's worktree, <strong>read-only</strong>, with <code>--output-schema</code> so the answer is strict JSON. Its input is the method group's versions, the concepts already linked to it in the base, and the commit messages and ticket IDs from Stage 4. Its output is one of three things: the same concept, a variant (with the behavioral difference and concrete values), or new concepts. Before proposing anything, Codex can search the concept store through an MCP server (<code>search_concepts</code>, <code>propose_concept</code>, <code>attach_evidence</code>), which stops most duplicates at the source.</p>
+
+  <p>Then the judge:</p>
+
+  <div class="pipeline">
+    <div class="pipe-stage">
+      <div class="pipe-aside">embed</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Embed the proposal</div>
+        <div class="pipe-desc">Name, description and aliases of each proposed concept.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">search</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Find the nearest existing concepts</div>
+        <div class="pipe-desc">Postgres with pgvector.</div>
+      </div>
+    </div>
+    <div class="pipe-stage">
+      <div class="pipe-aside">judge</div>
+      <div class="pipe-spine"><div class="pipe-dot"></div></div>
+      <div class="pipe-body">
+        <div class="pipe-title">Decide: same, variant, narrower, broader or new</div>
+        <div class="pipe-desc">With a confidence score. A plain structured-output API call; the judge needs no repository access, so it's far cheaper than an agent run.</div>
+        <div class="pipe-pass">✓ confident → recorded with its evidence</div>
+        <div class="pipe-fail">✗ low confidence → human review queue</div>
+      </div>
+    </div>
+  </div>
+
+  <p>A few operating rules keep this honest:</p>
+
+  <ul>
+    <li><strong>One run per method group or unit,</strong> never "read the whole fork".</li>
+    <li><strong>Stable rules go in <code>AGENTS.md</code>:</strong> what versus how, the level rubric, naming style. The extraction procedure goes in a skill.</li>
+    <li><strong>Pin the model and record the prompt version on every result,</strong> so you know which rubric produced which concept.</li>
+    <li><strong>Keep a test set:</strong> about 50 units across two forks, hand-labeled with their correct concept. Rerun it after every prompt or rubric change and track match accuracy.</li>
+  </ul>
+
+  <div class="callout">
+    <div class="callout-label">Why split proposing from deciding</div>
+    <p>An extractor that can create concepts will create a new one whenever it phrases a familiar behavior differently, and the hierarchy drifts into duplicates. <strong>Making creation a judged decision, with a confidence threshold and a human queue,</strong> turns that drift into a measurable rate you can tune.</p>
+  </div>
+
+  <h2>Stage 6 · Reconcile, then read the matrix</h2>
+
+  <p>Processing the base first means its vocabulary shapes the tree. A later fork can reveal a missing parent, or show that two existing concepts are really one. So the hierarchy is reconciled every five forks or so:</p>
+
+  <ul>
+    <li>Embedding similarity within each level flags near-duplicates.</li>
+    <li>The judge proposes merges, splits or moves.</li>
+    <li>People approve them as a pull request against the hierarchy's YAML export, versioned in Git.</li>
+  </ul>
+
+  <p>The output is a <strong>concept × fork matrix</strong>: one row per concept, one column per fork, each cell holding its Stage 3 status. Read it two ways. By cell type, it splits the work into catch-up gaps (stale, not received) that are mechanical, and real divergence (customized, fork-only, removed, divergent, legacy) that needs decisions. By row, it sorts concepts into universal, majority and fork-specific, and shows how alike the forks really are.</p>
+
+  <p>It's also the program's burn-down chart. Every cell that isn't "same" is work left, and because every analysis is cached by content, rerunning the whole inventory weekly costs little more than analyzing the week's new commits.</p>
+
+  <h2>What the pilot has to prove</h2>
+
+  <p>None of the above should run on dozens of forks first. An <strong>inventory pilot</strong> runs it on the base plus two forks, the closest and the most distant by the census, and checks four things before adding more:</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Check</th><th>Against</th></tr></thead>
+      <tbody>
+        <tr><td>Inventory coverage</td><td>Entry points found vs. request mappings and listeners in each fork's context dump</td></tr>
+        <tr><td>Match accuracy</td><td>The ~50 hand-labeled units</td></tr>
+        <tr><td>Cost</td><td>AI calls and spend per fork</td></tr>
+        <tr><td>The rubric</td><td>Fixed before any fork is added, so later results stay comparable</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>If coverage is low, the parser is missing a kind of entry point; fix that before trusting any count. If match accuracy is low, fix the rubric and the prompt against the labeled set, not against the forks.</p>
+
+  <h3>The tooling, in one place</h3>
+
+  <p>Deterministic tools count and compare. Codex names, describes and, later, refactors.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Task</th><th>Tools</th></tr></thead>
+      <tbody>
+        <tr><td>Git structure and change sets</td><td><code>git worktree</code>, <code>merge-base</code>, <code>log --cherry-mark --left-right</code>, <code>patch-id --stable</code>, <code>blame &lt;range&gt;</code>; PyDriller to script it</td></tr>
+        <tr><td>Separating how from what</td><td>RefactoringMiner; GumTree or difftastic for syntax-aware diffs</td></tr>
+        <tr><td>Functional inventory</td><td>JavaParser with the symbol resolver after delombok; SootUp as the call-graph fallback; a Spring Boot test harness for context dumps; JaCoCo for coverage</td></tr>
+        <tr><td>Concept extraction</td><td>Codex (<code>codex exec</code>), a Python driver; <code>@openai/codex-sdk</code> as the TypeScript alternative</td></tr>
+        <tr><td>Concept matching</td><td>Embeddings, Postgres with pgvector, a structured-output judge</td></tr>
+        <tr><td>Concept store</td><td>Postgres tables plus a YAML export in Git, reviewed as pull requests</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>What the inventory is for</h2>
+
+  <p>The matrix isn't the goal. The goal is a list of every distinct behavior the unified code has to reproduce, with enough detail to design how it varies: not "the reminder cadence differs" but "7 days here, 15 days there", which is already the future configuration of each fork.</p>
+
+  <p>That's where <strong><a href="multi-fork-variability.html">Part 2</a></strong> picks up: turning concepts into variants with concrete values, handling variants that leave work in flight, choosing the smallest variation mechanism that fits each difference, and proving with production traffic that a tenant's behavior survived the move. <strong><a href="multi-fork-cutover.html">Part 3</a></strong> covers the cutover itself, including tenants whose contracts require every change to be switched on separately, and the governance that stops the forks from growing back.</p>
+
+  <div class="bt-callout">
+    The inventory is the unglamorous part, and it's the part that decides whether the rest is engineering or guesswork. <strong>Git decides who changed what; AI only decides what a change means;</strong> and every claim either one makes is checked against something it can't fake: a booted Spring context, a hand-labeled set, or production traffic.
+  </div>
+
+  <div class="related-posts">
+    <div class="related-posts-label">Related reading</div>
+    <div class="related-posts-grid">
+      <a href="multi-fork-variability.html" class="related-post-card">
+        <div class="rpc-tag">Legacy Modernization</div>
+        <div class="rpc-title">Part 2 · Dozens of forks, one codebase: model every variant, then prove nothing changed</div>
+      </a>
+      <a href="multi-fork-cutover.html" class="related-post-card">
+        <div class="rpc-tag">Legacy Modernization</div>
+        <div class="rpc-title">Part 3 · Dozens of forks, one codebase: move every tenant, then keep the forks from growing back</div>
+      </a>
+      <a href="requirement-traceability.html" class="related-post-card">
+        <div class="rpc-tag">Testing</div>
+        <div class="rpc-title">Every requirement has a test, and a check that proves it</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; October 2026</p>
+    <p>Part 1 of 3 · A design, written before it was run. <a href="multi-fork-variability.html">Part 2: variability and proof</a>. <a href="multi-fork-cutover.html">Part 3: cutover and governance</a>.</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>

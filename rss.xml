@@ -6,7 +6,31 @@
   <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
   <language>en-us</language>
-  <lastBuildDate>Wed, 30 Sep 2026 00:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Fri, 23 Oct 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>Dozens of forks, one codebase: find out what each fork does</title>
+      <link>https://gpazevedo.github.io/blog/eng/multi-fork-inventory.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/multi-fork-inventory.html</guid>
+      <pubDate>Fri, 23 Oct 2026 00:00:00 +0000</pubDate>
+      <description>Before consolidating dozens of forks of a Spring Boot SaaS, inventory them: fingerprint every unit, compare each fork three ways, track changes by patch-id, and let AI name behavior under a judge.</description>
+      <category>Legacy Modernization</category>
+    </item>
+    <item>
+      <title>Dozens of forks, one codebase: model every variant, then prove nothing changed</title>
+      <link>https://gpazevedo.github.io/blog/eng/multi-fork-variability.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/multi-fork-variability.html</guid>
+      <pubDate>Fri, 23 Oct 2026 00:00:00 +0000</pubDate>
+      <description>Turn a multi-fork inventory into variants with concrete values, pick the smallest variation mechanism for each, and prove behavior survived by mirroring reads live and replaying writes offline.</description>
+      <category>Legacy Modernization</category>
+    </item>
+    <item>
+      <title>Dozens of forks, one codebase: move every tenant, then keep the forks from growing back</title>
+      <link>https://gpazevedo.github.io/blog/eng/multi-fork-cutover.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/multi-fork-cutover.html</guid>
+      <pubDate>Fri, 23 Oct 2026 00:00:00 +0000</pubDate>
+      <description>Cutting tenants over from dozens of forks to one codebase: shared-deployment prerequisites, three tenant tiers and their paths, flag governance with an audit trail, and the organizational rules that stop new forks.</description>
+      <category>Legacy Modernization</category>
+    </item>
     <item>
       <title>Inside a real-time AI voice agent: what each part of Supplier Line does</title>
       <link>https://gpazevedo.github.io/blog/eng/supplier-line-voice-agent.html</link>
