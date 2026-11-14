@@ -19,7 +19,7 @@
 <meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 <meta property="og:locale" content="en_US"/>
 <meta property="article:published_time" content="2026-09-24T00:00:00+00:00"/>
-<meta property="article:modified_time" content="2026-09-25T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-10-05T00:00:00+00:00"/>
 <meta property="article:section" content="Engineering"/>
 <meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
 <meta property="article:tag" content="Testing"/>
@@ -29,7 +29,7 @@
 <meta name="twitter:description" content="When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that proves every requirement has a test before review, and an optional pass that judges whether those tests cover all of it. It carries over to other agentic skill sets."/>
 <meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
 
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Every requirement has a test, and a check that proves it","description":"When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that proves every requirement has a test before review, and an optional pass that judges whether those tests cover all of it. It carries over to other agentic skill sets.","datePublished":"2026-09-24","dateModified":"2026-09-25","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/requirement-traceability.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/requirement-traceability.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"Every requirement has a test, and a check that proves it","description":"When an agent writes the code, the tests carry the intent. I added a check to Matt Pocock's skills that proves every requirement has a test before review, and an optional pass that judges whether those tests cover all of it. It carries over to other agentic skill sets.","datePublished":"2026-09-24","dateModified":"2026-10-05","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/requirement-traceability.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/requirement-traceability.html"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"Every requirement has a test, and a check that proves it","item":"https://gpazevedo.github.io/blog/eng/requirement-traceability.html"}]}</script>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -71,7 +71,7 @@
     <span class="dot">·</span>
     <time datetime="2026-09-24">September 2026</time>
     <span class="dot">·</span>
-    <span>14 min read</span>
+    <span>16 min read</span>
   </div>
 
   <h1>Every requirement has a test, <em>and a check that proves it</em></h1>
@@ -367,14 +367,14 @@ tests/test_refresh.py:6:def test_refresh_without_a_tag():</code></pre>
 
   <p>And <code>test_refresh_without_a_tag</code> gets a NO ID warning. A Python test cannot carry the ID in its name, so the check reads the docstring line after each <code>def test_</code>.</p>
 
-  <p>The check began as a handful of greps inside the skill's text. It moved to a script when the Jev pass below needed the same rules (which files are tests, which tests are skipped, where a test ends) and the two copies drifted the first time a rule changed. Now both read one set of rules.</p>
+  <p>The check began as a handful of greps inside the skill's text. It moved to a script when the judgement pass below needed the same rules (which files are tests, which tests are skipped, where a test ends) and the two copies drifted the first time a rule changed. Now both read one set of rules.</p>
 
   <div class="callout">
     <div class="callout-label">Where it can still be wrong</div>
     <p>The check reads text, not the language, so it can misread unusual code, but it errs toward the safe side. A switched-off test is reported untested, including a skip whose test name wraps onto the next line and a Python skip decorator. And an ID counts only where a test name sits (the first argument of <code>it(</code>, <code>test(</code> or <code>t.Run(</code>, or a pytest docstring's first line), so <code>expect(label).toBe('CPN-1: shown')</code> does not make an untested <code>CPN-1</code> look covered. <strong>The one unsafe case left is other languages</strong> (Java, Kotlin and so on), where any quoted string that starts with an ID still counts. Keep IDs out of other string literals there.</p>
   </div>
 
-  <p>Because the check is code the skill ships, it could break without anyone noticing. So the repo tests it: a script runs it on the fixture and compares the output and exit codes with the expected result. The same script tests the ticket-mapping check exactly as <code>SKILL.md</code> writes it, and a second suite pins the shared rules: where a tag counts, which tests are skipped, and which lines of each tagged test the Jev pass below would send. A repo with its own coverage tooling can plug it in instead, as long as it follows the same contract: exit 1 when any requirement is untested.</p>
+  <p>Because the check is code the skill ships, it could break without anyone noticing. So the repo tests it: a script runs it on the fixture and compares the output and exit codes with the expected result. The same script tests the ticket-mapping check exactly as <code>SKILL.md</code> writes it, and a second suite pins the shared rules: where a tag counts, which tests are skipped, and which lines of each tagged test the judgement pass below would send. A repo with its own coverage tooling can plug it in instead, as long as it follows the same contract: exit 1 when any requirement is untested, exit 0 otherwise, and accept IDs as trailing arguments to narrow the run to them.</p>
 
   <hr>
 
@@ -406,7 +406,7 @@ tests/test_refresh.py:6:def test_refresh_without_a_tag():</code></pre>
       <text x="251" y="114" class="s sl">the rejection, but</text>
       <text x="251" y="132" class="s sl">never the reason.</text>
       <text x="251" y="182" class="m">GAP CHECK: PASSES</text>
-      <text x="251" y="200" class="m ink-amber">JEV: FLAG</text>
+      <text x="251" y="200" class="m ink-amber">JUDGE: FLAG</text>
 
       <rect x="460" y="40" width="170" height="180" rx="10" class="box-teal"/>
       <text x="476" y="66" class="m ink-teal">3 · FULLY COVERED</text>
@@ -414,7 +414,7 @@ tests/test_refresh.py:6:def test_refresh_without_a_tag():</code></pre>
       <text x="476" y="114" class="s sl">check the rejection</text>
       <text x="476" y="132" class="s sl">and the reason.</text>
       <text x="476" y="182" class="m">GAP CHECK: PASSES</text>
-      <text x="476" y="200" class="m ink-teal">JEV: OK</text>
+      <text x="476" y="200" class="m ink-teal">JUDGE: OK</text>
 
       <line x1="183" y1="130" x2="231" y2="130" class="edge" marker-end="url(#rt3-a)"/>
       <line x1="408" y1="130" x2="456" y2="130" class="edge" marker-end="url(#rt3-a)"/>
@@ -430,7 +430,7 @@ tests/test_refresh.py:6:def test_refresh_without_a_tag():</code></pre>
   </figure>
 
 
-  <p>So there is an optional second pass. A small bundled script, <code>judge.mjs</code>, sends <a href="https://typesafe.ai/blog/introducing-system-one-models-and-jev">Jev</a>, TypeSafe's new model built for fast, structured decisions with calibrated confidence, one question per requirement, along with every test tagged with it, cut from its tag to the end of that test: <em>how much of the behaviour this requirement describes do these assertions check?</em> Because the tests are judged together, a requirement split across three tests counts as fully covered when the three together check all of it. Jev answers with a verdict and a confidence:</p>
+  <p>So there is an optional second pass, the judgement pass. A small bundled script, <code>judge.mjs</code>, sends <a href="https://typesafe.ai/blog/introducing-system-one-models-and-jev">Jev</a>, TypeSafe's new model built for fast, structured decisions with calibrated confidence, one question per requirement, along with every test tagged with it, cut from its tag to the end of that test: <em>how much of the behaviour this requirement describes do these assertions check?</em> Because the tests are judged together, a requirement split across three tests counts as fully covered when the three together check all of it. Jev answers with a verdict and a confidence:</p>
 
   <div class="table-wrap">
     <table>
@@ -444,7 +444,7 @@ tests/test_refresh.py:6:def test_refresh_without_a_tag():</code></pre>
     </table>
   </div>
 
-  <p>Jev was in early access when I wrote this, so not every reader can run this pass yet. Without it, everything above still holds. You get the presence guarantee, and the completeness question falls back to <code>/code-review</code>, as it always did.</p>
+  <p>Jev was in early access when I wrote this (September 2026), so not every reader can run this pass yet. Without it, everything above still holds. You get the presence guarantee, and the completeness question falls back to <code>/code-review</code>, as it always did.</p>
 
   <figure class="diagram">
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 300" role="img" aria-labelledby="rt4-t rt4-d">
@@ -577,7 +577,7 @@ tests/test_refresh.py:6:def test_refresh_without_a_tag():</code></pre>
 
   <h2>What the evals say, honestly</h2>
 
-  <p>The skill has a small <code>claude plugin eval</code> suite: a gap check with a commented-out test, the prefix collision, a spec without IDs left alone, the Jev pass staying off without a key, and annotating a spec and tickets. Every case passed with the plugin when I recorded the suite.</p>
+  <p>The skill has a small <code>claude plugin eval</code> suite: a gap check with a commented-out test, the prefix collision, a spec without IDs left alone, the Jev pass staying off without a key, and annotating a spec and tickets. Every case passed with the plugin when I first recorded the suite, before I tightened the graders (more below).</p>
 
   <p><strong>The four checking cases also pass without it.</strong> On fixtures this small, a current model answers "which requirement has no test?" correctly on its own. The evals do not show the skill making the model smarter, and I think that is worth saying plainly.</p>
 

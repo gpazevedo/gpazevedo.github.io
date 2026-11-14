@@ -104,7 +104,7 @@
 
   <h2>Build the base one fork at a time</h2>
 
-  <p>The base absorbs every variant; the fork branches aren't refactored. When the base can reproduce every variant a fork's tenants use, that fork has nothing left to refactor, and its tenants move onto the base's code with the right configuration. Meanwhile the forks become three things:</p>
+  <p>The base absorbs every variant; the fork branches aren't refactored. When the base can reproduce every variant a fork's tenants use, that fork has nothing left to refactor, and its tenants move onto the base's code with the right configuration. Meanwhile the forks become three things and stop being a fourth:</p>
 
   <div class="tradeoff-grid">
     <div class="tcard">
@@ -125,9 +125,9 @@
     </div>
   </div>
 
-  <p>Start with the fork closest to the base, since it needs the fewest variants. Add its variants to the base one variant per pull request, with the base's default behavior unchanged and replay as the merge gate, so no tenant's behavior changes yet. Cut its tenants over, learn, and move to the next fork. Each fork needs fewer new variation points than the last, because the shared variants already exist.</p>
+  <p>Start with the fork closest to the base, since it needs the fewest variants. Add its variants to the base one variant per pull request, with the base's default behavior unchanged and replay as the merge gate, so no tenant's behavior changes yet. Cut its tenants over, learn, and move to the next fork. Later forks reuse the variation points earlier ones created, so the work per fork should shrink.</p>
 
-  <p><strong>Decide the base-side changes before any tenant moves.</strong> For every "stale" item from the inventory, choose between keeping the fork's old behavior (it becomes a variant in the base) and adopting the base's version, as you would for bug and security fixes. Adopted changes do alter a tenant's behavior at cutover, so tell the tenant in advance.</p>
+  <p><strong>Decide the base-side changes before any tenant moves.</strong> For every catch-up gap in the inventory (stale or not received), choose between keeping the fork's behavior, which becomes a variant in the base, and adopting the base's version, the default for bug and security fixes. Adopted changes do alter a tenant's behavior at cutover, so tell the tenant in advance.</p>
 
   <h2>What a shared deployment needs first</h2>
 
@@ -147,7 +147,7 @@
 
   <h3>4 · Isolation, and connections sized by server</h3>
 
-  <p>A bug in one variant can now reach every tenant. Add a kill switch per variant per tenant, rate limits per tenant, and logs and metrics tagged by tenant and variant.</p>
+  <p>A bug in one variant can now reach every tenant. Make every variant reversible per tenant with one configuration change, and add rate limits per tenant, and logs and metrics tagged by tenant and variant.</p>
 
   <p>Connection pools follow the database topology. Size them per database server, never per tenant: with many tenants, a pool each would exhaust the server's connection limit. Schema-per-tenant can share one pool and set the schema at checkout. Database-per-tenant needs bounded pools created on demand and closed when idle, or a multiplexing proxy such as PgBouncer or RDS Proxy. Session-level settings can pin RDS Proxy connections, so test that before relying on it.</p>
 
@@ -250,8 +250,8 @@
   <ul>
     <li><strong>Before the move,</strong> every variant reproduces the fork's behavior exactly, including the old behavior for base-side changes the fork never received. Even bug fixes stay off for this tenant until each is switched on individually.</li>
     <li><strong>Evidence:</strong> session replay plus a longer period of mirrored reads than usual, weeks rather than days. Together they show the move changes nothing.</li>
-    <li><strong>After the move,</strong> every behavior change, whether adopting the base's version or standardizing, is a separate per-tenant flag flip, scheduled as the contract requires.</li>
-    <li><strong>Cost:</strong> no fork refactoring. These tenants follow the standard path with stricter configuration and a higher bar of evidence.</li>
+    <li><strong>After the move,</strong> every behavior change, whether adopting the base's version or standardizing, is a separate per-tenant switch, scheduled as the contract requires.</li>
+    <li><strong>Cost:</strong> no fork refactoring, but the base has to carry the old behavior for every base-side change these tenants missed, bug fixes included, each as a switchable variant. Otherwise it's the standard path with stricter configuration and a higher bar of evidence.</li>
   </ul>
 
   <h3>Option B: per-variant code switches in the fork deployment</h3>
@@ -271,7 +271,7 @@
     <p>Do the strict contracts govern changes in <strong>functional behavior</strong>, or <strong>any change to the code</strong> that serves the tenant? If it's behavior, Option A covers these tenants and no fork has to be refactored in place. Ask the contract owners early; the answer can remove the program's longest workstream. And whatever the answer, security fixes usually can't wait for per-variant scheduling, so check each contract's terms for emergency changes.</p>
   </div>
 
-  <p>Whatever the path, every flip of a <strong>stateful</strong> variant applies the switch strategy recorded in <a href="multi-fork-variability.html">Part 2</a>: drain, migrate or version the in-flight work before the flag counts as switched. In a full cutover, in-flight work on the fork either drains there before routing changes or is migrated with the tenant's data. And the old path must be able to read whatever the new one wrote until the fallback window closes.</p>
+  <p>Whatever the path, every flip at a <strong>stateful</strong> variation point applies the switch strategy recorded in <a href="multi-fork-variability.html">Part 2</a>: drain, migrate or version the in-flight work before the flag counts as switched. In a full cutover, in-flight work on the fork either drains there before routing changes or is migrated with the tenant's data. And the old path must be able to read whatever the new one wrote until the fallback window closes.</p>
 
   <h2>Flags: two kinds, never mixed</h2>
 
@@ -286,9 +286,9 @@
     </table>
   </div>
 
-  <p>Give every migration flag an owner and an expiry date, and make CI fail on expired ones. Otherwise the flags become the next layer of debt. One tenant configuration and flag service serves the shared deployment and the caught-up Option B forks alike, so a tenant's settings carry over unchanged when it moves.</p>
+  <p>An Option A switch changes variant configuration; an Option B switch flips a migration flag. Give every migration flag an owner and an expiry date, and make CI fail on expired ones. Otherwise the flags become the next layer of debt. One tenant configuration and flag service serves the shared deployment and the caught-up Option B forks alike, so a tenant's settings carry over unchanged when it moves.</p>
 
-  <p>For contract-sensitive tenants, <strong>each flip is a change record</strong>. Log who flipped it and when, which tenant and variant, the approval reference, the replay or mirrored-traffic evidence behind it, and the fallback window. If a contract requires notice before behavior changes, the tenant's list of pending variants <em>is</em> its change calendar. And a kill switch per variant per tenant keeps every reversal a single flag change.</p>
+  <p>For contract-sensitive tenants, <strong>each flip is a change record</strong>. Log who flipped it and when, which tenant and variant, the approval reference, the replay or mirrored-traffic evidence behind it, and the fallback window. If a contract requires notice before behavior changes, the tenant's list of pending variants <em>is</em> its change calendar. A kill switch isn't a third kind of flag. It's the same switch run backwards: the tenant's variant configuration set back to the previous variant, or its migration flag set back to the old path.</p>
 
   <h3>Tracking to zero</h3>
 
@@ -322,7 +322,7 @@
     </div>
   </div>
 
-  <p>The concept × fork matrix from Part 1 becomes the burn-down chart: every cell that isn't "same" is work left. A per-tenant view shows how many of each tenant's variants are on the unified path. Rerun the inventory weekly; the cache makes it cheap.</p>
+  <p>The concept × fork matrix from Part 1 becomes the burn-down chart. The forks are frozen, so their cells never turn "same" on their own: a cell is done when its difference has reached the last state for every tenant on that fork, and a column disappears when the fork is retired. A per-tenant view shows how many of each tenant's variants are on the unified path. Rerun the inventory weekly; the cache makes it cheap, and it catches urgent fixes that reached a fork but not the base.</p>
 
   <h3>A view the contract owners can read</h3>
 
@@ -372,7 +372,7 @@
     <div class="pipe-stage">
       <div class="pipe-aside">6</div>
       <div class="pipe-spine"><div class="pipe-dot"></div><div class="pipe-bar"></div></div>
-      <div class="pipe-body"><div class="pipe-title">Fork by fork, closest first</div><div class="pipe-desc">Its variants into the base, one per pull request.</div></div>
+      <div class="pipe-body"><div class="pipe-title">Fork by fork, closest first</div><div class="pipe-desc">Its variants into the base, one per pull request; its databases conformed to the base's schema.</div></div>
     </div>
     <div class="pipe-stage">
       <div class="pipe-aside">7</div>
@@ -413,7 +413,7 @@
   <ul>
     <li>A <strong>"no new forks" policy</strong>, agreed with product and commercial leadership.</li>
     <li>Every customer request goes through <strong>one intake</strong>.</li>
-    <li>A small <strong>architecture forum</strong>, with product and customer success, places each request on the variation ladder from Part 2: configuration, flag, extension point, or no.</li>
+    <li>A small <strong>architecture forum</strong>, with product and customer success, places each request on the variation ladder from Part 2: configuration, toggle, extension point, or no.</li>
     <li>A <strong>review gate in CI</strong> (an AI reviewer plus ArchUnit) enforces the rule automatically.</li>
   </ul>
 
