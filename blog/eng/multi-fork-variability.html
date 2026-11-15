@@ -113,7 +113,7 @@
       <tbody>
         <tr><td><strong>Variant</strong></td><td>Groups of forks that behave the same. Fingerprints give code-level groups; AI merges groups that behave alike and differ only in how they're written</td><td>Status per fork isn't enough; the code needs one implementation per behavior</td></tr>
         <tr><td><strong>Structured difference</strong></td><td>The kind of difference and the value per fork: not "the cadence differs" but 7 days vs. 15</td><td>The inventory then produces each fork's future configuration directly</td></tr>
-        <tr><td><strong>Base-side intent</strong></td><td>Bug fix, security fix, new capability, behavior change or refactoring</td><td>Fixes are adopted; behavior changes become variants</td></tr>
+        <tr><td><strong>Base-side intent</strong></td><td>Bug fix, security fix, new capability, behavior change or refactoring</td><td>Fixes are adopted by default; behavior changes become variants</td></tr>
         <tr><td><strong>Fork-side intent</strong></td><td>Contractual feature, hotfix, probable bug or unknown, judged from code plus commit messages and ticket IDs</td><td>A probable bug may be behavior a tenant depends on, so it goes to the decision queue, not the bin</td></tr>
         <tr><td><strong>Usage evidence</strong></td><td>Whether any tenant exercises it</td><td>Dead variants are deleted, not configured</td></tr>
         <tr><td><strong>Test coverage</strong></td><td>JaCoCo, per unit, per fork</td><td>Shows which variants have no safety net</td></tr>
@@ -127,26 +127,29 @@
   <p>Two details are easy to miss. A missing concept is a variant too: the feature turned off. And because AI writes part of this record, every record carries the pinned model and the prompt version that produced it. An illustrative record:</p>
 
   <pre><code>concept: reminders.follow-up-cadence          # stable ID from the hierarchy
-variation_point: config.value
+variation_point:
+  toggle: reminders.follow-up.enabled         # rung 3: on or off
+  value: reminders.follow-up.days             # rung 1: the cadence
 variants:
   - id: v1                                    # the base's behavior
-    value: { days: 7 }
+    config: { enabled: true, days: 7 }
     forks: [base, fork-a, fork-c]
   - id: v2
-    value: { days: 15 }
+    config: { enabled: true, days: 15 }
     forks: [fork-b]
     fork_intent: contractual
     usage: { tenants: 3, hits_30d: 18240 }
   - id: v0                                    # concept absent: feature off
+    config: { enabled: false }
     forks: [fork-d]
     usage: { tenants: 1 }
-stateful: true
-switch_strategy: drain
+stateful: true                                # reminder cycles already scheduled
+switch_strategy: drain                        # applies to every switch at this point
 provenance: { model: pinned-model-id, prompt_version: v3 }</code></pre>
 
   <h3>Variants that leave work in flight</h3>
 
-  <p>Some variants leave work in progress in their own shape: an approval halfway through its steps, a reminder cycle already scheduled, a cache built by the old code, rows in the old data layout. Switching a tenant to another variant mid-flight can break that work. So every variant is marked <strong>stateful or stateless</strong>, and every stateful variant gets exactly one switch strategy:</p>
+  <p>Some variants leave work in progress in their own shape: an approval halfway through its steps, a reminder cycle already scheduled, a cache built by the old code, rows in the old data layout. Switching a tenant to another variant mid-flight can break that work. So every variation point is marked <strong>stateful or stateless</strong>, and every stateful one gets exactly one switch strategy:</p>
 
   <div class="sampling-tiers">
     <div class="tier tier-always">
@@ -163,24 +166,24 @@ provenance: { model: pinned-model-id, prompt_version: v3 }</code></pre>
     </div>
   </div>
 
-  <p>The strategy is recorded with the variant, so it's applied the same way at every switch: a per-variant flip, a full cutover or a switch back. Switching back is the case that bites: the old path has to be able to read whatever the new path wrote while it was on.</p>
+  <p>The strategy is recorded with the variation point, so it's applied the same way at every switch: a per-variant flip, a full cutover or a switch back. Switching back is the case that bites: the old path has to be able to read whatever the new path wrote while it was on.</p>
 
   <div class="takeaway">
     <div class="takeaway-label">Reuse this</div>
-    <p>Record differences as <strong>values, not adjectives</strong> ("7 vs. 15 days", not "the cadence differs"), and give every stateful variant <strong>one named switch strategy</strong>: drain, migrate or version. The first makes configuration fall out of the inventory; the second makes switching back a plan instead of a hope.</p>
+    <p>Record differences as <strong>values, not adjectives</strong> ("7 vs. 15 days", not "the cadence differs"), and give every stateful variation point <strong>one named switch strategy</strong>: drain, migrate or version. The first makes configuration fall out of the inventory; the second makes switching back a plan instead of a hope.</p>
   </div>
 
   <h2>Pick the smallest mechanism that fits</h2>
 
-  <p>A small kit of standard mechanisms covers every variant, and each kind of difference maps to one of them. For each difference, use the lowest rung that solves it; each rung up brings more power, more risk and more cost.</p>
+  <p>A small kit of standard mechanisms covers every variant, one per kind of difference. Use the lowest rung that solves each difference; every rung up adds power, risk and cost.</p>
 
   <div class="table-wrap">
     <table>
       <thead><tr><th>Rung</th><th>Kind of difference</th><th>Mechanism</th><th>Tools</th></tr></thead>
       <tbody>
-        <tr><td>1</td><td>A different value</td><td>Configuration resolved per tenant</td><td><code>@ConfigurationProperties</code>, a config service</td></tr>
+        <tr><td>1</td><td>A different value</td><td>Configuration resolved per tenant</td><td>A tenant-keyed config service; <code>@ConfigurationProperties</code> for the defaults</td></tr>
         <tr><td>2</td><td>Modules a customer bought</td><td>Entitlements, kept separate from flags</td><td>A small service of your own</td></tr>
-        <tr><td>3</td><td>Behavior on or off</td><td>Feature flag evaluated with the tenant as context</td><td>OpenFeature as the API</td></tr>
+        <tr><td>3</td><td>Behavior on or off</td><td>Per-tenant toggle, evaluated with the tenant as context</td><td>OpenFeature as the API</td></tr>
         <tr><td>4</td><td>Custom fields and validations</td><td>Metadata</td><td>JSON columns plus JSON Schema</td></tr>
         <tr><td>5</td><td>Rules and workflows that vary</td><td>A rules or workflow engine</td><td>DMN, Drools, Camunda, Flowable, Temporal</td></tr>
         <tr><td>6</td><td>Alternative logic; a different external system</td><td>Strategy interface, or ports and adapters, chosen per tenant</td><td>Spring Plugin's <code>PluginRegistry</code></td></tr>
@@ -190,7 +193,9 @@ provenance: { model: pinned-model-id, prompt_version: v3 }</code></pre>
     </table>
   </div>
 
-  <blockquote><p>A feature flag is not configuration. Permanent differences go into entitlements, configuration or extension points; flags are short-lived and have an owner.</p></blockquote>
+  <blockquote><p>A migration flag is not configuration. Permanent differences live in configuration, entitlements, toggles or extension points. Migration flags are short-lived and have an owner.</p></blockquote>
+
+  <p>Both get called "flags", and they may share an SDK. <a href="multi-fork-cutover.html">Part 3</a> keeps them apart.</p>
 
   <h3>Runtime, not startup</h3>
 
@@ -240,7 +245,7 @@ provenance: { model: pinned-model-id, prompt_version: v3 }</code></pre>
 
   <p>The order matters. Hibernate builds one entity model at startup, shared by every tenant, so <strong>each tenant's database must already satisfy the base's model when its tenants move</strong>. The per-fork migration gets there with additive changes only: new columns are nullable or defaulted, so the fork's code can still write during the fallback window. Validating the base's entity model against each tenant's database is a cutover gate. Moving data between databases is a separate, later decision.</p>
 
-  <p>Data-model variants themselves use <strong>expand/contract</strong>: add the new structure beside the old, backfill or dual-write, switch reads per tenant, then remove the old structure. Changes stay additive while any fallback window is open.</p>
+  <p>Data-model variants, and the type conflicts flagged above, use <strong>expand/contract</strong>: add the new structure beside the old, backfill or dual-write, switch reads per tenant, then remove the old structure. Changes stay additive while any fallback window is open.</p>
 
   <h2>Proof, part one: which variants are actually used</h2>
 
@@ -248,7 +253,7 @@ provenance: { model: pinned-model-id, prompt_version: v3 }</code></pre>
 
   <ul>
     <li><strong>Entry-point usage</strong> comes from access logs, job execution logs and consumer metrics: hit counts per entry point per tenant. That marks each unit and variant used or unused.</li>
-    <li><strong>Variants inside a method</strong> (a branch, not an entry point) need line-level evidence. Run a JaCoCo agent on one production instance per fork for a few weeks; its coverage maps straight onto the fingerprinted methods from Part 1.</li>
+    <li><strong>Variants inside a method</strong> (a branch, not an entry point) need line-level evidence. Run a JaCoCo agent on one production instance per fork for a few weeks; its coverage maps straight onto the fingerprinted methods from Part 1. It's evidence per fork, not per tenant: the agent sees every tenant on that instance.</li>
   </ul>
 
   <h2>Proof, part two: mirror reads, replay writes</h2>
@@ -336,7 +341,7 @@ provenance: { model: pinned-model-id, prompt_version: v3 }</code></pre>
 
   <h2>Proof, part three: guardrails for the AI doing the refactoring</h2>
 
-  <p>In this playbook, the base absorbs every variant, and Codex does much of that refactoring: it reads a fork's implementation and reimplements it as a variant in the base, one variant per pull request, in a worktree with write access, with replay as a required CI check and a person reviewing each PR. Nothing is merged from the forks; they become the <strong>reference</strong> Codex reads and the <strong>oracle</strong> replay compares against.</p>
+  <p>The base absorbs every variant, and Codex does much of that work. It reads a fork's implementation and reimplements it as a variant in the base: one variant per pull request, in a worktree with write access, with replay as a required CI check and a person reviewing each PR. Nothing is merged from the forks; they become the <strong>reference</strong> Codex reads and the <strong>oracle</strong> replay compares against.</p>
 
   <p>The biggest risk isn't bad code. It's an agent that changes the tests along with the code and so "proves" a regression is correct. Five rules, for <code>AGENTS.md</code> and CI:</p>
 
@@ -383,7 +388,7 @@ provenance: { model: pinned-model-id, prompt_version: v3 }</code></pre>
     </div>
   </div>
 
-  <p>Three complements make the safety net stronger than it looks:</p>
+  <p>Three complements strengthen the net:</p>
 
   <ul>
     <li><strong>Property-based tests</strong> (jqwik in Java) for mapping rules. Golden masters pin the examples you observed; properties check the rule for any input.</li>

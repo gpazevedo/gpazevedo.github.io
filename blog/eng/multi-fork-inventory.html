@@ -94,8 +94,8 @@
     <div class="tldr-label">TL;DR</div>
     <p><strong>The problem.</strong> A Java and Spring Boot SaaS has dozens of customer forks. They're branches of one repository, they all compile, and every one serves tenants who depend on how it behaves today. The goal is one codebase, with every tenant keeping its current behavior and each change switched on one variant and one tenant at a time.</p>
     <p><strong>What you get.</strong> The first stage of the playbook, the inventory. A deterministic pipeline measures every fork, fingerprints what it does, and classifies each difference against <em>both</em> the point where the fork split off and the base as it is today. AI then names each difference as a behavior, under a judge that decides what is new.</p>
-    <p><strong>Why it's worth your time.</strong> A plain fork-vs-base diff makes every <em>stale</em> fork look heavily <em>customized</em>. A three-way comparison separates the mechanical catch-up work from the real divergence that needs a decision, and that's what keeps the program small enough to finish.</p>
-    <p><strong>Status.</strong> This is a design, written before I read a line of the code it targets. The pilot gates at the end are what it has to prove before it scales.</p>
+    <p><strong>Why it's worth your time.</strong> A plain fork-vs-base diff makes every <em>stale</em> fork look heavily <em>customized</em>. A three-way comparison separates catch-up work, settled once per base change, from real divergence, decided fork by fork. That's what keeps the program small enough to finish.</p>
+    <p><strong>Status.</strong> This is a design, not a case study: it hasn't been run end to end. The pilot gates at the end are what it has to prove before it scales.</p>
     <p><strong>Part 1 of 3.</strong> <a href="multi-fork-variability.html">Part 2</a> turns the inventory into a variability model and proves behavior is preserved with production traffic. <a href="multi-fork-cutover.html">Part 3</a> covers cutting tenants over, including the ones whose contracts make every change a separate event.</p>
   </div>
 
@@ -133,7 +133,7 @@
 
   <h2>The target, the constraints and the principles</h2>
 
-  <p>The target is a single codebase. In the end-state this playbook was designed for, it runs as one shared multi-tenant deployment. Every tenant keeps its current behavior, and changes are switched on one variant and one tenant at a time.</p>
+  <p>The target is a single codebase, running as one shared multi-tenant deployment. Every tenant keeps its current behavior, and changes are switched on one variant and one tenant at a time.</p>
 
   <p>The constraints that shape everything below:</p>
 
@@ -145,7 +145,7 @@
     <li>The AI tool is OpenAI Codex. The ideas carry over to any agent that can run headless against a working copy and return structured output.</li>
   </ul>
 
-  <p>And six principles, which the stages below keep coming back to:</p>
+  <p>And six principles the stages keep coming back to:</p>
 
   <div class="tradeoff-grid">
     <div class="tcard">
@@ -233,7 +233,7 @@
 
   <h2>Stage 1 · The census comes before any AI</h2>
 
-  <p>Measure first. The census is cheap, deterministic, and it decides the order and the budget of everything after it.</p>
+  <p>Measure first. The census is cheap and deterministic, and it sets the order and the budget of everything after it.</p>
 
   <p>Give every fork its own working copy with <code>git worktree add</code>. All worktrees share one object store, so dozens of checkouts cost little more than one. Then record, for each fork:</p>
 
@@ -245,7 +245,7 @@ git diff --name-only $(git merge-base base forkX) forkX | wc -l   # files the fo
   <p>Three more things come out of the census:</p>
 
   <ul>
-    <li><strong>The fork tree.</strong> Forks often descend from each other. Two forks that share commits the base doesn't have are parent and child, and parents are processed before children. Don't detect this from split points alone: a child fork usually has the <em>same</em> split point from the base as its parent, so that rule misses exactly the cases you're looking for. Forks with a recent split point are the ones that merge the base regularly.</li>
+    <li><strong>The fork tree.</strong> Forks often descend from each other. Two forks that share commits the base doesn't have are related, usually as parent and child, and parents are processed before children. Don't detect this from split points alone: a child usually has the <em>same</em> split point from the base as its parent, so that rule misses exactly the cases you're looking for. A recent split point means the fork merges the base regularly.</li>
     <li><strong>The platform spread.</strong> Java, Spring Boot and key library versions per fork, resolved from the build, not just declared. Only the base moves to the target platform. The spread sets the normalization rules for fingerprints in Stage 2 and the cost of any fork that has to catch up in place.</li>
     <li><strong>The tenancy model.</strong> How each fork identifies tenants, which tenant-level configuration tables it already has, the database engine and topology, and how many tenants each fork serves.</li>
   </ul>
@@ -265,8 +265,8 @@ git diff --name-only $(git merge-base base forkX) forkX | wc -l   # files the fo
     <div class="layer l1">
       <div class="layer-meta">
         <span class="layer-num">Unit 1</span>
-        <span class="layer-name">Entry points</span>
-        <span class="layer-src">where behavior starts</span>
+        <span class="layer-name">Entry and exit points</span>
+        <span class="layer-src">where behavior starts and where it leaves</span>
       </div>
       <div class="chips">
         <span class="chip">controller methods</span>
@@ -339,15 +339,15 @@ git diff --name-only $(git merge-base base forkX) forkX | wc -l   # files the fo
 
   <h3>Static analysis can't see Spring's wiring, so ask Spring</h3>
 
-  <p>Conditional beans, aspects, interceptors and the links between an event publisher and its listeners are decided at runtime. Each fork's application context is therefore also booted in a test harness, with a Testcontainers database and stubbed outbound calls, and the harness dumps its beans, condition report, request mappings and advisors. That's the same data Actuator exposes at <code>/beans</code>, <code>/conditions</code> and <code>/mappings</code>, captured without touching a single production deployment.</p>
+  <p>Conditional beans, aspects, interceptors and the links between an event publisher and its listeners are decided at runtime. Each fork's application context is therefore also booted in a test harness, with a Testcontainers database and stubbed outbound calls, and the harness dumps its beans, condition report, request mappings, scheduled tasks, listener endpoints and advisors. Most of that is what Actuator exposes at <code>/beans</code>, <code>/conditions</code>, <code>/mappings</code> and <code>/scheduledtasks</code>, captured without touching a production deployment.</p>
 
-  <p>The dump adds the framework-invoked edges to the call slices. Its request mappings also become the <strong>ground truth for coverage</strong>: if the parser found fewer entry points than Spring registered, the inventory has a hole, and the pilot will catch it.</p>
+  <p>The dump adds the framework-invoked edges to the call slices. What Spring registered (mappings, scheduled tasks, listeners) also becomes the <strong>ground truth for coverage</strong>: if the parser found fewer entry points, the inventory has a hole, and the pilot will catch it.</p>
 
-  <p>If call resolution turns out slow or imprecise, SootUp over the compiled bytecode is the fallback for the call graph.</p>
+  <p>If call resolution proves slow or imprecise, SootUp over the compiled bytecode is the fallback for the call graph.</p>
 
   <div class="takeaway">
     <div class="takeaway-label">Reuse this</div>
-    <p>Fingerprint <strong>declarations separately from bodies</strong>, and inventory what lives outside method bodies. Then boot each variant's Spring context in a test harness and use its request mappings as the ground truth your static inventory has to match.</p>
+    <p>Fingerprint <strong>declarations separately from bodies</strong>, and inventory what lives outside method bodies. Then boot each fork's Spring context in a test harness and use what Spring registered as the ground truth your static inventory has to match.</p>
   </div>
 
   <h2>Stage 3 · Compare every fork three ways, not two</h2>
@@ -405,7 +405,9 @@ git diff --name-only $(git merge-base base forkX) forkX | wc -l   # files the fo
     </table>
   </div>
 
-  <p>Rows with a blue tag are <strong>catch-up gaps</strong>: the fork simply never received the base's changes. That's mechanical work. Shaded rows are <strong>real divergence</strong>: the fork genuinely differs, and someone has to decide what happens to that behavior. A two-way diff can't tell these apart, and in forks that are years old the first group can easily be the larger one.</p>
+  <p>Rows with a blue tag are <strong>catch-up gaps</strong>: the fork never received a change the base made. Each base change is classified once, by intent, and the answer serves every fork that missed it: fixes are adopted, behavior changes are kept as a variant (<a href="multi-fork-variability.html">Part 2</a>). Shaded rows are <strong>real divergence</strong>: the fork itself differs, and someone has to decide what happens to that behavior, fork by fork. A two-way diff can't tell the two groups apart, and in forks that are years old the first can easily be the larger.</p>
+
+  <p>Two combinations need no row. Removed on both sides counts as same. Added on both sides is converged or divergent, depending on whether the fingerprints match.</p>
 
   <h3>Two traps</h3>
 
@@ -423,7 +425,7 @@ git diff --name-only $(git merge-base base forkX) forkX | wc -l   # files the fo
 
   <h2>Stage 4 · Provenance: a SHA says where, a patch-id says what</h2>
 
-  <p>Every piece of evidence carries two hashes. The <strong>commit SHA</strong> says where the change came from. The <strong>patch-id</strong> says what the change is. After a cherry-pick, rebase or squash, the same change has a different SHA in every fork it reached, so SHAs alone would report differences that aren't there.</p>
+  <p>Every piece of evidence carries two hashes. The <strong>commit SHA</strong> says where the change came from. The <strong>patch-id</strong> says what the change is. After a cherry-pick or rebase, the same change has a different SHA in every fork it reached, so SHAs alone would report differences that aren't there.</p>
 
   <pre><code>git blame M..base  -- &lt;file&gt;              # base-side changes, on the changed lines
 git blame base..forkX -- &lt;file&gt;           # fork-side changes; older lines show as boundaries
@@ -432,13 +434,15 @@ git log --cherry-mark --left-right base...forkX   # commits equivalent on both s
 
   <p>On the fork side, lines unchanged since the split show up as boundary lines, so older history drops out by itself.</p>
 
-  <p><strong>First appearance comes from Git, not from processing order.</strong> Among commits with the same patch-id, take the earliest <em>author</em> date: cherry-picks keep the author date and change the committer date. Then pick the fork closest to the root of the fork tree that contains it (<code>git branch --contains</code>). That also catches features that were born in a fork and later carried into the base.</p>
+  <p>A patch-id matches only when the diff is textually the same. A squash, or a cherry-pick that needed conflict resolution, gets a new one. Those cases still surface in Stage 3 as converged when the resulting code matches.</p>
+
+  <p><strong>First appearance comes from Git, not from processing order.</strong> Date a change by its <em>author</em> date, which cherry-picks and rebases keep. To find where it landed first, take the equivalent commit with the earliest <em>committer</em> date, the one a cherry-pick rewrites, and if several forks contain that commit, the one closest to the root of the fork tree (<code>git branch --contains</code>). That also catches features born in a fork and later carried into the base.</p>
 
   <p>Provenance runs <em>before</em> any concept extraction. It's deterministic Git work, and its output, the commit messages and ticket IDs behind each change, tells the AI in the next stage why a fork changed something.</p>
 
   <div class="takeaway">
     <div class="takeaway-label">Reuse this</div>
-    <p>Key change identity on <strong><code>git patch-id --stable</code></strong>, not the SHA, and date it by author date. It's the only way to recognize the same fix after it has been cherry-picked into a dozen branches.</p>
+    <p>Key change identity on <strong><code>git patch-id --stable</code></strong>, not the SHA, and date it by author date. That's how you recognize the same fix after it has been cherry-picked into a dozen branches.</p>
   </div>
 
   <h2>Stage 5 · AI proposes, a judge decides</h2>
@@ -448,7 +452,7 @@ git log --cherry-mark --left-right base...forkX   # commits equivalent on both s
   <p>The base is processed first, from its current head, so the concept hierarchy uses the vocabulary of the version new customers get.</p>
 
   <ul>
-    <li>For each functional unit, Codex extracts <strong>leaf concepts</strong>: a few-word name and one sentence that explains it.</li>
+    <li>For each functional unit, Codex extracts <strong>leaf concepts</strong>, the rules: a few-word name and one sentence that explains it.</li>
     <li>Embedding-based clustering groups leaves into <strong>features</strong>, and an LLM names each group. A second pass groups features into <strong>capabilities</strong>.</li>
     <li><strong>People review the top two levels in full.</strong> Every fork's results are hung on this tree, so this is where review pays off most.</li>
   </ul>
@@ -521,9 +525,9 @@ git log --cherry-mark --left-right base...forkX   # commits equivalent on both s
     <li>People approve them as a pull request against the hierarchy's YAML export, versioned in Git.</li>
   </ul>
 
-  <p>The output is a <strong>concept × fork matrix</strong>: one row per concept, one column per fork, each cell holding its Stage 3 status. Read it two ways. By cell type, it splits the work into catch-up gaps (stale, not received) that are mechanical, and real divergence (customized, fork-only, removed, divergent, legacy) that needs decisions. By row, it sorts concepts into universal, majority and fork-specific, and shows how alike the forks really are.</p>
+  <p>The output is a <strong>concept × fork matrix</strong>: one row per concept, one column per fork, each cell holding its Stage 3 status. Read it two ways. By cell type, it splits the work into catch-up gaps (stale, not received), settled once per base change, and real divergence (customized, fork-only, removed, divergent, legacy), decided per fork. By row, it sorts concepts into universal, majority and fork-specific, and shows how alike the forks really are.</p>
 
-  <p>It's also the program's burn-down chart. Every cell that isn't "same" is work left, and because every analysis is cached by content, rerunning the whole inventory weekly costs little more than analyzing the week's new commits.</p>
+  <p>It's also where the program's burn-down chart starts: every cell that isn't "same" is a decision and a piece of work, tracked to done in <a href="multi-fork-cutover.html">Part 3</a>. And because every analysis is cached by content, rerunning the whole inventory weekly costs little more than analyzing the week's new commits.</p>
 
   <h2>What the pilot has to prove</h2>
 
