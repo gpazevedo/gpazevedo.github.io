@@ -2,6 +2,15 @@
    Add one entry per file in this folder. Ties keep the order listed here. */
 window.engPosts = [
   {
+    "slug": "writing-for-agents-experiment",
+    "file": "writing-for-agents-experiment.html",
+    "title": "I improved a skill for writing skills and measured the gain: 25% fewer lost points",
+    "description": "Goal: improve Matt Pocock's writing-for-agents skill. Five rounds of blind, pre-registered testing show my revision cuts lost points by 25.6%, so it replaces the original.",
+    "tags": ["Evaluation", "AI Coding", "Agent Skills"],
+    "date": "2026-11-21",
+    "readingTime": 6
+  },
+  {
     "slug": "multi-fork-inventory",
     "file": "multi-fork-inventory.html",
     "title": "Dozens of forks, one codebase: find out what each fork does",

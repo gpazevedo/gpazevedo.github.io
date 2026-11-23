@@ -6,7 +6,17 @@
   <atom:link href="https://gpazevedo.github.io/rss.xml" rel="self" type="application/rss+xml"/>
   <description>Technical deep-dives on agentic and generative AI, the large-scale distributed systems underneath them, and what both mean for the business.</description>
   <language>en-us</language>
-  <lastBuildDate>Fri, 23 Oct 2026 00:00:00 +0000</lastBuildDate>
+  <lastBuildDate>Sat, 21 Nov 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>I improved a skill for writing skills and measured the gain: 25% fewer lost points</title>
+      <link>https://gpazevedo.github.io/blog/eng/writing-for-agents-experiment.html</link>
+      <guid>https://gpazevedo.github.io/blog/eng/writing-for-agents-experiment.html</guid>
+      <pubDate>Sat, 21 Nov 2026 00:00:00 +0000</pubDate>
+      <description>Goal: improve Matt Pocock's writing-for-agents skill. Five rounds of blind, pre-registered testing show my revision cuts lost points by 25.6%, so it replaces the original.</description>
+      <category>Evaluation</category>
+      <category>AI Coding</category>
+      <category>Agent Skills</category>
+    </item>
     <item>
       <title>Dozens of forks, one codebase: find out what each fork does</title>
       <link>https://gpazevedo.github.io/blog/eng/multi-fork-inventory.html</link>
