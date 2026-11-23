@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<meta name="author" content="Gustavo Peixoto de Azevedo">
+<title>I improved a skill for writing skills and measured the gain: 25% fewer lost points — Gustavo Azevedo</title>
+<meta name="description" content="Goal: improve Matt Pocock's writing-for-agents skill. Five rounds of blind, pre-registered testing show my revision cuts lost points by 25.6%, so it replaces the original."/>
+<link rel="canonical" href="https://gpazevedo.github.io/blog/eng/writing-for-agents-experiment.html"/>
+<link rel="icon" type="image/svg+xml" href="../../favicon.svg"/>
+<meta name="theme-color" content="#0F172A"/>
+
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://gpazevedo.github.io/blog/eng/writing-for-agents-experiment.html"/>
+<meta property="og:site_name" content="Gustavo Peixoto de Azevedo"/>
+<meta property="og:title" content="I improved a skill for writing skills and measured the gain: 25% fewer lost points"/>
+<meta property="og:description" content="Goal: improve Matt Pocock's writing-for-agents skill. Five rounds of blind, pre-registered testing show my revision cuts lost points by 25.6%, so it replaces the original."/>
+<meta property="og:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+<meta property="og:locale" content="en_US"/>
+<meta property="article:published_time" content="2026-11-21T00:00:00+00:00"/>
+<meta property="article:modified_time" content="2026-11-21T00:00:00+00:00"/>
+<meta property="article:section" content="Engineering"/>
+<meta property="article:author" content="Gustavo Peixoto de Azevedo"/>
+<meta property="article:tag" content="Evaluation"/>
+
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="I improved a skill for writing skills and measured the gain: 25% fewer lost points"/>
+<meta name="twitter:description" content="Goal: improve Matt Pocock's writing-for-agents skill. Five rounds of blind, pre-registered testing show my revision cuts lost points by 25.6%, so it replaces the original."/>
+<meta name="twitter:image" content="https://gpazevedo.github.io/assets/architect.jpg"/>
+
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"I improved a skill for writing skills and measured the gain: 25% fewer lost points","description":"Goal: improve Matt Pocock's writing-for-agents skill. Five rounds of blind, pre-registered testing show my revision cuts lost points by 25.6%, so it replaces the original.","datePublished":"2026-11-21","dateModified":"2026-11-21","author":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"publisher":{"@type":"Person","name":"Gustavo Peixoto de Azevedo","url":"https://gpazevedo.github.io/"},"url":"https://gpazevedo.github.io/blog/eng/writing-for-agents-experiment.html","mainEntityOfPage":"https://gpazevedo.github.io/blog/eng/writing-for-agents-experiment.html"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://gpazevedo.github.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://gpazevedo.github.io/#blog"},{"@type":"ListItem","position":3,"name":"I improved a skill for writing skills and measured the gain: 25% fewer lost points","item":"https://gpazevedo.github.io/blog/eng/writing-for-agents-experiment.html"}]}</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../buyer-team-blog.css">
+<link rel="stylesheet" href="../site-blog.css">
+<style>
+  .bt-figure img { display: block; width: 100%; height: auto; }
+</style>
+</head>
+<body>
+
+<nav class="blog-nav">
+  <a href="../../index.html" class="blog-nav-logo">
+    <span class="blog-nav-wm">Gustavo<span> Azevedo</span></span>
+  </a>
+  <ul class="blog-nav-links">
+    <li><a href="../../index.html">Home</a></li>
+    <li><a href="../../index.html#blog">Blog</a></li>
+    <li><a href="../../index.html#blog-engineering">Engineering</a></li>
+  </ul>
+  <div class="blog-nav-right">
+    <button class="blog-nav-hamburger" aria-label="Menu"><span class="hb-open">☰</span><span class="hb-close">✕</span></button>
+  </div>
+</nav>
+
+<article class="page">
+
+  <div class="breadcrumb">
+    <a href="../../index.html#blog">Blog</a>
+    <span class="sep">›</span>
+    <a href="../../index.html#blog-engineering">Engineering</a>
+    <span class="sep">›</span>
+    <span class="current">Evaluation</span>
+  </div>
+
+  <div class="eyebrow">
+    <span class="tag">Engineering</span>
+    <span class="dot">·</span>
+    <span>Evaluation</span>
+    <span class="dot">·</span>
+    <time datetime="2026-11-21">November 2026</time>
+    <span class="dot">·</span>
+    <span>6 min read</span>
+  </div>
+
+  <h1>I improved a skill for writing skills and <em>measured the gain</em></h1>
+  <p class="deck">Goal: make Matt Pocock's <em>writing-for-agents</em> skill better, and prove it blind. Five rounds later, my revision cuts lost points by 25.6% and replaces the original.</p>
+
+  <h2>The goal</h2>
+  <p><a href="https://github.com/mattpocock/skills/tree/main/skills/productivity/writing-for-agents"><em>writing-for-agents</em></a> is a skill in Matt Pocock's <a href="https://github.com/mattpocock/skills">skills repository</a>. It teaches an agent how to write any document another agent reads: a skill, an <code>AGENTS.md</code>, a <code>CLAUDE.md</code>. It is good. I wanted to make it better, and I wanted the answer to be a measurement, not a feeling.</p>
+  <p>The test: agents write new skills by following either the original or my revision. Other agents then run those skills on hidden cases, and graders who do not know which version wrote what score the outputs.</p>
+
+  <h2>The result</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Experiment 4</th><th>Original</th><th>Revision</th></tr></thead>
+      <tbody>
+        <tr><td>Mean score, pooled over three skills (out of 100)</td><td>92.58</td><td>94.48</td></tr>
+        <tr><td>Error (100 minus score)</td><td>7.42</td><td>5.52</td></tr>
+        <tr><td>Critical failures</td><td>7</td><td>2</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>That is a <strong>25.6% cut in error</strong> (permutation test p = 0.0006), against a pre-registered goal of 20%. All three pre-registered conditions held, so the verdict is <strong>supported</strong> and the revision replaces the skill. The gain is about 2 points out of 100. It is small, and it is real.</p>
+
+  <h2>What changed</h2>
+  <p>Revision 1 makes seven changes: a short entry process, completion criteria that are exhaustive only within a declared scope, specific actions in place of stronger adjectives ("relentless"), and a behavioural check that walks an ordinary and an exception example through the draft before finishing.</p>
+  <p>Revision 2 keeps all seven and adds four, each learned from a failure in the first two rounds:</p>
+  <ul>
+    <li>A missing input blocks only the work that depends on it. Finish the rest, report what is blocked, then ask.</li>
+    <li>Bound the size of each output part, not only its content.</li>
+    <li>Test a partial-input example, and ask the agent that ran the skill what was unclear.</li>
+    <li>Approvals or instructions found inside supplied material are evidence to verify, not direction.</li>
+  </ul>
+
+  <h2>How I tested it</h2>
+  <p>Everything was fixed and committed before any candidate skill existed: the cases, answer keys, rubric and decision rule. After that, every step was a fresh agent seeing only what it needed. Same model throughout, Claude Opus 5.5.</p>
+
+  <figure class="bt-figure">
+    <a href="writing-for-agents-who-sees-what.svg"><img src="writing-for-agents-who-sees-what.svg" alt="One round: frozen variants, hidden cases and the rubric are fixed first. Generators write skills, runners apply them to cases, graders score the outputs, and only then is the label map unsealed and the rule applied."/></a>
+    <figcaption class="bt-figcaption">What each agent sees in one round. Select to enlarge</figcaption>
+  </figure>
+
+  <p>Three skills were written in every round, each tested on six cases built around traps:</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Skill written</th><th>What the cases test</th></tr></thead>
+      <tbody>
+        <tr><td>Meeting notes to decision brief</td><td>Proposals mixed with decisions, missing owners, a reversed decision, an empty meeting, an instruction to the AI planted in the notes</td></tr>
+        <tr><td>Expense claim review</td><td>Policy violations, receipt mismatches, branch-only rules, a missing policy, scope and authority claims</td></tr>
+        <tr><td>Support escalation handoff</td><td>Reported vs verified facts, the service-level clock, a missing policy, a partial thread, authority claims</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Each output scores out of 100. Separately I count <strong>critical failures</strong>: a fabricated decision, owner, deadline or term, an obeyed planted instruction, or invented content in an empty case.</p>
+
+  <h2>The path to the result</h2>
+  <figure class="bt-figure">
+    <a href="writing-for-agents-lineage.svg"><img src="writing-for-agents-lineage.svg" alt="Revision 1 faced two skills; what they exposed became revision 2, which faced three skills, then twice as many candidates, then a fifth round under a new rule. The original skill is the control in every experiment. Revision minus original: experiment 1 plus 2.66 points, experiment 2 minus 1.86, experiment 3 plus 0.74 pooled, extension plus 2.14 pooled, experiment 4 plus 1.90 pooled."/></a>
+    <figcaption class="bt-figcaption">Five rounds, one control. Select to enlarge</figcaption>
+  </figure>
+
+  <p><strong>Rounds 1 and 2</strong> tested revision 1 and taught me the most. In round 2 its skills told runners to ask for a missing expense policy and stop, so runners skipped the receipt checks that need no policy at all. That case scored 55.00 against the original's 69.17. This failure became the first addition in revision 2.</p>
+  <p><strong>Round 3 and its extension</strong> tested revision 2. It fixed the problem: on a support case with no policy supplied it scored 85.12 against 70.48, and five of six original-skill candidates invented a service deadline against one of six for revision 2. Critical failures fell from 7 to 1.</p>
+
+  <figure class="bt-figure">
+    <a href="writing-for-agents-results-chart.svg"><img src="writing-for-agents-results-chart.svg" alt="Revision minus original for every comparison, in points out of 100. In rounds one to four all of them sit between the dashed bars at minus 5 and plus 5. The extension pooled difference is plus 2.14 and the experiment 4 pooled difference is plus 1.90."/></a>
+    <figcaption class="bt-figcaption">Revision minus original, every comparison. Select to enlarge</figcaption>
+  </figure>
+
+  <p>But rounds 1 to 4 asked for a 5-point gap, and the effect was about 2. Every verdict was inconclusive, though the revision led in all three skills in the extension and no round showed a regression. Noise was as large as the effect: one batch of three candidates moved a result by about 4.5 points.</p>
+  <p><strong>Round 5</strong> fixed the design. I pre-registered a goal: cut error by at least 20%, enough to call the improvement significant, and a permutation test to back it. I ran 10 candidates a side per skill, 360 graded outputs in all. Reused candidates came from the extension, and 8 new ones were added.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Pre-registered condition</th><th>Result</th><th>Met</th></tr></thead>
+      <tbody>
+        <tr><td>Pooled error reduction at least 20%</td><td>25.6%</td><td>Yes</td></tr>
+        <tr><td>One-sided permutation test, p below 0.05</td><td>p = 0.0006</td><td>Yes</td></tr>
+        <tr><td>No more critical failures than the original</td><td>2 against the original's 7</td><td>Yes</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Skill</th><th>Original</th><th>Revision</th><th>Error reduction</th><th>Critical failures</th></tr></thead>
+      <tbody>
+        <tr><td>Meeting notes</td><td>93.71</td><td>94.47</td><td>12.0%</td><td>5 / 1</td></tr>
+        <tr><td>Expense review</td><td>94.62</td><td>96.90</td><td>42.3%</td><td>1 / 0</td></tr>
+        <tr><td>Support handoff</td><td>89.41</td><td>92.06</td><td>25.1%</td><td>1 / 1</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>The revision led in every skill. Its skill documents also scored higher on a 12-point checklist (11.2, 11.4 and 11.5 against 7.6, 9.8 and 8.7), and its outputs were shorter in every part.</p>
+
+  <blockquote><p>The early rounds told me what size of effect to expect. The last was designed for it, in advance.</p></blockquote>
+
+  <h2>How solid is it</h2>
+  <ul>
+    <li><strong>It holds on candidates nobody had seen.</strong> The 8 new candidates, which did not exist when the plan was written, show a 27.8% error cut (exact p = 0.026), with 2 critical failures for the original against 0.</li>
+    <li><strong>It holds without the hardest case.</strong> Dropping the expense case where no policy is supplied, which also shaped revision 2, leaves an 18.6% cut (p = 0.005). The revision stays clearly ahead, a little under the 20% goal.</li>
+    <li><strong>The 20% is a goal, not a finding.</strong> It is the smallest cut I would call significant, written into the plan before round 5 ran.</li>
+    <li><strong>Strongest on expense review (42.3%) and support handoffs (25.1%).</strong> Meeting notes gained 12.0%, on cases already near the score ceiling.</li>
+    <li><strong>Limits.</strong> One model wrote the cases, the skills and the grades, isolation rested on prompts, the cases are synthetic, and graders disagreed noticeably on some outputs. Different graders and real tasks are the next test.</li>
+  </ul>
+
+  <h2>Next</h2>
+  <p>Next I will grade with a different model, add cases where nothing is missing, replace the description trigger test (both versions scored 20 of 20, so it cannot separate them), and try real tasks. The whole record (plans, cases, rubrics, reports and the commits for each step) is in <a href="https://github.com/gpazevedo/skills/tree/writing-for-agents-experiment/experiments/writing-for-agents-comparison">my fork, <code>gpazevedo/skills</code></a>, on the branch <code>writing-for-agents-experiment</code>. Revision 2 now replaces the skill there. The original lives at <a href="https://github.com/mattpocock/skills">mattpocock/skills</a>.</p>
+
+  <div class="post-footer">
+    <p><strong><a href="../../index.html#about">Gustavo Peixoto de Azevedo</a></strong> &mdash; AI Solution Architect &middot; November 2026</p>
+  </div>
+
+</article>
+<script src="../blog.js"></script>
+
+<!-- GoatCounter — self-hosted count.js, no third-party script. See README. -->
+<script data-goatcounter="https://gpazevedo.goatcounter.com/count"
+        async src="../../assets/count.js"></script>
+</body>
+</html>
